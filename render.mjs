@@ -26,7 +26,7 @@ const port = server.address().port;
 const LINUX_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({
   ...(fs.existsSync(LINUX_CHROME) ? { executablePath: LINUX_CHROME } : {}),
-  args: process.platform === 'darwin'
+  args: process.env.IZO_CHROME_ARGS ? process.env.IZO_CHROME_ARGS.split(' ') : process.platform === 'darwin'
     ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
