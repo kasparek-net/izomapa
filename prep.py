@@ -1377,9 +1377,10 @@ for _, r in land.iterrows():
                 d += 7
 DENS = {'park': 11, 'cemetery': 9, 'residential': 16, 'garden': 12, 'grass': 20, 'village_green': 18,
         'recreation_ground': 20, 'allotments': 14, 'kindergarten': 14}
+_zopen = shapely.unary_union(ZORNA + ZTTP).buffer(0)      # residential polygons often span real fields; dark crops pass the canopy mask
 for _, r in lu.iterrows():
     s = DENS.get(r['class'])
-    if s: scatter(r.geom, s, 0.25, 6, 15)
+    if s: scatter(r.geom.difference(_zopen), s, 0.25, 6, 15)
 # řídké stromy všude kromě luk, polí a pastvin (tam ve skutečnosti stromy nejsou)
 OPEN = shapely.unary_union([g for c, g in zip(lu['class'], lu.geom) if c in ('meadow', 'farmland', 'grass', 'village_green', 'downhill', 'pitch')]
                            + [g for c, g in zip(land['class'], land.geom) if c in ('grassland', 'meadow') and g.geom_type != 'Point'] + ZTTP + ZORNA)
