@@ -14,3 +14,8 @@ for v in ['spring', 'summer', 'autumn', 'winter']:
     im.resize((w, h), Image.Resampling.BOX).save(out, 'WEBP', quality=82, method=6)
     m.update({'mpp': m['mpp'] * k, 'w': w, 'h': h}); json.dump(m, open(f'site/preview/{v}.json', 'w'))
     print(v, w, h, os.path.getsize(out) // 1000, 'kB')
+summer = Image.open('site/preview/summer.webp').convert('RGBA')
+og = Image.new('RGBA', (1200, 630), (27, 35, 51, 255))
+summer.thumbnail((1200, 630), Image.Resampling.LANCZOS)
+og.alpha_composite(summer, ((1200 - summer.width) // 2, (630 - summer.height) // 2))
+og.convert('RGB').save('site/og.jpg', quality=85)
