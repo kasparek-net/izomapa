@@ -1,0 +1,39 @@
+[
+ {
+  "name": "Kostel sv. Bartoloměje",
+  "lat": 49.592839, "lon": 18.143781,
+  "text": "Podle fotek z Wikimedia Commons (CC BY-SA 4.0) a ortofota ČÚZK: novogotická trojlodní stavba, bílé zdi, šedozelená střecha, věž s hodinami a zelenou jehlou na severozápadním konci.",
+  "spec": {
+   "wc": [232, 228, 214], "rc": [92, 112, 106], "r": "gabled", "h": 15, "rh": 9,
+   "face": [49.5934, 18.1425],
+   "towers": [{"at": "front", "w": 7, "h": 36, "top": "spire", "to": 54, "tc": [96, 146, 128], "clock": 1}]
+  }
+ },
+ {
+  "name": "Rozhledna Bílá hora",
+  "lat": 49.594296, "lon": 18.126402,
+  "text": "Podle fotek z Wikimedia Commons (public domain): válcová věž se zelenými ochozy a tmavou stříškou, výška 43 m podle OpenStreetMap.",
+  "spec": {
+   "wc": [78, 150, 128], "rc": [70, 66, 62], "r": "flat", "h": 3, "rh": 0,
+   "towers": [{"at": "c", "w": 11, "h": 39, "top": "cone", "to": 43, "tc": [70, 66, 62], "round": 1}]
+  }
+ },
+ {
+  "name": "Muzeum Fojtství",
+  "lat": 49.590053, "lon": 18.138371,
+  "text": "Podle fotek z Wikimedia Commons (CC BY-SA 4.0) a ortofota ČÚZK: bílé zdi a vysoká tmavá šindelová střecha.",
+  "spec": {"wc": [236, 232, 222], "rc": [78, 62, 54], "r": "hipped", "h": 4.5, "rh": 7}
+ },
+ {
+  "name": "Zřícenina hradu Šostýn",
+  "lat": 49.586367, "lon": 18.157314,
+  "text": "Poloha z Wikipedie, vzhled podle fotek z Wikimedia Commons (CC0): nízké zbytky kamenných zdí v lese.",
+  "spec": {"only": 1, "towers": [{"at": "c", "w": 9, "h": 7, "top": "none", "stone": 1, "ruin": 1}]}
+ },
+ {
+  "name": "Zřícenina hradu Šostýn",
+  "lat": 49.58646, "lon": 18.15745,
+  "text": "Druhý zbytek zdiva, přesná poloha jen orientační.",
+  "spec": {"only": 1, "towers": [{"at": "c", "w": 6, "h": 5, "top": "none", "stone": 1, "ruin": 1}]}
+ }
+]
