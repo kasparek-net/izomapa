@@ -213,7 +213,7 @@ _dv = pq.read_table('data_all/division_area.parquet').to_pandas()
 _SKIP = set(MESTO.get('skryte_casti', []))      # názvy částí, které se na mapě nemají ukazovat (náměstí apod.)
 for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
     nm = n.get('primary') if isinstance(n, dict) else None
-    if st not in ('macrohood', 'microhood') or not nm or nm in _SKIP: continue
+    if st not in ('macrohood', 'microhood', 'locality') or not nm or nm in _SKIP or nm == MESTO['nazev']: continue
     gg = shapely.ops.transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(g))
     rp = gg.representative_point(); c = chunk_of(rp.x, rp.y)
     if c not in CKEY: continue
