@@ -8,7 +8,7 @@ python novy_mesto.py "Praha 6" --dotaz "Praha 6, Česko"
 aby čtverců bylo co nejméně. Nulová výška terénu a spodek řezu se změří z výškového modelu Terrarium.
 Texty v mesto.json (titulek, popis) si potom uprav ručně, hlavně rod: Izometrický / Izometrická / Izometrické.
 """
-import io, json, math, re, sys, urllib.parse, urllib.request
+import io, json, math, re, subprocess, sys, urllib.parse
 import numpy as np, shapely
 from PIL import Image
 
@@ -23,7 +23,7 @@ UA = {'User-Agent': 'izomapa/1.0 (https://github.com/adamklatovsky/izomapa)'}
 
 
 def get(url):
-    return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read()
+    return subprocess.run(['curl', '-sSfL', '--retry', '5', '--retry-all-errors', '-m', '120', '-A', UA['User-Agent'], url], check=True, capture_output=True).stdout
 
 
 # 1) hranice obce

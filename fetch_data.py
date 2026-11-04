@@ -5,7 +5,7 @@ python fetch_data.py --chunk -1,0  # čtverec mapy s rezervou 300 m -> data_c-1_
 python fetch_data.py --places      # názvy a firmy (Overture places) pro karty budov -> data/places.parquet
 python fetch_data.py --deleni      # městské části a osady (Overture divisions) -> data_all/division_area.parquet
 """
-import math, os, subprocess, sys, time, urllib.request
+import math, os, subprocess, sys, time
 import pyarrow.dataset as ds, pyarrow.fs as fs, pyarrow.parquet as pq
 import geo
 
@@ -26,7 +26,7 @@ def dem(D, X0, X1, Y0, Y1, z=14):
     for x in range(tx0, tx1 + 1):
         for y in range(ty0, ty1 + 1):
             if not os.path.exists(f'{D}/dem/{z}_{x}_{y}.png'):
-                urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png', f'{D}/dem/{z}_{x}_{y}.png')
+                subprocess.run(['curl', '-sSfL', '--retry', '5', '--retry-all-errors', '-m', '120', '-o', f'{D}/dem/{z}_{x}_{y}.png', f'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], check=True)
 
 
 if sys.argv[1:2] == ['--vse']:
