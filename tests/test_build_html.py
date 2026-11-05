@@ -8,6 +8,10 @@ assert '{{' not in page, 'unfilled placeholder in index.html'
 has_mhd = bool((config.get('mhd') or {}).get('gtfs'))
 assert f"if ({'true' if has_mhd else 'false'}) fetch('mhd.json'" in page
 
+has_wind = bool(config.get('vitr'))
+assert f"if ({'true' if has_wind else 'false'}) {{ loadWind();" in page
+assert ('vítr © ' in page) == has_wind
+
 headers = open('site/_headers').read()
 for prefix in ('/tiles/*', '/preview/*'):
     assert re.search(re.escape(prefix) + r'\n  Cache-Control: public, max-age=31536000, immutable', headers)
