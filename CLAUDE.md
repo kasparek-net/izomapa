@@ -47,7 +47,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
   je opravit ji v OpenStreetMap (a za pár týdnů se propíše do Overture), jinak pravidlo v `prep.py`. Oprava jedné budovy
   bez čekání: `assets/upresneni.json`, `{"b": {"<id budovy>": {"h": výška, "floors": patra, "r": "hipped"}}, "roofs": [], "paved": [], "buses": []}`.
   Ruční povrchy a sochy tamtéž: `"plochy": [{"k": "plaza", "q": [[lat, lon], …]}]` (třídy `plaza`, `plaza2`, `deck`, `park`; kreslí se přes cesty) a `"sochy": [{"lat", "lon", "a"}]`.
-  Stromy podle ortofota: `assets/oblasti.json`, `{"název": {"poly": [[lat, lon], …], "trees": [[lat, lon, výška, jehličnan]], "b": {}, "b_auto": {}}}` (náhodné stromy v polygonu zmizí).
+  Stromy podle ortofota: `assets/oblasti.json`, `{"název": {"poly": [[lat, lon], …], "trees": [[lat, lon, výška, jehličnan]], "b": {}, "b_auto": {}, "skryt": true}}` (náhodné stromy v polygonu zmizí; `skryt` zachová pořadí ostatních stromů, takže se nemění jejich barvy ani švy).
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 

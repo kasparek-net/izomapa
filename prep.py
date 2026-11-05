@@ -517,7 +517,7 @@ for _, g, c, w, _n in roads:
 # ruční povrchy (assets/upresneni.json, "plochy"): přes cesty, stromy pak určí assets/oblasti.json
 for pl in UP.get('plochy', []):
     g_ = Polygon([to_local(lo, la) for la, lo in pl['q']])
-    fill(g_, C[pl['k']]); nd.polygon(P(g_.exterior.coords), fill=0)
+    fill(g_, C[pl['k']])
 # středová přerušovaná čára
 for _, g, c, w, _n in roads:
     if c in ('trunk', 'primary', 'secondary', 'tertiary'):
@@ -1401,6 +1401,7 @@ if LESM is not None:                         # strom jen tam, kde je na ortofotu
         return h01('z' + wkey(t[0], t[1])) < 0.3 and _sp.contains(Point(t[0], t[1]))
     trees = [t for t in trees if _ok(t)]
 for _o in OBL.values():                      # oblast podle skutečnosti: náhodné stromy pryč, místo nich změřené
+    if _o.get('skryt'): continue
     _q = shapely.prepared.prep(Polygon([to_local(lo, la) for la, lo in _o['poly']]))
     trees = [t for t in trees if not _q.contains(Point(t[0], t[1]))]
     for la, lo, hh, con in _o['trees']:
@@ -1411,6 +1412,13 @@ for t in trees:
     k = (round((t[0] + CX) / 3.0), round((t[1] + CY) / 3.0))
     if k in seen: continue
     seen.add(k); T.append(t)
+for _o in OBL.values():                      # "skryt": změřené stromy na konec a původní jen skrýt (kind = 2), barvy ostatních stromů závisí na pořadí
+    if not _o.get('skryt'): continue
+    _q = shapely.prepared.prep(Polygon([to_local(lo, la) for la, lo in _o['poly']]))
+    T = [t[:4] + (2,) if _q.contains(Point(t[0], t[1])) else t for t in T]
+    for la, lo, hh, con in _o['trees']:
+        x, y = (float(v) for v in to_local(lo, la))
+        if EXT_P.contains(Point(x, y)): T.append((x, y, hh, con, 0))
 tz = ground(np.array([t[0] for t in T]), np.array([t[1] for t in T]))
 trees = [[round(t[0], 2), round(t[1], 2), round(float(z), 2), round(t[2], 1), t[3], t[4]] for t, z in zip(T, tz)]
 print('stromů', len(trees))
