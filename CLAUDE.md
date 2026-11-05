@@ -61,6 +61,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
   Stromy podle ortofota: `assets/oblasti.json`, `{"název": {"poly": [[lat, lon], …], "trees": [[lat, lon, výška, jehličnan]], "b": {}, "b_auto": {}, "skryt": true}}` (náhodné stromy v polygonu zmizí; `skryt` zachová pořadí ostatních stromů, takže se nemění jejich barvy ani švy).
 - **Hustota aut (volitelné):** `.venv/bin/python nastroje/scitani.py` a v `mesto.json` `"doprava": {"kraj": "Moravskoslezský", "useky": {"480": ["7-2501"]}}` (`useky` je přesná volba úseků sčítání, jinak medián silnice v kraji). Počet aut na mapě je ilustrace poměrů, ne skutečný počet.
 - **Barvy střech:** `.venv/bin/python nastroje/strechy.py` (ortofoto po 0,4 m/px, 7 km čtverec ~10 min) vyrobí `assets/strechy_orto.json`, `prep.py` je pak použije u všech budov místo náhodných. Dominanty a `upresneni.json` mají přednost.
+- **Směr hřebene:** `.venv/bin/python nastroje/hrebeny.py` (po `dmp_fetch.py`) zapíše do `assets/hrebeny.json` jen jisté případy, kde laser ukazuje hřeben podél kratší strany.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 

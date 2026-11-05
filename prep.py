@@ -49,6 +49,7 @@ for _k, _v in UP['b'].items(): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
 OBL = json.load(open('assets/oblasti.json')) if os.path.exists('assets/oblasti.json') else {}
 for _o in OBL.values():
     for _k, _v in list(_o['b_auto'].items()) + list(_o['b'].items()): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
+HREBENY = json.load(open('assets/hrebeny.json')) if os.path.exists('assets/hrebeny.json') else {}   # nastroje/hrebeny.py
 # změřené výšky z DMP 1G (ČÚZK, CC BY 4.0): id -> [medián, p90] nad terénem. Nerozhodují o typu ani tvaru střechy, jen o výšce
 DMP = json.load(open('assets/dmp_vysky.json')) if os.path.exists('assets/dmp_vysky.json') else {}
 if os.path.exists('assets/dmp_rucne.json'): DMP.update({k: v for k, v in json.load(open('assets/dmp_rucne.json')).items() if not k.startswith('_')})   # ověřená měření z kontrolního seznamu
@@ -1069,6 +1070,7 @@ for _, r in bld.iterrows():
         if np.linalg.norm(e1) < np.linalg.norm(e2): e1, e2 = e2, e1
         L, Wd = float(np.linalg.norm(e1)), float(np.linalg.norm(e2))
         ang = math.atan2(e1[1], e1[0])
+        if HREBENY.get(r.id) == 'S': ang += math.pi / 2; L, Wd = Wd, L      # hřeben podél kratší strany (změřeno laserem)
         parts = []
         if rs != 'flat':
             parts = [[round(obb.centroid.x, 2), round(obb.centroid.y, 2), round(ang, 4), round(L, 2), round(Wd, 2)]] \
