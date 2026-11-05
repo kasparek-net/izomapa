@@ -35,5 +35,23 @@
   "lat": 49.58646, "lon": 18.15745,
   "text": "Druhý zbytek zdiva, přesná poloha jen orientační.",
   "spec": {"only": 1, "towers": [{"at": "c", "w": 6, "h": 5, "top": "none", "stone": 1, "ruin": 1}]}
+ },
+ {
+  "name": "Šustalova vila",
+  "lat": 49.596096, "lon": 18.146523,
+  "text": "Podle fotky z Wikimedia Commons (Lašské muzeum v Šustalově vile, CC BY-SA 4.0) a ortofota ČÚZK: krémová fasáda, hnědošedá plechová střecha, osmiboká věž s bání na jihozápadním rohu. Výšky jsou odhad.",
+  "spec": {
+   "wc": [232, 212, 192], "rc": [104, 92, 84], "r": "hipped", "h": 9, "rh": 3,
+   "towers": [{"at": "sw", "w": 5, "h": 15, "top": "helm", "to": 21, "tc": [66, 66, 70], "round": 1}]
+  }
+ },
+ {
+  "name": "Muzeum osobních automobilů Tatra",
+  "lat": 49.599537, "lon": 18.143862,
+  "text": "Podle fotek z Wikimedia Commons (Mateo Pavlík, CC BY-SA 4.0) a ortofota ČÚZK: bílé zdi, světlá plochá střecha, severozápadní křídlo s modrým prosklením a špičatým štítem. Výšky jsou odhad.",
+  "spec": {
+   "wc": [238, 238, 232], "rc": [214, 204, 188], "r": "flat", "h": 13, "win": 3,
+   "towers": [{"at": "nw", "w": 16, "h": 10, "top": "pyramid", "to": 19, "tc": [52, 104, 176]}]
+  }
  }
 ]
