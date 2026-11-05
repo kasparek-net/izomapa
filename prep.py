@@ -41,6 +41,9 @@ EXT_P = shapely.prepared.prep(EXT)
 SAT = json.load(open('assets/satelit.json')) if os.path.exists('assets/satelit.json') else {'b': {}, 'lu': {}, 'zones': []}
 # ruční upřesnění podle satelitu a 3D fotek: výška/barvy budov (OSM je často nemá), přístřešky, plochy, autobusy
 UP = json.load(open('assets/upresneni.json')) if os.path.exists('assets/upresneni.json') else {'b': {}, 'roofs': [], 'paved': [], 'buses': []}
+# barvy střech z ortofota (nastroje/strechy.py); ruční úpravy v upresneni.json mají přednost
+if os.path.exists('assets/strechy_orto.json'):
+    for _k, _v in json.load(open('assets/strechy_orto.json')).items(): SAT['b'].setdefault(_k, {})['rc'] = _v
 for _k, _v in UP['b'].items(): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
 # oblasti podle skutečnosti (tuning/oblast.py): stromy z ortofota a DMP, barvy střech, ruční úpravy budov
 OBL = json.load(open('assets/oblasti.json')) if os.path.exists('assets/oblasti.json') else {}
