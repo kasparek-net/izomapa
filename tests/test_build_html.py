@@ -13,6 +13,9 @@ for prefix in ('/tiles/*', '/preview/*'):
     assert re.search(re.escape(prefix) + r'\n  Cache-Control: public, max-age=31536000, immutable', headers)
 assert '/overlay' not in headers and '/index' not in headers, 'unversioned files must not be immutable'
 
+source = config.get('zdrojovy_kod')
+assert ('Zdrojový kód této mapy' in page) == bool(source) and (not source or source in page)
+
 missing = open('site/404.html', encoding='utf-8').read()
 assert 'noindex' in missing and 'href="/"' in missing and config['titulek'] in missing
 print('ok')

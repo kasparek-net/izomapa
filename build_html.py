@@ -11,6 +11,8 @@ fill = {
     'PODTITUL': E(M['podtitul']),
     'HLASENI': 'true' if M.get('hlaseni') else 'false',
     'MHD': 'true' if mhd.get('gtfs') else 'false',
+    'ZDROJOVY_KOD': f'<p class="muted"><a href="{E(M["zdrojovy_kod"])}" target="_blank" rel="noopener">Zdrojový kód této mapy</a> (AGPL-3.0).</p>'
+                    if M.get('zdrojovy_kod') else '',
     'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                  if mhd.get('gtfs') and mhd.get('zdroj') else '',
 }
