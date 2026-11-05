@@ -14,12 +14,14 @@ fs.mkdirSync(outDir, { recursive: true });
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
 const server = http.createServer((req, res) => {
   const p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  if (!p.startsWith(ROOT + path.sep)) { res.writeHead(403); res.end(); return; }   // jen soubory projektu
   fs.readFile(p, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(0);
+}).listen(0, '127.0.0.1');   // jen z tohoto počítače, ne z celé sítě
+await new Promise((r) => server.once('listening', r));
 const port = server.address().port;
 
 // cloud (Linux bez GPU): předinstalovaný Chromium + SwiftShader; Mac: Chromium z Playwrightu + GPU (Metal)
