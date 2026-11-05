@@ -11,8 +11,8 @@ def krovak(g):
     return shapely.transform(g, lambda c: np.column_stack(T.transform(c[:, 0], c[:, 1])))
 B = {}
 for f in sorted(glob.glob('data*/building.parquet')):
-    for r in pq.read_table(f, columns=['id', 'geometry', 'height', 'num_floors', 'class', 'sources']).to_pylist():
-        if r['id'] in B or not any(s['dataset'] == 'OpenStreetMap' for s in (r['sources'] or [])): continue
+    for r in pq.read_table(f, columns=['id', 'geometry', 'height', 'num_floors', 'class']).to_pylist():
+        if r['id'] in B: continue
         B[r['id']] = r
 ids = list(B); P = krovak(shapely.from_wkb([B[i]['geometry'] for i in ids])); P = shapely.make_valid(P)
 RING = shapely.difference(shapely.buffer(P, 14), shapely.buffer(P, 1))

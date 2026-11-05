@@ -13,6 +13,7 @@ podklady/
 # vygenerovaná data ČÚZK (python dmp_vysky.py, nastroje/zabaged.py)
 assets/zabaged.json
 assets/dmp_vysky.json
+assets/hrebeny.json
 
 # konfigurace tvého města (python novy_mesto.py); ukázka je v priklady/mesto.json
 /mesto.json
