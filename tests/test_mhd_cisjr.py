@@ -1,7 +1,7 @@
 """python tests/test_mhd_cisjr.py"""
 import datetime, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'nastroje'))
-from mhd_cisjr import active_versions, clip_bits, inside_runs, line_label, shortest, stop_key, stop_label, to_calendar
+from mhd_cisjr import active_versions, clip_bits, drop_days, inside_runs, latest_wins, line_label, shortest, stop_key, stop_label, to_calendar
 
 D = datetime.date
 assert stop_key('Kopřivnice,,Čs.armády') == stop_key('Kopřivnice, Čs. armády')
@@ -14,6 +14,10 @@ old, new, detour = (D(2026, 6, 14), False, 'a'), (D(2026, 8, 30), False, 'b'), (
 assert active_versions([new, old]) == [(old, D(2026, 8, 30)), (new, None)]
 assert active_versions([old, new, detour]) == [(old, D(2026, 8, 30)), (detour, None)]
 assert clip_bits(D(2026, 1, 1), '1111', D(2026, 1, 2), D(2026, 1, 4)) == '0110'
+
+assert drop_days(D(2026, 1, 1), '1111', [(D(2026, 1, 2), D(2026, 1, 3))]) == '1001'
+assert latest_wins([(D(2026, 1, 1), '1111'), (D(2026, 1, 2), '011')]) == ['1100', '011']
+assert latest_wins([(D(2026, 1, 1), '11'), (D(2026, 1, 1), '11'), (D(2026, 1, 5), '1')]) == ['00', '11', '1']
 
 # Mon 2.11.2026 to Sun 22.11.2026, weekdays only, Tue 17.11. off, Sat 7.11. extra
 bits = ''.join('1' if (D(2026, 11, 2) + datetime.timedelta(days=i)).weekday() < 5 else '0' for i in range(19))

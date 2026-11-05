@@ -1,7 +1,7 @@
 """MHD podle jízdních řádů (GTFS, adresa v mesto.json mhd.gtfs) -> site/mhd.json
 
 python mhd.py [--stahnout]   stáhne build/gtfs.zip (při --stahnout nebo když je starší než den) a převede ho:
-  routes   [číslo linky, typ (0 tramvaj, 3 autobus)]
+  routes   [číslo linky, typ (0 tramvaj, 2 vlak, 3 autobus)]
   shapes   trasy ve světových souřadnicích mapy [[x, y], ...] (zjednodušené na 1 m)
   services kalendář {id: [po..ne (7× 0/1), od, do, [přidané dny], [zrušené dny]]}
   trips    [linka, trasa, služba, začátek (s od půlnoci), [Δt, vzdálenost po trase (m)] × zastávky, cíl, [zastávka, Δt příjezdu] × zastávky]
@@ -55,7 +55,7 @@ for r in T('stop_times'):
     st.setdefault(r['trip_id'], []).append((int(r['stop_sequence']), sec(r['arrival_time']), sec(r['departure_time']), float(r['shape_dist_traveled'] or 0), SN.get(r['stop_id'], '')))
 out = []
 for t in trips:
-    if len(routes[RI[t['route_id']]][0]) > 4: continue           # poptávková doprava apod. bez pravidelné trasy
+    if routes[RI[t['route_id']]][1] != 2 and len(routes[RI[t['route_id']]][0]) > 4: continue   # poptávková doprava apod. bez pravidelné trasy; vlaky mají dlouhá čísla
     s = sorted(st.get(t['trip_id'], []))
     if len(s) < 2 or t['shape_id'] not in SI: continue
     L, gl = SLEN[t['shape_id']]; k = L / gl                     # vzdálenost z jízdního řádu -> délka trasy v mapě

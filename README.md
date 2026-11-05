@@ -1,6 +1,6 @@
 # izomapa
 
-> **Upravená verze pro [Kopřivnici](https://koprivnice.kasparek.net), změny z listopadu 2026.** Oproti [původnímu projektu](https://github.com/adamklatovsky/izomapa) přidává autobusy z CIS JŘ, model rozhledny, příběhy míst, odkaz na zdrojový kód, `_headers` a stránku 404. Přehled: `git log` této větve.
+> **Upravená verze pro [Kopřivnici](https://koprivnice.kasparek.net), změny z listopadu 2026.** Oproti [původnímu projektu](https://github.com/adamklatovsky/izomapa) přidává autobusy a vlaky z CIS JŘ, model rozhledny, příběhy míst, odkaz na zdrojový kód, `_headers` a stránku 404. Přehled: `git log` této větve.
 
 Izometrická pixel-art mapa českého města z otevřených dat, ve stylu SimCity 2000. Celé město s budovami, výškami
 změřenými laserem, lesy, poli, ročními obdobími, nocí, počasím a MHD podle jízdních řádů.
@@ -105,7 +105,7 @@ ale i tak se může splést, proto fakta před zveřejněním ověřte.
 | ČÚZK: ZABAGED | orná půda, louky, sady | CC BY 4.0 |
 | [Terrarium](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | terén | s uvedením zdroje |
 | jízdní řády GTFS dopravce | MHD | **podmínky konkrétního dopravce si ověřte** |
-| CIS JŘ, Ministerstvo dopravy | autobusy bez GTFS dopravce | **podmínky si ověřte** na md.gov.cz, polohy zastávek z OSM, trasy jsou odhad |
+| CIS JŘ, Ministerstvo dopravy | autobusy a vlaky bez GTFS dopravce | **podmínky si ověřte** na md.gov.cz, polohy zastávek z OSM, trasy jsou odhad |
 
 Prohlížeč má zdroje dat v patičce nápovědy, nechte je tam.
 
@@ -142,7 +142,7 @@ render.html     renderer (three.js), render.mjs ho pouští po dlaždicích v Ch
 dzi.py          dlaždice -> Deep Zoom pyramidy (WebP) do site/tiles/
 overlay.py      klikací vrstva: obrysy budov, adresy, ulice, místa, doprava
 mhd.py          jízdní řády GTFS -> site/mhd.json
-nastroje/mhd_cisjr.py  oficiální jízdní řády CIS JŘ (bez GTFS dopravce) -> build/gtfs.zip pro mhd.py
+nastroje/mhd_cisjr.py  oficiální jízdní řády autobusů a vlaků CIS JŘ (bez GTFS dopravce) -> build/gtfs.zip pro mhd.py
 hlaseni/        volitelný server: hlášení nepřesností a administrace /admin
 web/app.html    prohlížeč, build_html.py z něj udělá site/index.html
 ```
