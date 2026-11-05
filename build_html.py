@@ -1,5 +1,5 @@
 """Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap). Výsledná složka site/ je statický web."""
-import html, json, re
+import hashlib, html, json, os, re
 from geo import MESTO
 
 M = MESTO
@@ -17,14 +17,16 @@ fill = {
                  if mhd.get('gtfs') and mhd.get('zdroj') else '',
 }
 app = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], open('web/app.html', encoding='utf-8').read())
-og = f'''<meta property="og:image" content="{SITE_URL}/og.jpg">
+# social networks cache images by URL, so a changed og.jpg needs a new one
+OG_V = hashlib.sha256(open('site/og.jpg', 'rb').read()).hexdigest()[:10] if os.path.exists('site/og.jpg') else '1'
+og = f'''<meta property="og:image" content="{SITE_URL}/og.jpg?v={OG_V}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="{E(M['titulek'])}: izometrická pixel-art mapa města">
 <meta property="og:url" content="{SITE_URL}/">
 <link rel="canonical" href="{SITE_URL}/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="{SITE_URL}/og.jpg">
+<meta name="twitter:image" content="{SITE_URL}/og.jpg?v={OG_V}">
 ''' if SITE_URL else ''
 LD = json.dumps({'@context': 'https://schema.org', '@type': 'WebApplication', 'name': M['titulek'], 'description': M['popis'],
                  'inLanguage': 'cs', 'applicationCategory': 'TravelApplication', 'operatingSystem': 'Web',

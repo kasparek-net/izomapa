@@ -1,5 +1,5 @@
 // Share image with a title: close-up of the map, 1200x630, overwrites site/og.jpg from preview.py.
-// Run after build_html.py: node nastroje/og.mjs SITE_DIR LAT LON KM "Line 1" "Line 2" "Subtitle" "domain"
+// Run before build_html.py, which puts a hash of the image in its URL: node nastroje/og.mjs SITE_DIR LAT LON KM "Line 1" "Line 2" "Subtitle" "domain"
 // Needs build/PixelifySans.ttf (google/fonts, OFL).
 import { chromium } from 'playwright';
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';

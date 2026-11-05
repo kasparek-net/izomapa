@@ -16,6 +16,9 @@ assert '/overlay' not in headers and '/index' not in headers, 'unversioned files
 source = config.get('zdrojovy_kod')
 assert ('Zdrojový kód této mapy' in page) == bool(source) and (not source or source in page)
 
+if config.get('url'):
+    assert re.search(r'property="og:image" content="[^"]+/og\.jpg\?v=\w+"', page) and re.search(r'name="twitter:image" content="[^"]+/og\.jpg\?v=\w+"', page)
+
 missing = open('site/404.html', encoding='utf-8').read()
 assert 'noindex' in missing and 'href="/"' in missing and config['titulek'] in missing
 print('ok')
