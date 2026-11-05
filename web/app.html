@@ -452,9 +452,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (at.length >= 2 && at.every(Number.isFinite)) {
       const [lat, lon, km] = at, x = (lon - cam.lon0) * cam.kx, y = (lat - cam.lat0) * cam.ky;
       const [ix, iy] = toImg(x, y, gz(x, y));
-      viewer.viewport.panTo(new OpenSeadragon.Point(ix / W, iy / W), true);
-      viewer.viewport.zoomTo(W * cam.mpp / ((km || 1) * 1000), null, true);
-      if (at[3] === 1) {                                    // ...,1 = značka přesně na místě (odkaz z administrace hlášení)
+      const inMap = ix >= 0 && ix <= W && iy >= 0 && iy <= Hh;      // ručně upravený odkaz mimo mapu by ukázal prázdno
+      if (inMap) {
+        viewer.viewport.panTo(new OpenSeadragon.Point(ix / W, iy / W), true);
+        viewer.viewport.zoomTo(W * cam.mpp / (Math.min(Math.max(km > 0 ? km : 1, 0.05), W * cam.mpp / 1000) * 1000), null, true);
+      }
+      if (inMap && at[3] === 1) {                                  // ...,1 = značka přesně na místě (odkaz z administrace hlášení)
         const el = document.createElement('div'); el.className = 'here-pin';
         viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(ix / W, iy / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
         onChunk.push(() => { const bb = hit(ix, iy); if (bb) state.sel = bb; });   // budovu na místě zvýraznit, jakmile se načtou data
