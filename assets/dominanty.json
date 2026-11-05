@@ -102,9 +102,9 @@
  {
   "name": "Hotel Tatra",
   "lat": 49.59888, "lon": 18.144009,
-  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0): modrošedé pásy oken výškové budovy.",
+  "text": "Podle fotek v článku ebeton.cz (Revitalizace centra města Kopřivnice): písková fasáda s pásy skla.",
   "spec": {
-   "wc": [128, 136, 146], "rc": [96, 96, 96], "win": 1
+   "wc": [206, 190, 156], "rc": [96, 96, 96], "win": 14
   }
  },
  {
@@ -146,5 +146,7 @@
   "spec": {
    "wc": [204, 150, 72], "rc": [150, 150, 150], "r": "flat"
   }
- }
+ },
+  {"name": "Výstavní pavilon", "lat": 49.5987, "lon": 18.145053, "text": "Skleněný pavilon s vozem Tatra. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "pavilon", "wc": [150, 178, 192], "rc": [128, 124, 92], "r": "flat", "h": 4, "win": 5}},
+  {"name": "Lašská brána", "lat": 49.598898, "lon": 18.14536, "text": "Portál z bílého betonu, výška 5 m, šířka 17 m. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "brana", "wc": [255, 253, 246], "rc": [255, 253, 246], "r": "flat", "h": 5, "win": 5}}
 ]
