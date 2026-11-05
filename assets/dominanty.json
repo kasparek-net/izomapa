@@ -53,5 +53,66 @@
    "wc": [238, 238, 232], "rc": [214, 204, 188], "r": "flat", "h": 13, "win": 3,
    "towers": [{"at": "nw", "w": 16, "h": 10, "top": "pyramid", "to": 19, "tc": [52, 104, 176]}]
   }
+ },
+ {
+  "name": "Kostel Všech svatých ve Vlčovicích",
+  "lat": 49.590295, "lon": 18.191296,
+  "text": "Podle fotek z Wikimedia Commons (Palickap, CC BY-SA 4.0) a ortofota ČÚZK: šedé kamenné zdi, šedá plechová střecha, masivní bílá věž s bání na severozápadě. Výšky jsou odhad.",
+  "spec": {
+   "wc": [178, 172, 160], "rc": [112, 108, 104], "r": "gabled", "h": 10, "rh": 8,
+   "towers": [{"at": "nw", "w": 8, "h": 26, "top": "helm", "to": 36, "tc": [56, 58, 62], "wc": [236, 234, 226]}]
+  }
+ },
+ {
+  "name": "Kaple svaté Máří Magdalény v Mniší",
+  "lat": 49.600918, "lon": 18.197241,
+  "text": "Podle fotky z Wikimedia Commons (Palickap, CC BY-SA 4.0) a ortofota ČÚZK: béžové zdi, červená střecha, věžička se šedou špicí nad průčelím k silnici. Výšky jsou odhad.",
+  "spec": {
+   "wc": [204, 190, 168], "rc": [190, 84, 52], "r": "gabled", "h": 7, "rh": 6,
+   "face": [49.6007, 18.1975],
+   "towers": [{"at": "front", "w": 3, "h": 14, "top": "spire", "to": 21, "tc": [120, 122, 128]}]
+  }
+ },
+ {
+  "name": "Kostel svatého Václava ve Větřkovicích",
+  "lat": 49.618061, "lon": 18.174213,
+  "text": "Podle fotek z Wikimedia Commons (Isolda11, Hoelaho214, CC BY-SA 4.0) a ortofota ČÚZK: žlutá fasáda, červenohnědá střecha, štíhlá věž s červenohnědou špicí na východním konci. Výšky jsou odhad.",
+  "spec": {
+   "wc": [224, 190, 90], "rc": [176, 96, 80], "r": "gabled", "h": 9, "rh": 7,
+   "face": [49.6180, 18.1760],
+   "towers": [{"at": "front", "w": 5.5, "h": 24, "top": "spire", "to": 38, "tc": [128, 56, 44]}]
+  }
+ },
+ {
+  "name": "Kulturní dům",
+  "lat": 49.5993, "lon": 18.144441,
+  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0): pískové zdi a pásy oken. Vyšší střední část model nemá.",
+  "spec": {
+   "wc": [206, 184, 130], "rc": [120, 118, 114], "r": "flat", "h": 10, "win": 3
+  }
+ },
+ {
+  "name": "Katolický dům",
+  "lat": 49.593811, "lon": 18.143309,
+  "text": "Podle fotky z Wikimedia Commons (CC BY-SA 4.0): krémová fasáda a červená valbová střecha. Výšky jsou odhad.",
+  "spec": {
+   "wc": [222, 212, 184], "rc": [176, 72, 50], "r": "hipped", "h": 9, "rh": 5
+  }
+ },
+ {
+  "name": "Hotel Tatra",
+  "lat": 49.59888, "lon": 18.144009,
+  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0): modrošedé pásy oken výškové budovy.",
+  "spec": {
+   "wc": [128, 136, 146], "rc": [96, 96, 96], "win": 1
+  }
+ },
+ {
+  "name": "Hotel Tatra, přilehlá část",
+  "lat": 49.59883, "lon": 18.14415,
+  "text": "Podle stejných fotek a ortofota ČÚZK: plochá šedá střecha místo vygenerované červené, stejné barvy jako hlavní budova.",
+  "spec": {
+   "wc": [128, 136, 146], "rc": [96, 96, 96], "r": "flat", "win": 1
+  }
  }
 ]
