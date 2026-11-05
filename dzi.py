@@ -62,15 +62,15 @@ WATER = [(64, 124, 190), (92, 196, 230), (72, 132, 196), (186, 210, 228), (150, 
 
 
 # ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou
-SURFACES = [(176, 176, 174), (120, 125, 139), (195, 195, 189), (133, 138, 151), (138, 98, 83), (94, 70, 66),
-            (197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152, 176), (167, 151, 151), (114, 107, 121)]
+SURFACES = [(176, 176, 174), (120, 125, 139), (195, 195, 189), (133, 138, 151), (138, 98, 83), (94, 70, 66)]
+SURFACES_WINTER = [(197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152, 176), (167, 151, 151), (114, 107, 121)]
 
 
-def palette_with_water(sample, colors):
-    n = colors - 1 - 3 * len(WATER) - len(SURFACES)
+def palette_with_water(sample, colors, surfaces=SURFACES):
+    n = colors - 1 - 3 * len(WATER) - len(surfaces)
     q = sample.quantize(colors=n, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     p = q.getpalette()[:3 * n]
-    for c in SURFACES: p += list(c)
+    for c in surfaces: p += list(c)
     for r, g, b in WATER:
         for k in (1.0, 0.8, 0.66):         # stupně osvětlení terénu ve stínu
             p += [int(r * k), int(g * k), int(b * k)]
@@ -94,7 +94,7 @@ def quant_alpha(rgba, colors, pal=None):
 def build_alpha(variant, chunk, img, info):
     colors = 64 if variant == 'lights' else 160
     sample = img.convert('RGB').resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
-    pal = palette_with_water(sample, colors) if variant != 'lights' else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    pal = palette_with_water(sample, colors, SURFACES_WINTER if variant == 'winter' else SURFACES) if variant != 'lights' else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     name = f'c{chunk[0]}_{chunk[1]}' if chunk else None
     d0 = f'{OUT}/{name}/{variant}' if name else f'{OUT}/{variant}'
     shutil.rmtree(d0, ignore_errors=True)
