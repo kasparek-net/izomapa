@@ -1,0 +1,59 @@
+{
+ "nazev": "Kopřivnice",
+ "titulek": "Izometrická Kopřivnice",
+ "h1": [
+  "Izometrická",
+  "Kopřivnice"
+ ],
+ "podtitul": "Kopřivnice z otevřených dat, ve stylu SimCity 2000.",
+ "popis": "Izometrická pixel-art mapa: Kopřivnice ve stylu SimCity 2000. Roční období, den, noc a počasí.",
+ "url": "https://koprivnice.kasparek.net",
+ "stred": [
+  18.135339,
+  49.597155
+ ],
+ "polovina": 1150.0,
+ "ctverce": [
+  [
+   0,
+   1
+  ],
+  [
+   1,
+   1
+  ],
+  [
+   2,
+   1
+  ],
+  [
+   0,
+   0
+  ],
+  [
+   1,
+   0
+  ],
+  [
+   2,
+   0
+  ],
+  [
+   0,
+   -1
+  ],
+  [
+   1,
+   -1
+  ]
+ ],
+ "href": 318.3,
+ "dno": -67,
+ "mhd": {
+  "gtfs": null,
+  "zdroj": null,
+  "zdroj_url": null
+ },
+ "vanocni_strom": null,
+ "zdrojovy_kod": null
+}
