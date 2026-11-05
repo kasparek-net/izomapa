@@ -35,7 +35,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
   - `wc` barva zdí, `rc` barva střechy (RGB), `r` tvar střechy (`hipped`, `gabled`, `flat`…), `h` výška zdí, `rh` výška střechy,
     `win` styl oken, `face` [lat, lon] bodu, ke kterému je průčelí (náměstí),
   - `towers` [{`at` front/back/c/n/s/e/w…, `side` posun podél průčelí, `w`, `h`, `top` spire/helm/tiered/dome/pyramid/cone/none,
-    `to` výška špičky, `tc` barva, `clock`, `round`, `stone`, `ruin`}], `chimneys`, `blocks` (nástavby), `canopy`, `skylights`,
+    `to` výška špičky, `tc` barva, `wc` barva zdí věže (jinak jako budova), `clock`, `round`, `stone`, `ruin`}], `chimneys`, `blocks` (nástavby), `canopy`, `skylights`,
   - `lm` vlastní model z `render.html` (`radnice` je ukázka, jak model napsat),
   - `only`: samostatná stavba bez budovy v datech (zřícenina, rozhledna).
   Napárování na budovu: bod uvnitř půdorysu, jinak největší budova do 25 m (`match_doms` v `prep.py`).
@@ -44,7 +44,8 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
   Památkový katalog, Wikipedie s odkazem). Když si nejsi jistý, zeptej se uživatele. Nic si nevymýšlej.
   Ukázka je v `priklady/mista.json`.
 - **Chyby v datech:** špatná výška → zkontroluj `build/dmp_kontrola.csv`; chybějící nebo nesmyslná budova → nejlepší
-  je opravit ji v OpenStreetMap (a za pár týdnů se propíše do Overture), jinak pravidlo v `prep.py`.
+  je opravit ji v OpenStreetMap (a za pár týdnů se propíše do Overture), jinak pravidlo v `prep.py`. Oprava jedné budovy
+  bez čekání: `assets/upresneni.json`, `{"b": {"<id budovy>": {"h": výška, "floors": patra, "r": "hipped"}}, "roofs": [], "paved": [], "buses": []}`.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 
