@@ -9,8 +9,11 @@ has_mhd = bool((config.get('mhd') or {}).get('gtfs'))
 assert f"if ({'true' if has_mhd else 'false'}) fetch('mhd.json'" in page
 
 has_wind = bool(config.get('vitr'))
-assert f"if ({'true' if has_wind else 'false'}) {{ loadWind();" in page
+assert f"if ({'true' if has_wind else 'false'} || {'true' if config.get('pocasi') else 'false'}) {{ loadWind();" in page
 assert ('vítr © ' in page) == has_wind
+has_weather = bool(config.get('pocasi'))
+assert f"if ({'true' if has_weather else 'false'}) {{ realWeather = wmoWeather" in page
+assert ('počasí' in page.split('Open-Meteo')[0][-200:]) == has_weather
 
 headers = open('site/_headers').read()
 for prefix in ('/tiles/*', '/preview/*'):

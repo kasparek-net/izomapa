@@ -62,5 +62,6 @@
  },
  "vanocni_strom": null,
  "vitr": true,
+ "pocasi": true,
  "zdrojovy_kod": "https://github.com/kasparek-net/izomapa/tree/koprivnice"
 }

@@ -12,7 +12,8 @@ fill = {
     'HLASENI': 'true' if M.get('hlaseni') else 'false',
     'MHD': 'true' if mhd.get('gtfs') else 'false',
     'VITR': 'true' if M.get('vitr') else 'false',
-    'VITR_ZDROJ': ', vítr © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') else '',
+    'POCASI': 'true' if M.get('pocasi') else 'false',
+    'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
     'ZDROJOVY_KOD': f'<p class="muted"><a href="{E(M["zdrojovy_kod"])}" target="_blank" rel="noopener">Zdrojový kód této mapy</a> (AGPL-3.0).</p>'
                     if M.get('zdrojovy_kod') else '',
     'MHD_ZDROJ': f', jízdní řády © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
