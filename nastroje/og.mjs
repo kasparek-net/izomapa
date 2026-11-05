@@ -6,17 +6,23 @@ import http from 'node:http'; import fs from 'node:fs'; import path from 'node:p
 
 const [root, lat, lon, km, line1, line2, sub, domain] = process.argv.slice(2);
 const mime = { '.html': 'text/html', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg' };
+const base = path.resolve(root);
 const server = http.createServer((q, s) => {
-  let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html';
-  fs.readFile(path.join(root, p), (e, d) => { if (e) { s.writeHead(404); s.end(); return; } s.writeHead(200, { 'content-type': mime[path.extname(p)] || 'application/octet-stream' }); s.end(d); });
-}).listen(0);
+  let p;
+  try { p = decodeURIComponent(new URL(q.url, 'http://x').pathname); } catch { s.writeHead(400); s.end(); return; }
+  if (p.endsWith('/')) p += 'index.html';
+  const file = path.resolve(base, '.' + p);
+  if (!file.startsWith(base + path.sep)) { s.writeHead(403); s.end(); return; }
+  fs.readFile(file, (e, d) => { if (e) { s.writeHead(404); s.end(); return; } s.writeHead(200, { 'content-type': mime[path.extname(p)] || 'application/octet-stream' }); s.end(d); });
+});
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const browser = await chromium.launch({ args: (process.env.IZO_CHROME_ARGS || '').split(' ').filter(Boolean) });
 const ctx = await browser.newContext({ viewport: { width: 1200, height: 630 } });
 await ctx.route('**/openseadragon.min.js', (r) => r.fulfill({ path: 'node_modules/openseadragon/build/openseadragon/openseadragon.min.js', contentType: 'text/javascript' }));
 await ctx.route('**/fonts.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 const page = await ctx.newPage();
 await page.clock.setFixedTime(new Date('2026-11-05T15:30:00+01:00'));
-await page.goto(`http://localhost:${server.address().port}/#@${lat},${lon},${km}`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${server.address().port}/#@${lat},${lon},${km}`, { waitUntil: 'load' });
 await page.waitForTimeout(9000);
 const font = fs.readFileSync('build/PixelifySans.ttf').toString('base64');
 await page.evaluate(([font, line1, line2, sub, domain]) => {
