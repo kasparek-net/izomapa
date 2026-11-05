@@ -887,7 +887,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const main = []; for (let i = i0; i < roads.length; i++) if (roads[i].c !== 'service') main.push(i);
     const n0 = cars.length, n = Math.min(110, Math.round(main.length / 6));
     for (let j = 0; j < n && main.length; j++) {
-      const i = n0 + j, c = { r: main[Math.floor(rnd(i) * main.length)], dir: rnd(i + 9) > 0.5 ? 1 : -1, s: rnd(i + 3) * 50, v: 7 + rnd(i + 5) * 6, col: CARC[i % CARC.length] };
+      const i = n0 + j, r_ = main[Math.floor(rnd(i) * main.length)], c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, v: 7 + rnd(i + 5) * 6, col: CARC[i % CARC.length] };
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
     }
@@ -903,8 +903,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const r = roads[c.r];
     if (c.s < 0 || c.s > r.L) {
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
-      const opts = (ends.get(ek(endPt)) || []).filter(([i]) => i !== c.r && roads[i].c !== 'service');
+      const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
       if (opts.length) { const [i, dir] = opts[Math.floor(Math.random() * opts.length)]; c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
+      else if (r.o) {                  // konec jednosměrky: otočit se nesmí, auto se objeví jinde
+        let i = c.r; for (let k = 0; k < 20; k++) { i = Math.floor(Math.random() * roads.length); if (roads[i].c !== 'service') break; }
+        c.r = i; c.dir = roads[i].o || 1; c.s = c.dir > 0 ? 0 : roads[i].L;
+      }
       else { c.dir *= -1; c.s = Math.max(0, Math.min(r.L, c.s)); }
     }
   }
@@ -1000,7 +1004,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state };       // ladění v lokálním náhledu
   function drawSkier(q, sx, ox, oy) {
     const L = q.r.len; let i = 1; while (i < L.length - 1 && L[i] < q.s) i++;
     const a = q.r.w[i - 1], b = q.r.w[i], t = Math.max(0, Math.min(1, (q.s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));
@@ -1169,7 +1173,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function drawVehicle(o, len, wid, col, sx, ox, oy, night, isBus) {
     const L = Math.hypot(o.dx, o.dy) || 1, fx_ = o.dx / L * (o.dirSign || 1), fy_ = o.dy / L * (o.dirSign || 1);
     const sxv = -fy_, syv = fx_;
-    const cxw = o.x - sxv * 1.6, cyw = o.y - syv * 1.6;
+    const lane = o.lane ?? 1.6, cxw = o.x - sxv * lane, cyw = o.y - syv * lane;
     const h0 = gz(cxw, cyw);
     const base = toImg(cxw, cyw, h0);
     if (occluded(base[0], base[1], depth(cxw, cyw, h0))) return false;
@@ -1304,7 +1308,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       for (const c of cars) stepCar(c, dt);
       if (sx > 0.12) for (const c of cars) {
         if (!shown(roads[c.r].k)) continue;
-        const o = along(roads[c.r], c.s); o.dirSign = c.dir;
+        const o = along(roads[c.r], c.s); o.dirSign = c.dir; o.lane = roads[c.r].o ? 0 : 1.6;
         if (vis(o.ix, o.iy)) drawVehicle(o, 4.2, 1.76, c.col, sx, ox, oy, night, false);
       }
       if (MHD.on) {

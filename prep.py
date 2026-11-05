@@ -1591,9 +1591,53 @@ for n, ls in streets.items():
     if m.is_empty: continue
     pt = m.interpolate(0.5, normalized=True) if m.geom_type == 'LineString' else max(lines(m), key=lambda q: q.length).interpolate(0.5, normalized=True)
     street_out.append({'name': n, 'x': round(pt.x, 1), 'y': round(pt.y, 1), 'z': round(float(ground(pt.x, pt.y)), 1)})
-graph = [{'p': [[round(x, 1), round(y, 1), round(float(z), 1)] for (x, y), z in zip(l.coords, ground(*np.array(l.coords).T))],
-          'c': c, 'n': n} for l0, w, c, n in drive_lines for l in lines(l0.intersection(AREA.intersection(CLIP.buffer(-4)))) if l.length > 2]   # auta jen uvnitř mapy, přes šev ano
-graph += [{'p': deck_line(D), 'c': D[6], 'n': D[7]} for D in DECKS if D[6] in DRIVE and AREA.intersects(D[0])]   # po mostech ve výšce mostovky
+# jednosměrky pro auta: +1 = jen ve směru geometrie, -1 = jen proti němu
+def _oneway(r):
+    acc = r.get('access_restrictions')
+    if acc is None or isinstance(acc, float): return 0
+    for a in acc:
+        w_ = a.get('when') or {}
+        if a.get('access_type') == 'denied' and a.get('between') is None and not w_.get('mode') and not w_.get('using') and not w_.get('recognized'):
+            if w_.get('heading') == 'backward': return 1
+            if w_.get('heading') == 'forward': return -1
+    return 0
+_ow = [(l, _oneway(r), r['class']) for _, r in seg.iterrows() if r['class'] in DRIVE and r['class'] != 'service' for l in lines(r.geom)]
+# kruhové objezdy data často jednosměrné nemají: malý kruhový prstenec krátkých úseků, doprava proti směru hodinových ručiček
+_short = [l for l, _o, _c in _ow if l.length < 60]
+_ring_lines = []
+for _poly in shapely.ops.polygonize(shapely.ops.unary_union(_short) if _short else []):
+    if _poly.length < 250 and 4 * math.pi * _poly.area / _poly.length ** 2 > 0.85 and len(_poly.exterior.coords) >= 8:
+        _ring_lines.append(shapely.geometry.polygon.orient(_poly, 1.0).exterior)
+def _along(src, l):
+    a_, b_ = src.project(l.interpolate(0.25, normalized=True)), src.project(l.interpolate(0.75, normalized=True))
+    return 1 if b_ >= a_ else -1
+_ow2 = []
+for l, o, c in _ow:
+    m_ = l.interpolate(0.5, normalized=True)
+    for ring in _ring_lines:
+        if l.length < 60 and ring.distance(m_) < 0.5 and ring.distance(Point(l.coords[0])) < 0.5 and ring.distance(Point(l.coords[-1])) < 0.5:
+            o = _along(ring, l)
+    if o: _ow2.append((l, o))
+_ow_tree = shapely.STRtree([l for l, _o in _ow2])
+def piece_oneway(l):
+    """směr jednosměrky pro kus cesty (kus může být oříznutý nebo otočený proti zdroji)"""
+    m_ = l.interpolate(0.5, normalized=True)
+    for k in _ow_tree.query(m_.buffer(0.5)):
+        src, o = _ow2[k]
+        if src.distance(m_) < 0.5: return o * _along(src, l)
+    return 0
+def _road(p3, l, c, n):
+    o = {'p': p3, 'c': c, 'n': n}
+    d_ = piece_oneway(l)
+    if d_: o['o'] = d_
+    return o
+graph = [_road([[round(x, 1), round(y, 1), round(float(z), 1)] for (x, y), z in zip(l.coords, ground(*np.array(l.coords).T))], l, c, n)
+         for l0, w, c, n in drive_lines for l in lines(l0.intersection(AREA.intersection(CLIP.buffer(-4)))) if l.length > 2]   # auta jen uvnitř mapy, přes šev ano
+for D in DECKS:                               # po mostech ve výšce mostovky
+    if D[6] in DRIVE and AREA.intersects(D[0]):
+        p3 = deck_line(D)
+        graph.append(_road(p3, LineString([(x, y) for x, y, _z in p3]), D[6], D[7]))
+print('jednosměrných úseků pro auta', sum(1 for g_ in graph if g_.get('o')), 'kruhových objezdů', len(_ring_lines))
 stops = [{'name': sname(r), 'x': r.geom.x, 'y': r.geom.y} for _, r in inf.iterrows()
          if r['class'] == 'bus_stop' and AREA.contains(r.geom) and sname(r)]
 def zline(l):
