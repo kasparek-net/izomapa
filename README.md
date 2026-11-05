@@ -106,6 +106,7 @@ ale i tak se může splést, proto fakta před zveřejněním ověřte.
 | [Terrarium](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | terén | s uvedením zdroje |
 | jízdní řády GTFS dopravce | MHD | **podmínky konkrétního dopravce si ověřte** |
 | CIS JŘ, Ministerstvo dopravy | autobusy a vlaky bez GTFS dopravce | **podmínky si ověřte** na md.gov.cz, polohy zastávek z OSM, trasy jsou odhad |
+| [Celostátní sčítání dopravy ŘSD](https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy) (volitelné, `"doprava"` v `mesto.json`) | kolik aut jezdí po které silnici | **podmínky si ověřte**: web ŘSD uvádí CC BY-SA 4.0, u souboru licence není; denní křivka je odhad |
 | [Open-Meteo](https://open-meteo.com/) (volitelné, `"vitr": true` a `"pocasi": true` v `mesto.json`) | skutečný vítr pro kouř z komínů, skutečné počasí v mapě | CC BY 4.0, zdarma jen pro nekomerční použití; prohlížeč návštěvníka se k službě připojuje přímo |
 
 Prohlížeč má zdroje dat v patičce nápovědy, nechte je tam.

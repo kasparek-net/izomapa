@@ -63,5 +63,6 @@
  "vanocni_strom": null,
  "vitr": true,
  "pocasi": true,
+ "doprava": {"kraj": "Moravskoslezský", "useky": {"480": ["7-2507", "7-2501", "7-2502"], "482": ["7-5661"], "58": ["7-3937", "7-2506"]}},
  "zdrojovy_kod": "https://github.com/kasparek-net/izomapa/tree/koprivnice"
 }

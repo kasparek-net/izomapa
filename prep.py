@@ -1602,6 +1602,28 @@ def _oneway(r):
             if w_.get('heading') == 'forward': return -1
     return 0
 _ow = [(l, _oneway(r), r['class']) for _, r in seg.iterrows() if r['class'] in DRIVE and r['class'] != 'service' for l in lines(r.geom)]
+# intenzita dopravy ze sčítání ŘSD ("doprava" v mesto.json, data z nastroje/scitani.py): vozidla za 24 h podle čísla silnice
+_cfg = geo.MESTO.get('doprava')
+_sv = {}
+if _cfg:
+    _useky = _cfg.get('useky', {})
+    for s_ in json.load(open('build/scitani.json', encoding='utf-8')):
+        chosen = s_['usek'] in _useky[s_['sil']] if s_['sil'] in _useky else s_['kraj'] == _cfg['kraj']
+        if chosen: _sv.setdefault(s_['sil'], []).append(s_['sv'])
+    _sv = {k: float(np.median(v)) for k, v in _sv.items()}
+_V_CLASS = {'trunk': 10000, 'primary': 8000, 'secondary': 3000, 'tertiary': 1500, 'unclassified': 400, 'residential': 300, 'living_street': 100}   # silnice bez sčítání: odhad
+def _intensity(r):
+    routes = r.get('routes')
+    for x in (routes if routes is not None and not isinstance(routes, float) else []):
+        ref = str(x.get('ref') or '').replace(' ', '')
+        if ref in _sv: return _sv[ref]
+    return _V_CLASS.get(r['class'], 300)
+_v = [(l, _intensity(r)) for _, r in seg.iterrows() if r['class'] in DRIVE and r['class'] != 'service' for l in lines(r.geom)] if _cfg else []
+_v_tree = shapely.STRtree([l for l, _x in _v]) if _v else None
+def piece_intensity(l):
+    m_ = l.interpolate(0.5, normalized=True)
+    near = _v_tree.query(m_.buffer(3.0))
+    return int(_v[min(near, key=lambda k: _v[k][0].distance(m_))][1]) if len(near) else None
 # kruhové objezdy data často jednosměrné nemají: malý kruhový prstenec krátkých úseků, doprava proti směru hodinových ručiček
 _short = [l for l, _o, _c in _ow if l.length < 60]
 _ring_lines = []
@@ -1630,6 +1652,8 @@ def _road(p3, l, c, n):
     o = {'p': p3, 'c': c, 'n': n}
     d_ = piece_oneway(l)
     if d_: o['o'] = d_
+    if _v_tree is not None and c != 'service':
+        o['v'] = piece_intensity(l) or _V_CLASS.get(c, 300)
     return o
 graph = [_road([[round(x, 1), round(y, 1), round(float(z), 1)] for (x, y), z in zip(l.coords, ground(*np.array(l.coords).T))], l, c, n)
          for l0, w, c, n in drive_lines for l in lines(l0.intersection(AREA.intersection(CLIP.buffer(-4)))) if l.length > 2]   # auta jen uvnitř mapy, přes šev ano
