@@ -887,6 +887,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   // silniční graf
   const roads = [], ends = new Map(), cars = [];
   const ek = (p) => Math.round(p[0]) + ',' + Math.round(p[1]);
+  const TRUCKC = ['#e4e2da', '#3f5f8a', '#b8291f', '#d9a441', '#55704f'];
   const CARC = ['#ecebe6', '#b3b8bf', '#2a2c31', '#b8291f', '#33529e', '#62666d', '#3d6b4c', '#cdbd99'];
   // silnice čtverce: napojit na graf (konce se potkají i přes šev) a přidat auta
   onChunk.push((k, d) => {
@@ -903,7 +904,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const n0 = cars.length, n = wsum ? Math.min(300, Math.round(wsum / 450 / 1000)) : Math.min(110, Math.round(main.length / 6));
     const pickMain = (u) => { if (!wsum) return main[Math.floor(u * main.length)]; let x = u * wsum; for (let k = 0; k < main.length; k++) { x -= weights[k]; if (x <= 0) return main[k]; } return main[main.length - 1]; };
     for (let j = 0; j < n && main.length; j++) {
-      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, v: 7 + rnd(i + 5) * 6, q: rnd(i + 7), col: CARC[i % CARC.length] };
+      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, v: 7 + rnd(i + 5) * 6, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
+      if (c.truck) { c.v = 6 + rnd(i + 5) * 3; c.col = TRUCKC[i % TRUCKC.length]; }
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
     }
@@ -914,7 +916,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const a = r.w[i - 1], b = r.w[i], pa = r.p[i - 1], pb = r.p[i];
     return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, ix: pa[0] + (pb[0] - pa[0]) * t, iy: pa[1] + (pb[1] - pa[1]) * t, d: pa[2] + (pb[2] - pa[2]) * t, dx: b[0] - a[0], dy: b[1] - a[1] };
   }
-  function pickExit(opts) {
+  function pickExit(all, truck) {
+    const big = truck ? all.filter(([i]) => roads[i].t) : all, opts = big.length ? big : all;   // nákladní auta drží sčítané silnice
     const sum = opts.reduce((a, [i]) => a + (roads[i].v || 0), 0);
     if (!sum) return opts[Math.floor(Math.random() * opts.length)];
     let x = Math.random() * sum;
@@ -935,7 +938,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (c.s < 0 || c.s > r.L) {
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
       const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
-      if (opts.length) { const [i, dir] = pickExit(opts); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
+      if (opts.length) { const [i, dir] = pickExit(opts, c.truck); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
       else if (r.o) {                  // konec jednosměrky: otočit se nesmí, auto se objeví jinde
         let i = c.r; for (let k = 0; k < 20; k++) { i = Math.floor(Math.random() * roads.length); if (roads[i].c !== 'service') break; }
         c.r = i; c.dir = roads[i].o || 1; c.s = c.dir > 0 ? 0 : roads[i].L;
@@ -1063,7 +1066,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const lit = (rgb, d) => { const f = (0.62 + 0.42 * Math.max(0, d)) / 0.88; return `rgb(${rgb.map((q) => Math.min(255, Math.round(q * f))).join(',')})`; };
   const VEH = new Map(), NDIR = 48;
   function vehicleSprite(col, k, isBus, len, wid, snowy) {
-    const key = `${col}|${k}|${isBus ? +isBus : 0}|${snowy ? 1 : 0}`;      // isBus: 1 autobus, 2 tramvaj
+    const key = `${col}|${k}|${isBus ? +isBus : 0}|${snowy ? 1 : 0}`;      // isBus: 1 autobus, 2 tramvaj, 3 nákladní auto
     if (VEH.has(key)) return VEH.get(key);
     const a = k / NDIR * Math.PI * 2, fx_ = Math.cos(a), fy_ = Math.sin(a), sxv = -fy_, syv = fx_;
     const O = toImg(0, 0, 0), R = (s, t, h) => { const p = toImg(fx_ * s + sxv * t, fy_ * s + syv * t, h); return [p[0] - O[0], p[1] - O[1]]; };
@@ -1107,6 +1110,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       faces.push([ip.map(([s_, t_]) => R(s_, t_, rz)), lit(ROOF, sun(0, 0, 1))]);
       box(-0.9, 0.7, -0.45, 0.45, rz, rz + 0.15, [92, 94, 100]);
       box(-0.5, 0.4, -0.06, 0.06, rz + 0.15, rz + 0.75, YE); box(-0.05, 0.35, -0.06, 0.06, rz + 0.6, rz + 1.05, YE); box(0.15, 0.3, -0.75, 0.75, rz + 1.0, rz + 1.08, YE);
+    } else if (isBus === 3) {                                               // nákladní auto: skříň v barvě a kabina
+      const CAB = [226, 226, 220], ROOF = snow || c;
+      box(-l, l - 2.3, -w, w, 0.8, 3.2, c, ROOF);
+      box(l - 2.1, l, -w * 0.94, w * 0.94, 0.55, 2.7, CAB, snow || CAB);
+      box(l - 0.03, l + 0.01, -w * 0.8, w * 0.8, 1.55, 2.5, GLASS);
     } else if (isBus) {                                                     // autobus: bílý, zelený a žlutý pruh, tmavá okna, žluté čelo
       const WH = [238, 238, 234], GR = [30, 140, 84], YL = [244, 196, 28], GL = [40, 44, 52], DOOR = [54, 58, 66], ROOF = snow || [222, 224, 220];
       const ch = 0.45, fp = [[-l + ch, -w], [l - ch, -w], [l, -w + ch], [l, w - ch], [l - ch, w], [-l + ch, w], [-l, w - ch], [-l, -w + ch]];
@@ -1341,7 +1349,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (sx > 0.12) for (const c of cars) {
         if (c.q > tShare || !shown(roads[c.r].k)) continue;
         const o = along(roads[c.r], c.s); o.dirSign = c.dir; o.lane = roads[c.r].o ? 0 : 1.6;
-        if (vis(o.ix, o.iy)) drawVehicle(o, 4.2, 1.76, c.col, sx, ox, oy, night, false);
+        if (vis(o.ix, o.iy)) drawVehicle(o, c.truck ? 9 : 4.2, c.truck ? 2.4 : 1.76, c.col, sx, ox, oy, night, c.truck ? 3 : false);
       }
       if (MHD.on) {
         const ns = Math.floor(now / 1000);

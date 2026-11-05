@@ -1,7 +1,7 @@
 """Výsledky Celostátního sčítání dopravy ŘSD -> build/scitani.json (počet vozidel za 24 h na úseku silnice).
 
 python nastroje/scitani.py [xlsx nebo URL]
-Výsledky: https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy (sloupec SV = všechna vozidla za 24 h)
+Výsledky: https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy (sloupec SV = všechna vozidla za 24 h, nak = nákladní)
 """
 import json, os, re, sys, urllib.request, zipfile
 from xml.etree import ElementTree as ET
@@ -30,7 +30,11 @@ def sections(path):
     for r in it:
         try: sv = int(float(r.get(head['SV'], '')))
         except ValueError: continue
-        res.append({'kraj': r.get(head['NÁZEV_KRAJE']), 'sil': str(r.get(head['SIL'], '')).strip(), 'usek': r.get(head['ÚSEK']), 'sv': sv})
+        def num(k):
+            try: return float(r.get(head[k], 0))
+            except ValueError: return 0.0
+        res.append({'kraj': r.get(head['NÁZEV_KRAJE']), 'sil': str(r.get(head['SIL'], '')).strip(), 'usek': r.get(head['ÚSEK']), 'sv': sv,
+                    'nak': round(num('TV') - num('A') - num('Z'))})          # TV bez sloupců A a Z = LN + SN + SNP + TN + TNP + NSN (nákladní)
     return res
 
 
