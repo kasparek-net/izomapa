@@ -215,9 +215,35 @@ NOTREE_LU = {'pitch', 'track', 'playground', 'stadium', 'school', 'industrial', 
 lu = load('land_use')
 lu['area'] = lu.geom.map(lambda g: g.area)
 lu = lu.sort_values('area', ascending=False)
+def _green_share(g):
+    # podíl zeleně z ortofota (nastroje/povrchy.py) na mřížce po 5 m v ploše
+    if not os.path.exists('build/zelen_maska.png'): return 0.0
+    x0_, y0_, x1_, y1_ = g.bounds; xs_, ys_ = np.meshgrid(np.arange(x0_, x1_, 5.0), np.arange(y0_, y1_, 5.0))
+    inside = shapely.contains_xy(g, xs_, ys_)
+    if inside.sum() < 8: return 0.0
+    z_, h_ = _GZ
+    return float(z_[np.clip(((h_[1] - (ys_[inside] + CY)) / h_[2]).astype(int), 0, z_.shape[0] - 1), np.clip(((xs_[inside] + CX - h_[0]) / h_[2]).astype(int), 0, z_.shape[1] - 1)].mean())
+_GZ = None
+if os.path.exists('build/zelen_maska.png'):
+    _gz = np.asarray(Image.open('build/zelen_maska.png')) > 0
+    if os.path.exists('build/les_maska.png'):                   # koruny stromů jsou tmavé a maska zeleně je nepočítá
+        _lz = np.asarray(Image.open('build/les_maska.png')) > 0
+        if _lz.shape == _gz.shape: _gz = _gz | _lz
+    _GZ = (_gz, json.load(open('build/zelen_maska.json'))['x0y1m'])
+_PARK_Z = set()
 for _, r in lu.iterrows():
     k = SAT['lu'].get(r.id) or LU.get(r['class'])
-    if k: fill(r.geom, C[k], block=r['class'] in NOTREE_LU)
+    block_ = r['class'] in NOTREE_LU
+    if k == 'cobble' and _green_share(r.geom) > 0.5: k = 'park'; block_ = False; _PARK_Z.add(r.id)      # náměstí, které je ve skutečnosti park
+    if k: fill(r.geom, C[k], block=block_)
+# zpevněné plochy z dat, které jsou na ortofotu zelené, jsou tráva (nastroje/povrchy.py)
+if os.path.exists('build/zelen_maska.png'):
+    _zm = np.asarray(Image.open('build/zelen_maska.png')) > 0; _x0, _y1, _m = json.load(open('build/zelen_maska.json'))['x0y1m']
+    _c = (np.arange(TWE) + 0.5) * TEX_RES - HE
+    _mx = np.clip(((_c + CX - _x0) / _m).astype(int), 0, _zm.shape[1] - 1); _my = np.clip(((_y1 - (-_c + CY)) / _m).astype(int), 0, _zm.shape[0] - 1)
+    _a = np.array(cls); _hit = _zm[np.ix_(_my, _mx)] & np.isin(_a, [C['paved'], C['industrial']])
+    _a[_hit] = C['grass']; cls.paste(Image.fromarray(_a))
+    _n = np.array(notree); _n[_hit] = 0; notree.paste(Image.fromarray(_n))
 # pitch: bílé čáry hřiště. Překrývající se hřiště z dat se sloučí (jinak se čáry kříží); čáry jen u zhruba obdélníkových
 pitch_polys = [p for _, r in lu.iterrows() if r['class'] == 'pitch' and SAT['lu'].get(r.id, 'pitch') in ('pitch', 'track', 'court_blue')
                for p in polys(r.geom.intersection(DRAWBOX)) if p.area > 30]
@@ -1401,7 +1427,7 @@ DENS = {'park': 11, 'cemetery': 9, 'residential': 16, 'garden': 12, 'grass': 20,
         'recreation_ground': 20, 'allotments': 14, 'kindergarten': 14}
 _zopen = shapely.unary_union(ZORNA + ZTTP).buffer(0)      # residential polygons often span real fields; dark crops pass the canopy mask
 for _, r in lu.iterrows():
-    s = DENS.get(r['class'])
+    s = DENS.get(r['class']) or (DENS['park'] if r.id in _PARK_Z else None)
     if s: scatter(r.geom.difference(_zopen), s, 0.25, 6, 15)
 # řídké stromy všude kromě luk, polí a pastvin (tam ve skutečnosti stromy nejsou)
 OPEN = shapely.unary_union([g for c, g in zip(lu['class'], lu.geom) if c in ('meadow', 'farmland', 'grass', 'village_green', 'downhill', 'pitch')]
