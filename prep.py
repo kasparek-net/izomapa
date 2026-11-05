@@ -630,6 +630,7 @@ bld = load('building')
 bld = bld[bld.sources.map(lambda s: s is not None and any(x['dataset'] == 'OpenStreetMap' for x in s))].reset_index(drop=True)
 for i, r in bld.iterrows():                             # výšky z upřesnění mají přednost před daty
     if 'h' in UP['b'].get(r.id, {}): bld.at[i, 'height'] = UP['b'][r.id]['h']
+    if 'floors' in UP['b'].get(r.id, {}): bld.at[i, 'num_floors'] = UP['b'][r.id]['floors']
 if len(bld) and UP['roofs']:                            # přístřešky nástupišť (nejsou v OSM jako budovy)
     t0 = bld.iloc[0]; rows = []
     for i, q in enumerate(UP['roofs']):
