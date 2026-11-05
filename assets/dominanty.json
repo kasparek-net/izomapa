@@ -114,5 +114,37 @@
   "spec": {
    "wc": [128, 136, 146], "rc": [96, 96, 96], "r": "flat", "win": 1
   }
+ },
+ {
+  "name": "Městský úřad Kopřivnice",
+  "lat": 49.597809, "lon": 18.147166,
+  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0) a ortofota ČÚZK: šedobéžová výšková budova s pásy oken a plochou střechou.",
+  "spec": {
+   "wc": [176, 172, 160], "rc": [120, 118, 112], "win": 1
+  }
+ },
+ {
+  "name": "Ringhofferova vila",
+  "lat": 49.596687, "lon": 18.14688,
+  "text": "Podle fotek vily v parku z Wikimedia Commons (Jan Polák, CC BY-SA 3.0; Pohled 111, CC0) a ortofota ČÚZK: bílé zdi a šedá plechová střecha. Sloupový portikus model nemá. Výšky jsou odhad.",
+  "spec": {
+   "wc": [238, 236, 228], "rc": [122, 130, 138], "r": "hipped", "h": 8, "rh": 3
+  }
+ },
+ {
+  "name": "Nádraží Kopřivnice",
+  "lat": 49.595544, "lon": 18.147063,
+  "text": "Podle fotky z Wikimedia Commons (Dahoralka, CC BY-SA 3.0) a ortofota ČÚZK: okrové cihlové zdi, šedá střecha. Vyšší odbavovací hala model nemá.",
+  "spec": {
+   "wc": [204, 150, 72], "rc": [150, 150, 150], "r": "flat", "h": 7
+  }
+ },
+ {
+  "name": "Nádraží Kopřivnice, jižní křídlo",
+  "lat": 49.595091, "lon": 18.146916,
+  "text": "Stejné podklady jako hlavní budova nádraží.",
+  "spec": {
+   "wc": [204, 150, 72], "rc": [150, 150, 150], "r": "flat"
+  }
  }
 ]
