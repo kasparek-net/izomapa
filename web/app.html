@@ -35,7 +35,7 @@ body { background: var(--night); color: var(--ink); font-family: var(--body); ov
   max-height: calc(100% - 32px - 190px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow: auto;
   background: var(--panel); border: 2px solid var(--edge); box-shadow: 4px 4px 0 rgba(0, 0, 0, .35);
-  display: grid; gap: 12px; padding: 14px 16px;
+  display: grid; gap: 12px; padding: 14px 16px; box-sizing: border-box;
 }
 .panel { transition: transform .2s ease; }
 .fold {
