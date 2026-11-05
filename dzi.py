@@ -4,6 +4,7 @@ python dzi.py [varianty...]            čtverec (0, 0) -> site/tiles/<varianta>/
 python dzi.py --chunk 0,-1 [varianty]  další čtverec (průhledné pozadí) -> site/tiles/c0_-1/<varianta>/...
 """
 import json, math, os, shutil, sys
+import numpy as np
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
@@ -61,16 +62,15 @@ def build(variant, chunk=None):
 WATER = [(64, 124, 190), (92, 196, 230), (72, 132, 196), (186, 210, 228), (150, 168, 184), (58, 96, 136), (236, 240, 240)]
 
 
-# ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou
+# ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou.
+# Mají sloty za paletou a dostanou je jen pixely přesně té barvy, ostatní barvy mapy se tak neposunou.
 SURFACES = [(176, 176, 174), (120, 125, 139), (195, 195, 189), (133, 138, 151), (138, 98, 83), (94, 70, 66)]
 SURFACES_WINTER = [(197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152, 176), (167, 151, 151), (114, 107, 121)]
 
 
-def palette_with_water(sample, colors, surfaces=SURFACES):
-    n = colors - 1 - 3 * len(WATER) - len(surfaces)
-    q = sample.quantize(colors=n, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    p = q.getpalette()[:3 * n]
-    for c in surfaces: p += list(c)
+def palette_with_water(sample, colors):
+    q = sample.quantize(colors=colors - 1 - 3 * len(WATER), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER))]
     for r, g, b in WATER:
         for k in (1.0, 0.8, 0.66):         # stupně osvětlení terénu ve stínu
             p += [int(r * k), int(g * k), int(b * k)]
@@ -78,15 +78,20 @@ def palette_with_water(sample, colors, surfaces=SURFACES):
     return im
 
 
-def quant_alpha(rgba, colors, pal=None):
+def quant_alpha(rgba, colors, pal=None, keep=()):
     """paletový PNG s jedním průhledným indexem (pixel art má jen plnou nebo žádnou průhlednost)"""
     a = rgba.getchannel('A').point(lambda v: 255 if v > 127 else 0)
     rgb = rgba.convert('RGB')
     q = rgb.quantize(palette=pal, dither=Image.Dither.NONE) if pal else \
         rgb.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     p = q.getpalette()[:3 * (colors - 1)] + [0, 0, 0]
+    for c in keep: p += list(c)
     q.putpalette(p + [0] * (768 - len(p)))
     q.paste(colors - 1, mask=a.point(lambda v: 255 - v))
+    if keep:
+        idx, px, op = np.array(q), np.array(rgb), np.array(a) > 0
+        for i, c in enumerate(keep): idx[(px == c).all(axis=2) & op] = colors + i
+        q = Image.fromarray(idx, 'P'); q.putpalette(p + [0] * (768 - len(p)))
     q.info['transparency'] = colors - 1
     return q
 
@@ -94,7 +99,8 @@ def quant_alpha(rgba, colors, pal=None):
 def build_alpha(variant, chunk, img, info):
     colors = 64 if variant == 'lights' else 160
     sample = img.convert('RGB').resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
-    pal = palette_with_water(sample, colors, SURFACES_WINTER if variant == 'winter' else SURFACES) if variant != 'lights' else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    pal = palette_with_water(sample, colors) if variant != 'lights' else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    keep = () if variant == 'lights' else SURFACES_WINTER if variant == 'winter' else SURFACES
     name = f'c{chunk[0]}_{chunk[1]}' if chunk else None
     d0 = f'{OUT}/{name}/{variant}' if name else f'{OUT}/{variant}'
     shutil.rmtree(d0, ignore_errors=True)
@@ -112,7 +118,7 @@ def build_alpha(variant, chunk, img, info):
                 t = im.crop((c * TS, r * TS, min(w, (c + 1) * TS), min(h, (r + 1) * TS)))
                 # zmenšené úrovně bez vlastní palety: kvantizace zmenšeniny měnila vzácné barvy (bazény, voda) na šedou
                 # bez palety i v plném rozlišení: vzácné barvy (malé vodní plochy) se v paletě čtverce měnily na šedou
-                save(quant_alpha(t, colors, pal), f'{d}/{c}_{r}.png')      # stejná paleta (s vodou) pro všechny úrovně
+                save(quant_alpha(t, colors, pal, keep), f'{d}/{c}_{r}.png')      # stejná paleta (s vodou) pro všechny úrovně
                 n += 1
     size = sum(os.path.getsize(os.path.join(a, f)) for a, _, fs in os.walk(d0) for f in fs)
     print(name or 'c0_0', variant, W, 'x', H, 'souborů', n, 'MB', round(size / 1e6, 1))
