@@ -30,7 +30,7 @@ def sheet(f):
         for j, k in enumerate(u): out.setdefault(int(k), [[], []])[key] = zz[ti[st[j]:st[j + 1]]].tolist()
     return out
 if __name__ == '__main__':
-    fs = sorted(glob.glob('build/dmp/*.laz')); acc = {}
+    fs = sorted(glob.glob('build/dmp/*.laz')) if '--znovu' not in sys.argv else []; acc = {}   # --znovu: jen znovu vyhodnotit build/dmp_vysky.json
     with Pool(8) as p:
         for i, o in enumerate(p.imap_unordered(sheet, fs)):
             for k, (a, b) in o.items():
@@ -41,6 +41,7 @@ if __name__ == '__main__':
         r = B[ids[k]]; c = shapely.from_wkb(r['geometry']).centroid
         if len(a) >= 1 and len(b) >= 2:
             g0 = float(np.median(b)); res[ids[k]] = [round(float(P[k].area)), len(a), round(float(np.median(a)) - g0, 1), round(float(np.percentile(a, 90)) - g0, 1), r['num_floors'], round(r['height'], 1) if r['height'] else None, r['class'], round(c.y, 6), round(c.x, 6)]
+    if '--znovu' in sys.argv: res = json.load(open('build/dmp_vysky.json'))
     json.dump(res, open('build/dmp_vysky.json', 'w')); print(len(B), 'budov', len(res), 'změřeno')
     import csv, os
     ok, bad = {}, []
@@ -48,7 +49,8 @@ if __name__ == '__main__':
         why = ''
         if ar >= 80 and n < max(3, ar * .04): why = 'málo bodů'
         if med < 1.5 or med > 75: why = 'nesmyslná výška'
-        if fl and fl >= 3 and abs(med - fl * 2.9) > 6.5: why = why or 'nesedí na patra OSM'
+        # hustý laser má přednost před patry v OSM (ta bývají chybná, ověřeno na ortofotu); řídký je na kontrolu
+        if fl and fl >= 3 and abs(med - fl * 2.9) > 6.5 and (med < 3 or n < ar * .4): why = why or 'nesedí na patra OSM'
         if p90 - med > 8 and ar > 300: why = why or 'více výšek pod jedním půdorysem'
         if why: bad.append([why, cl or '', ar, n, med, p90, fl or '', la, lo, k])
         else: ok[k] = [med, p90]
