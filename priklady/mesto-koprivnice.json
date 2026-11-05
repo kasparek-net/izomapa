@@ -50,10 +50,10 @@
  "href": 318.3,
  "dno": -67,
  "mhd": {
-  "gtfs": null,
-  "zdroj": null,
-  "zdroj_url": null
+  "gtfs": "build/gtfs.zip",
+  "zdroj": "CIS JŘ, Ministerstvo dopravy ČR",
+  "zdroj_url": "https://portal.cisjr.cz/pub/netex/"
  },
  "vanocni_strom": null,
- "zdrojovy_kod": null
+ "zdrojovy_kod": "https://github.com/kasparek-net/izomapa/tree/koprivnice"
 }

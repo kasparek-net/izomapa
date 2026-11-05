@@ -1,5 +1,7 @@
 # izomapa
 
+> **Upravená verze pro [Kopřivnici](https://koprivnice.kasparek.net), změny z listopadu 2026.** Oproti [původnímu projektu](https://github.com/adamklatovsky/izomapa) přidává autobusy z CIS JŘ, model rozhledny, příběhy míst, odkaz na zdrojový kód, `_headers` a stránku 404. Přehled: `git log` této větve.
+
 Izometrická pixel-art mapa českého města z otevřených dat, ve stylu SimCity 2000. Celé město s budovami, výškami
 změřenými laserem, lesy, poli, ročními obdobími, nocí, počasím a MHD podle jízdních řádů.
 
