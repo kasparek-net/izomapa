@@ -167,7 +167,8 @@ C = dict(grass=0, garden=1, park=2, meadow=3, forest=4, scrub=5, pitch=6, track=
          industrial=10, parking=11, road=12, marking=13, curb=14, dirt=15, water=16, pool=17, stream=18,
          rail=19, cemetery=20, wetland=21, rock=22, construction=23, footway=24, pool_edge=25, farmland=26,
          cobble=27, grave=28, manhole=29, court_blue=30, zone=31, zone2=32, piste=33, skijump=34,
-         wheat=35, wheat2=36, rape=37, rape2=38, maize=39, maize2=40, soil=41, soil2=42)    # pole: plodina + řádky
+         wheat=35, wheat2=36, rape=37, rape2=38, maize=39, maize2=40, soil=41, soil2=42,
+         plaza=43, plaza2=44, deck=45)    # pole: plodina + řádky
 TW = int(2 * HALF / TEX_RES)
 TWE = TW + 2 * MPX                          # rastry včetně pásu sousedů
 cls = Image.new('L', (TWE, TWE), C['grass'])
@@ -513,6 +514,10 @@ for _, g, c, w, _n in roads:
     if c == 'rail':
         line(g, C['dirt'], 3.2, block=True); line(g, C['rail'], 1.4); continue
     line(g, C[RCLS.get(c, 'road')], w, block=w >= 3)
+# ruční povrchy (assets/upresneni.json, "plochy"): přes cesty, stromy pak určí assets/oblasti.json
+for pl in UP.get('plochy', []):
+    g_ = Polygon([to_local(lo, la) for la, lo in pl['q']])
+    fill(g_, C[pl['k']]); nd.polygon(P(g_.exterior.coords), fill=0)
 # středová přerušovaná čára
 for _, g, c, w, _n in roads:
     if c in ('trunk', 'primary', 'secondary', 'tertiary'):
@@ -1102,6 +1107,7 @@ for _, r in bld.iterrows():
         if lm: b['lm'] = lm
         if dsp:
             b['dn'] = dom['name']
+            if dsp.get('model'): b['md'] = dsp['model']
             if dsp.get('canopy'): b['cn'] = dsp['canopy']
             for blk in dsp.get('blocks', []):
                 o = p.minimum_rotated_rectangle; cs = list(o.exterior.coords)[:3]
@@ -1462,6 +1468,10 @@ for _, r in inf.iterrows():
 props['planter'] = props['slab'] = props['pavilion'] = props['shed'] = []
 props['grave'] = graves
 props['statue'] = statues
+props['socha'] = []                    # ruční sochy (assets/upresneni.json, "sochy"): podstavec a figura běžce
+for so_ in UP.get('sochy', []):
+    x, y = (float(v) for v in to_local(so_['lon'], so_['lat']))
+    if AREA.contains(Point(x, y)): props['socha'].append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), so_.get('a', 0.0)])
 props['wheelie'] = [[round(v, 3) for v in q] for q in props['wheelie']]
 print('hrobů', len(graves), 'soch', len(statues))
 
@@ -1477,7 +1487,8 @@ SEASON_PAL = {
                'court_blue': (70, 112, 170), 'zone': (255, 0, 220), 'zone2': (0, 230, 230),
                'piste': (150, 178, 92), 'skijump': (98, 160, 150),
                'wheat': (214, 186, 106), 'wheat2': (194, 162, 86), 'rape': (150, 148, 82), 'rape2': (128, 126, 70),
-               'maize': (80, 134, 58), 'maize2': (58, 106, 44), 'soil': (110, 142, 66), 'soil2': (128, 104, 70)},
+               'maize': (80, 134, 58), 'maize2': (58, 106, 44), 'soil': (110, 142, 66), 'soil2': (128, 104, 70),
+               'plaza': (186, 186, 184), 'plaza2': (206, 206, 200), 'deck': (146, 104, 88)},
 }
 sp = dict(SEASON_PAL['summer'])
 sp.update({'grass': (122, 176, 80), 'garden': (132, 184, 86), 'park': (118, 180, 78), 'meadow': (150, 188, 90),
@@ -1500,6 +1511,7 @@ wi.update({'forest': (214, 222, 232), 'scrub': (220, 226, 234), 'paved': (222, 2
            'parking': (176, 180, 188), 'road': (104, 106, 114), 'marking': (190, 192, 196), 'curb': (226, 230, 236),
            'dirt': (214, 214, 218), 'water': (186, 210, 228), 'pool': (150, 168, 184), 'stream': (58, 96, 136),
            'footway': (226, 230, 236), 'cobble': (206, 210, 218), 'pool_edge': (230, 234, 238), 'grave': (222, 226, 232), 'manhole': (90, 92, 98)})
+wi.update({'plaza': (208, 212, 220), 'plaza2': (222, 226, 232), 'deck': (176, 160, 160)})
 SEASON_PAL['winter'] = wi
 
 # kontrolní ohraničení zón upřesněných podle snímků (geo.SAT_OUTLINE, po kontrole vypnout)

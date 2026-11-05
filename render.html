@@ -378,6 +378,44 @@ function roofDeco(b, X, eave, rc) {
   const deg = THREE.MathUtils.degToRad;
   for (const b of scene.buildings) {
     if (b.only) continue;            // samostatná věž dominanty (kreslí se níž)
+    if (b.md) {   // vlastní modely podle půdorysu: portál a prosklený pavilon
+      let best = 0, ang = 0;
+      for (let i = 0; i < b.p.length; i++) { const [x0, y0] = b.p[i], [x1, y1] = b.p[(i + 1) % b.p.length], l = Math.hypot(x1 - x0, y1 - y0); if (l > best) { best = l; ang = Math.atan2(y1 - y0, x1 - x0); } }
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      let s0 = 1e9, s1 = -1e9, t0 = 1e9, t1 = -1e9;
+      for (const [x, y] of b.p) { const s_ = x * ca + y * sa, t_ = -x * sa + y * ca; s0 = Math.min(s0, s_); s1 = Math.max(s1, s_); t0 = Math.min(t0, t_); t1 = Math.max(t1, t_); }
+      const sm = (s0 + s1) / 2, tm = (t0 + t1) / 2, L = (s1 - s0) / 2, D = (t1 - t0) / 2, H = b.e - b.g, lo = b.b - b.g;
+      const f = frameAt(sm * ca - tm * sa, sm * sa + tm * ca, b.g, ang), solid = [0, 1, 1, 0], wc = C255(b.wc), rc = C255(b.rc);
+      if (b.md === 'brana') {
+        for (const sd of [-1, 1]) pushBox(X, f, sd > 0 ? L - 0.7 : -L, sd > 0 ? L : -L + 0.7, -D, D, lo, H, wc, solid);
+        pushBox(X, f, -L, L, -D, D, H - 0.8, H, wc, solid);
+        pushBox(X, f, -L + 0.7, L - 0.7, -0.1, 0.1, H - 0.86, H - 0.8, [1, 0.96, 0.84], [0.7, 1, 0, 0]);   // světelný pás v podhledu
+        continue;
+      }
+      const FRAME = [0.16, 0.17, 0.19], GLASS = wc, FLOOR = [0.86, 0.85, 0.80], lit = [0.65, 1, 0, 0];
+      pushBox(X, f, -L, L, -D, D, lo, 0.15, FLOOR, lit);
+      // strany odvrácené od kamery (pohled od jihozápadu) jsou sklo, přední jen rám, takže je vidět dovnitř
+      const back = (nx, ny) => nx + ny > 0;
+      const side = (s_0, t_0, s_1, t_1, nx, ny) => {
+        const len = Math.hypot(s_1 - s_0, t_1 - t_0), n = Math.round(len / 1.6);
+        if (back(nx, ny)) pushBox(X, f, Math.min(s_0, s_1), Math.max(s_0, s_1) + (s_0 === s_1 ? 0.05 : 0), Math.min(t_0, t_1), Math.max(t_0, t_1) + (t_0 === t_1 ? 0.05 : 0), 0.15, H, GLASS, lit);
+        for (let i = 0; i <= n; i++) { const q = i / n, m = [s_0 + (s_1 - s_0) * q, t_0 + (t_1 - t_0) * q]; pushBox(X, f, m[0] - 0.05, m[0] + 0.05, m[1] - 0.05, m[1] + 0.05, 0.15, H, FRAME, [0, 1, 0, 0]); 
+          if (!back(nx, ny) && i < n) {            // přední sklo: odlesk na části tabule, nadsvětlík a sokl
+            const a = [m[0] + (s_1 - s_0) / n * 0.1, m[1] + (t_1 - t_0) / n * 0.1], c = [m[0] + (s_1 - s_0) / n * (i % 3 ? 0.36 : 0.62), m[1] + (t_1 - t_0) / n * (i % 3 ? 0.36 : 0.62)];
+            const pane = (p, q_, y0, y1, col) => pushBox(X, f, Math.min(p[0], q_[0]) - 0.02, Math.max(p[0], q_[0]) + 0.02, Math.min(p[1], q_[1]) - 0.02, Math.max(p[1], q_[1]) + 0.02, y0, y1, col, [0, 1, 0, 0]);
+            pane(a, c, 0.15, H - 0.6, [0.66, 0.80, 0.88]);
+            pane(m, [m[0] + (s_1 - s_0) / n, m[1] + (t_1 - t_0) / n], H - 0.6, H, [0.58, 0.72, 0.82]);
+          }
+        }
+      };
+      side(-L, -D, L, -D, sa, -ca); side(-L, D, L, D, -sa, ca); side(-L, -D, -L, D, -ca, -sa); side(L, -D, L, D, ca, sa);
+      pushBox(X, f, -L - 0.3, L + 0.3, -D - 0.3, D + 0.3, H, H + 0.4, FRAME, [0, 1, 1, 0], rc);
+      // Tatra 603 na třetině délky: černá karoserie, kabina se skly
+      const cs = -L * 0.45, BODY = [0.07, 0.07, 0.08], cs_ = [[cs - 2.5, cs + 2.5, 0.42, 1.0, 0.9], [cs - 1.4, cs + 1.0, 1.0, 1.5, 0.72]];
+      cs_.forEach(([a, c, y0, y1, w_], i) => pushBox(X, f, a, c, -w_, w_, 0.15 + y0, 0.15 + y1, i ? [0.30, 0.36, 0.42] : BODY, [0, 1, 0, 0], BODY));
+      for (const a of [cs - 1.5, cs + 1.5]) pushBox(X, f, a - 0.35, a + 0.35, -0.92, 0.92, 0.15, 0.85, [0.03, 0.03, 0.03], [0, 1, 0, 0]);
+      continue;
+    }
     if (b.s === 12) {               // přístřešek: deska střechy na sloupech, bez stěn
       const ring = b.p, rc = C255(b.rc), e = b.e, th = 0.35;
       const pts = ring.map(([x, y]) => new THREE.Vector2(x, y));
@@ -781,6 +819,16 @@ function roofDeco(b, X, eave, rc) {
     pushBox(B, F, -0.17, 0.17, -0.15, 0.15, 2.7, 3.05, [0.46, 0.47, 0.45], [0, 1, 1, 0]);
   });
   inst(statueG, P.statue || [], id);
+  // ruční socha běžce: nízký dlouhý podstavec z bílého betonu a bronzová figura
+  const sochaG = make((B) => {
+    pushBox(B, F, -1.8, 1.8, -0.65, 0.65, -0.2, 0.55, [0.93, 0.92, 0.88], [0, 1, 1, 0]);
+    const BR = [0.42, 0.29, 0.17];
+    pushBox(B, F, -0.45, -0.1, -0.13, 0.13, 0.55, 1.5, BR, [0, 1, 0, 0]);
+    pushBox(B, F, 0.1, 0.5, -0.13, 0.13, 0.95, 1.5, BR, [0, 1, 0, 0]);
+    pushBox(B, F, -0.2, 0.3, -0.2, 0.2, 1.5, 2.3, BR, [0, 1, 0, 0]);
+    pushBox(B, F, 0.0, 0.3, -0.13, 0.13, 2.3, 2.62, BR, [0, 1, 0, 0]);
+  });
+  inst(sochaG, P.socha || [], id);
   // popelnice před domy (černá komunál, modrá papír, žlutá plast)
   const wheelG = make((B) => {
     pushBox(B, F, -0.3, 0.3, -0.35, 0.35, 0, 1.0, [1, 1, 1], [0, 0, 1, 0]);
