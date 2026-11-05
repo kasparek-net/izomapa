@@ -1619,7 +1619,7 @@ if _cfg:
         if chosen: _sv.setdefault(s_['sil'], []).append((s_['sv'], s_['nak']))
     _nak = {k: round(100 * sum(n for _s, n in v) / max(1, sum(s for s, _n in v)), 1) for k, v in _sv.items()}   # % nákladních aut
     _sv = {k: float(np.median([s for s, _n in v])) for k, v in _sv.items()}
-_V_CLASS = {'trunk': 10000, 'primary': 8000, 'secondary': 3000, 'tertiary': 1500, 'unclassified': 400, 'residential': 300, 'living_street': 100}   # silnice bez sčítání: odhad
+_V_CLASS = {'motorway': 25000, 'trunk': 10000, 'primary': 8000, 'secondary': 3000, 'tertiary': 1500, 'unclassified': 400, 'residential': 300, 'living_street': 100}   # silnice bez sčítání: odhad
 def _intensity(r):
     routes = r.get('routes')
     for x in (routes if routes is not None and not isinstance(routes, float) else []):
