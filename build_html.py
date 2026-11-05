@@ -18,6 +18,9 @@ fill = {
 }
 app = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], open('web/app.html', encoding='utf-8').read())
 og = f'''<meta property="og:image" content="{SITE_URL}/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{E(M['titulek'])}: izometrická pixel-art mapa města">
 <meta property="og:url" content="{SITE_URL}/">
 <link rel="canonical" href="{SITE_URL}/">
 <meta name="twitter:card" content="summary_large_image">
