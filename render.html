@@ -591,9 +591,34 @@ function roofDeco(b, X, eave, rc) {
     }
   };
   const GOLDC = [0.85, 0.72, 0.30];
+  // lookout tower: pale column, stairs winding around it, dark flared head with a platform, antenna mast
+  const spiralTower = (t, f, s) => {
+    const green = C255(t.wc), dark = C255(t.tc), pale = [0.84, 0.82, 0.76], aw = [0, 1, 0, 0];
+    const Ro = t.w / 2, Rc = Ro * 0.45, z0 = t.b + s.from, headZ = t.h - s.head;
+    ring(X, f, Rc, Rc, t.b, t.h, 12, pale, aw);
+    const steps = 8, pitch = (headZ - z0) / s.turns, Z = (a) => z0 + pitch * a / (Math.PI * 2);
+    const Pt = (r, a, z) => f(Math.cos(a) * r, Math.sin(a) * r, z);
+    for (let i = 0; i < s.turns * steps; i++) {
+      const a0 = i / steps * Math.PI * 2, a1 = (i + 1) / steps * Math.PI * 2, z_0 = Z(a0), z_1 = Z(a1);
+      pushQuad(X, Pt(Rc, a0, z_0), Pt(Ro, a0, z_0), Pt(Ro, a1, z_1), Pt(Rc, a1, z_1), dark, aw);
+      pushQuad(X, Pt(Ro, a0, z_0 - 0.5), Pt(Rc, a0, z_0 - 0.5), Pt(Rc, a1, z_1 - 0.5), Pt(Ro, a1, z_1 - 0.5), dark, aw);
+      pushQuad(X, Pt(Ro, a0, z_0 - 0.7), Pt(Ro, a1, z_1 - 0.7), Pt(Ro, a1, z_1 + 1.9), Pt(Ro, a0, z_0 + 1.9), green, aw);
+      pushQuad(X, Pt(Ro + 0.03, a0, z_0 + 1.0), Pt(Ro + 0.03, a1, z_1 + 1.0), Pt(Ro + 0.03, a1, z_1 + 1.5), Pt(Ro + 0.03, a0, z_0 + 1.5), pale, aw);
+    }
+    const Rh = Ro * 1.28;
+    ring(X, f, Ro, Rh, headZ, headZ + s.head * 0.35, 8, dark, aw, Math.PI / 8);
+    ring(X, f, Rh, Rh, headZ + s.head * 0.35, headZ + s.head * 0.72, 8, green, aw, Math.PI / 8);
+    ring(X, f, Rh + 0.03, Rh + 0.03, headZ + s.head * 0.56, headZ + s.head * 0.66, 8, pale, aw, Math.PI / 8);
+    ring(X, f, Rh, Rh, headZ + s.head * 0.72, t.h, 8, dark, aw, Math.PI / 8);
+    ring(R, f, Rh * 1.05, Rc, t.h, t.to, 8, dark, [0, 0, 0, 0], Math.PI / 8);
+    const steel = [0.5, 0.52, 0.55];
+    pushBox(X, f, -0.4, 0.4, -0.4, 0.4, t.to, s.mast, steel, aw);
+    for (const k of [0.3, 0.6, 0.85]) pushBox(X, f, -1.3, 1.3, -1.3, 1.3, t.to + (s.mast - t.to) * k, t.to + (s.mast - t.to) * k + 0.8, steel, aw);
+  };
   for (const b of scene.buildings) {
     for (const t of b.tw || []) {
       const f = frameAt(t.x, t.y, 0, t.a), T = t.w / 2, n = t.round ? 10 : 4, rot = t.round ? 0 : Math.PI / 4;
+      if (t.spiral) { spiralTower(t, f, { from: 4, turns: 5, head: 7, mast: t.to + t.spiral }); continue; }
       const R0 = t.round ? T : T * Math.SQRT2;
       const wcol = C255(t.stone ? [150, 146, 136] : t.wc), tc = C255(t.tc);
       // dřík s okny (styl kostela), u kamenných věží bez oken

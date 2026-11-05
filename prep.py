@@ -1114,7 +1114,7 @@ for _, r in bld.iterrows():
                 if not own and not AREA.contains(Point(x, y)) and not EXT.contains(Point(x, y)): continue
                 b.setdefault('tw', []).append({'x': round(x, 2), 'y': round(y, 2), 'a': round(a, 4), 'w': tw['w'], 'h': round(gnd + tw['h'], 2),
                     'to': round(gnd + tw.get('to', tw['h']), 2), 'top': tw['top'], 'tc': tw.get('tc', [90, 96, 104]), 'wc': list(wc),
-                    'clock': tw.get('clock', 0), 'round': tw.get('round', 0), 'stone': tw.get('stone', 0), 'ruin': tw.get('ruin', 0), 'b': round(base, 2)})
+                    'clock': tw.get('clock', 0), 'round': tw.get('round', 0), 'stone': tw.get('stone', 0), 'ruin': tw.get('ruin', 0), 'b': round(base, 2), 'spiral': tw.get('spiral', 0)})
             if dsp.get('skylights') and pi == tw_piece:          # světlíky na ploché střeše
                 inner = p.buffer(-6.0)
                 if not inner.is_empty:
