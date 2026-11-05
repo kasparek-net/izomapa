@@ -1039,6 +1039,9 @@ for _, r in bld.iterrows():
         if not lm and r.id in DMP and area > 80 and DMP[r.id][0] >= 6 and DMP[r.id][1] - DMP[r.id][0] < 0.4:
             rs = 'flat'
             if tenement or (DMP[r.id][0] >= 11 and c in ('', 'residential', 'apartments', 'yes')): tenement = False; panel = True
+        # i malý dům: laser na celé střeše ve stejné výšce znamená plochou nebo téměř plochou střechu (ověřeno na ortofotu)
+        if not lm and r.id in DMP and area >= 25 and DMP[r.id][0] >= 2.2 and DMP[r.id][1] - DMP[r.id][0] < 0.35:
+            rs = 'flat'; tenement = False
         if lm == 'radnice': rs = 'hipped'
         if URBAN and not lm and rs not in (None, 'flat') and area > 2500: rs = 'flat'
         if c == 'roof': rs = 'flat'                     # přístřešek (nástupiště, zastávka): střecha na sloupech
