@@ -1361,7 +1361,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         }
         if (sx > 0.12) for (const [i, el] of MHD.act) {
           const trip = MHD.trips[i], o = mhdPos(trip, el + (now / 1000 - ns)), [line, typ] = MHD.routes[trip[0]];
-          if (!vis(o.ix, o.iy, 120)) continue;
+          if (!vis(o.ix, o.iy, 120) || !cam.grounds.some((q) => Math.abs(o.x - q.cx) <= cam.half && Math.abs(o.y - q.cy) <= cam.half)) continue;   // mimo čtverce mapy
           const shown_ = typ === 0 ? drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2) : typ === 2 ? drawVehicle(o, 26, 2.8, '#d9e6ee', sx, ox, oy, night, true) : drawVehicle(o, 12, 2.5, '#e9e6dc', sx, ox, oy, night, true);
           if (shown_) MHD.drawn.push([Math.round(ox + o.ix * sx), Math.round(oy + o.iy * sx) - Math.round(8 * sx), i]);
           if (shown_ && (sx > 0.55 || i === MHD.follow)) {     // číslo linky nad vozidlem

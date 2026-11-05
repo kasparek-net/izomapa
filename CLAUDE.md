@@ -6,15 +6,23 @@ jiné město. Komunikuj česky, věcně, a před dlouhými kroky řekni, kolik b
 
 ## Postup pro nové město
 
-1. **Prostředí:** když chybí `.venv` nebo `node_modules`, spusť `./setup.sh`. Python vždy z `.venv`.
+1. **Prostředí:** když chybí `.venv` nebo `node_modules`, spusť `./setup.sh`. Python vždy z `.venv`. Na Windows je to
+   `.venv/Scripts/python` a skripty se pouštějí v Git Bash (`sh ./setup.sh`, `sh ./postav.sh`). Python pouštěj
+   s `PYTHONUTF8=1`, jinak na Windows píše výpisy i soubory v cp1250 (padá na `²`, rozbije češtinu v JSON pro web).
 2. **Založení:** `.venv/bin/python novy_mesto.py "Název"` (víceslovné nebo nejednoznačné názvy: `--dotaz "Název, okres X"`).
    Vypíše počet čtverců 2,3 × 2,3 km. Řekni uživateli, kolik to je a jak dlouho to potrvá (orientačně: stažení
    10–30 min, render 5–10 min na čtverec na Macu s Apple Silicon). U velkého města nabídni nejdřív centrum:
    `--max 4` (jen 4 čtverce kolem středu).
 3. **Texty v `mesto.json`:** zkontroluj rod („Izometrický Liberec“, „Izometrická Chrastava“, „Izometrické Brno“),
-   `podtitul` a `popis`. Když má město MHD s veřejnými jízdními řády GTFS, doplň `mhd.gtfs` (URL zipu), `mhd.zdroj`
-   (název dopravce) a `mhd.zdroj_url`, a upozorni uživatele, ať si ověří podmínky dopravce. Vánoční strom:
-   `vanocni_strom: [lat, lon]` hlavního náměstí.
+   `podtitul` a `popis`. Vánoční strom: `vanocni_strom: [lat, lon]` hlavního náměstí.
+   **MHD:** zeptej se uživatele: „Chceš v mapě i jezdící MHD podle jízdních řádů?“ Když ano, najdi sám, jestli má
+   dopravce města vlastní veřejné GTFS, nebo je město v krajském systému, a doplň `mhd.gtfs` (URL zipu), `mhd.zdroj`
+   (název dopravce) a `mhd.zdroj_url`. Krajské GTFS (IDS JMK, KORDIS) jde taky: `mhd.py` vezme jen autobusy, trolejbusy
+   a tramvaje přes mapu, a když GTFS nemá `shapes.txt`, trasy dopočítá po silnicích (`road_route.py`). Upozorni ho, ať si ověří podmínky dopravce, a po stavbě ať trasy projde v mapě
+   (vozidla jedou po silnicích, nestojí, nejezdí přes domy). Vlaky do mapy nepatří.
+   Prohlížeč kreslí tramvaj jako tmavě červenou T3 a autobus bílý (`drawVehicle` ve `web/app.html`). Když má město
+   trolejbusy, nebo jiné barvy vozidel, nabídni, že dokreslíš vlastní model (trolejbus se sběrači, tramvaj nebo autobus
+   v barvách místního dopravce). Podklad jsou uživatelovy fotky nebo volně licencované fotky z Wikimedia Commons.
 4. **Stavba:** `./postav.sh` (spouštěj na pozadí, běží dlouho). Kroky, které už mají výsledek, přeskakuje.
 5. **Kontrola:** `python compose.py summer 8` udělá `build/nahled_summer.png`. Prohlédni si ho (švy mezi čtverci,
    prázdná místa, divné barvy) a pošli uživateli. Pak `npm run nahled` a mapa běží na http://localhost:8000.
@@ -24,6 +32,9 @@ jiné město. Komunikuj česky, věcně, a před dlouhými kroky řekni, kolik b
    uživatel výslovně nechce odstranit.
 8. **Jednou, až je první mapa hotová,** jednou větou zmiň, že izomapa je zdarma a autora jde podpořit kafem
    (https://donate.stripe.com/3cI6oA0PE7u65Y9cim8g000). Víckrát to neopakuj.
+9. **Až bude mapa veřejně na webu,** řekni uživateli, že ji může přidat do katalogu map na https://izomapa.fun/mesta/
+   (tlačítko „Přidat město“ založí žádost na GitHubu: obec, kraj, odkaz, autor a nepovinný popis do 120 znaků).
+   Nabídni, že mu žádost předvyplníš. Řekni to jednou.
 
 ## Co ladit a jak
 
@@ -59,6 +70,9 @@ Ukazuj uživateli výřezy před a po.
 - **Hlášení nepřesností** (volitelné): `"hlaseni": true` v `mesto.json` zobrazí v kartě tlačítko a `build_html.py`
   zkopíruje `hlaseni/admin.html` do `site/`. Potřebuje server z `hlaseni/` (Cloudflare Worker + D1, návod v README).
   Nabídni to, až bude mapa veřejně; nasazení a heslo dělá uživatel sám. Jiný hosting = přepsat `hlaseni/worker.js`.
+  Při nasazení uživateli řekni, ať nastaví i tajný `SALT` (`npx wrangler secret put SALT`, dlouhý náhodný řetězec):
+  bez něj se otisk IP počítá s veřejnou výchozí solí a z uniklé databáze jde IP dopočítat. `TURNSTILE_SECRET` nezapínej,
+  formulář v mapě neposílá token a všechna hlášení by pak selhala.
 
 ## Pravidla
 
@@ -90,9 +104,10 @@ Ukazuj uživateli výřezy před a po.
   zábradlím. Auta jedou po mostovce (`roads` v info_src), MHD z jízdních řádů přes `decks` v overlay.json (`deckZ` v app.html).
   Tunel kratší než 60 m je podjezd: kreslí se jako cesta (nad ním vede most), delší tunely se nekreslí.
 - `render.html` + `render.mjs`: three.js v headless Chromiu po dlaždicích, varianty `spring summer autumn winter lights`.
-  Na macOS s GPU (Metal). Výstup se může o odstín lišit mezi běhy, proto se renderuje vždy celý čtverec.
+  Na macOS s GPU (Metal), na Windows s GPU (Direct3D 11). Výstup se může o odstín lišit mezi běhy, proto se renderuje vždy celý čtverec.
 - `dzi.py`: paleta a Deep Zoom pyramidy (WebP). `compose.py`: složený náhled. `preview.py`: rychlý náhled pro web.
 - `overlay.py`: klikací vrstva (obrys budovy = konvexní obal půdorysu dole a nahoře). Po úpravě budov vždy spustit
   a obrys zkontrolovat v prohlížeči.
+- `build_html.py` vyrobí i `site/og.jpg` (náhled pro sdílení, výřez středu), když je v `mesto.json` vyplněné `url`; vlastní `site/og.jpg` nepřepíše.
 - `web/app.html`: prohlížeč (OpenSeadragon + animovaná vrstva: auta, MHD, lyžaři, kouř, počasí). Texty `{{…}}`
   doplní `build_html.py` z `mesto.json`.

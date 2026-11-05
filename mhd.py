@@ -6,12 +6,13 @@ python mhd.py [--stahnout]   stáhne build/gtfs.zip (při --stahnout nebo když 
   services kalendář {id: [po..ne (7× 0/1), od, do, [přidané dny], [zrušené dny]]}
   trips    [linka, trasa, služba, začátek (s od půlnoci), [Δt, vzdálenost po trase (m)] × zastávky, cíl, [zastávka, Δt příjezdu] × zastávky]
   heads, stops  názvy cílů a zastávek (indexy v trips)
+Krajské GTFS (např. IDS JMK) se ořízne: jen autobusy a tramvaje, jejichž trasa vede územím mapy.
 Prohlížeč z toho podle skutečného času dopočítá, kde je každé vozidlo. Bez mhd.gtfs skript nic neudělá.
 Místo adresy může být v mhd.gtfs "build/gtfs.zip" z nastroje/gtfs_cz.py, pak se nic nestahuje.
 """
 import csv, io, json, os, subprocess, sys, time, zipfile
 import shapely
-from geo import MESTO, to_local
+from geo import CHUNKS, HALF, MESTO, chunk_center, to_local
 
 URL = (MESTO.get('mhd') or {}).get('gtfs')
 if not URL: sys.exit('mesto.json nemá mhd.gtfs – MHD se vynechá')
@@ -20,39 +21,73 @@ if URL.startswith('http') and ('--stahnout' in sys.argv or not os.path.exists(Z)
     subprocess.run(['curl', '-sL', '-m', '120', '-o', Z + '.tmp', URL], check=True)
     zipfile.ZipFile(Z + '.tmp').testzip(); os.replace(Z + '.tmp', Z)
 zf = zipfile.ZipFile(Z)
-T = lambda n: list(csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='utf-8-sig')))
+T = lambda n: (csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='utf-8-sig')))
 sec = lambda t: (lambda h, m, s: h * 3600 + m * 60 + s)(*map(int, t.split(':')))
 
-routes, RI = [], {}
-for r in T('routes'):
-    RI[r['route_id']] = len(routes); routes.append([r['route_short_name'], int(r['route_type'] or 3)])
-trips = T('trips')
-used = {t['shape_id'] for t in trips}
-pts = {}
-for r in T('shapes'):
-    if r['shape_id'] in used: pts.setdefault(r['shape_id'], []).append((int(r['shape_pt_sequence']), float(r['shape_pt_lon']), float(r['shape_pt_lat']), float(r['shape_dist_traveled'] or 0)))
+AREA = shapely.union_all([shapely.box(x - HALF, y - HALF, x + HALF, y + HALF) for x, y in map(chunk_center, CHUNKS)])
+# tramvaj 0 / 900–906, autobus 3 / 700–716, trolejbus 11 / 800 (kreslí se jako autobus); vlaky a lanovky prohlížeč nekreslí
+KIND = lambda t: 0 if t == 0 or 900 <= t <= 906 else 3 if t in (3, 11, 800) or 700 <= t <= 716 else None
+RT = {r['route_id']: r for r in T('routes') if KIND(int(r['route_type'] or 3)) is not None}
+trips = [t for t in T('trips') if t['route_id'] in RT]
+SN, SXY = {}, {}
+for r in T('stops'):
+    SN[r['stop_id']] = r['stop_name']
+    if r['stop_lat']: SXY[r['stop_id']] = tuple(float(v) for v in to_local(float(r['stop_lon']), float(r['stop_lat'])))
 shapes, SI, SLEN = [], {}, {}
-for k, v in pts.items():
-    if len(v) < 2: continue
-    v.sort(); x, y = to_local([p[1] for p in v], [p[2] for p in v])
-    l = shapely.LineString(list(zip(x, y)))
-    SI[k] = len(shapes); SLEN[k] = (l.length, v[-1][3] or 1.0)
-    shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(l, 1.0).coords])
+if 'shapes.txt' in zf.namelist():
+    used = {t['shape_id'] for t in trips}
+    pts = {}
+    for r in T('shapes'):
+        if r['shape_id'] in used: pts.setdefault(r['shape_id'], []).append((int(r['shape_pt_sequence']), float(r['shape_pt_lon']), float(r['shape_pt_lat']), float(r['shape_dist_traveled'] or 0)))
+    for k, v in pts.items():
+        if len(v) < 2: continue
+        v.sort(); x, y = to_local([p[1] for p in v], [p[2] for p in v])
+        l = shapely.LineString(list(zip(x, y)))
+        if not l.intersects(AREA): continue                      # trasa mimo mapu
+        SI[k] = len(shapes); SLEN[k] = (l.length, v[-1][3] or 1.0)
+        shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(l, 1.0).coords])
+    trips = [t for t in trips if t['shape_id'] in SI]
+TI = {t['trip_id'] for t in trips}
+st = {}
+for r in T('stop_times'):
+    if r['trip_id'] not in TI: continue
+    st.setdefault(r['trip_id'], []).append((int(r['stop_sequence']), sec(r['arrival_time']), sec(r['departure_time']), float(r.get('shape_dist_traveled') or 0), r['stop_id']))
+for v in st.values(): v.sort()
+if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tras (např. IDS JMK): trasa mezi zastávkami po silnicích z mapy
+    import road_route
+    near = AREA.buffer(300)
+    trips = [t for t in trips if any(near.contains(shapely.Point(SXY[z[4]])) for z in st.get(t['trip_id'], []) if z[4] in SXY)]
+    R = road_route.Graph('data_all/segment.parquet')
+    syn = {}
+    for t in trips:
+        s = [z for z in st[t['trip_id']] if z[4] in SXY]
+        key = tuple(z[4] for z in s)
+        if key not in syn:
+            line, dists = R.path([SXY[z] for z in key])
+            syn[key] = (f'syn{len(shapes)}', dists)
+            SI[syn[key][0]] = len(shapes); SLEN[syn[key][0]] = (dists[-1] or 1.0, dists[-1] or 1.0)
+            shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(shapely.LineString(line), 1.0).coords])
+        t['shape_id'], dists = syn[key]
+        st[t['trip_id']] = [(q, a_, d_, dist, z) for (q, a_, d_, _, z), dist in zip(s, dists)]
+    print('trasy dopočítané po silnicích:', len(shapes), 'úseků bez silnice:', R.fails)
+TI = {t['trip_id'] for t in trips}; SV = {t['service_id'] for t in trips}
+st = {k: [(q, a_, d_, dist, SN.get(z, '')) for q, a_, d_, dist, z in v] for k, v in st.items() if k in TI}
+routes, RI = [], {}
+for rid in dict.fromkeys(t['route_id'] for t in trips):
+    RI[rid] = len(routes); routes.append([RT[rid]['route_short_name'], KIND(int(RT[rid]['route_type'] or 3))])
 services = {}
 for c in T('calendar'):
+    if c['service_id'] not in SV: continue
     services[c['service_id']] = [[int(c[d]) for d in ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')],
                                  int(c['start_date']), int(c['end_date']), [], []]
 for c in T('calendar_dates'):
+    if c['service_id'] not in SV: continue
     s = services.setdefault(c['service_id'], [[0] * 7, 0, 0, [], []])
     s[3 if c['exception_type'] == '1' else 4].append(int(c['date']))
-SN = {r['stop_id']: r['stop_name'] for r in T('stops')}
 names, NI = [], {}
 def nid(n):
     if n not in NI: NI[n] = len(names); names.append(n)
     return NI[n]
-st = {}
-for r in T('stop_times'):
-    st.setdefault(r['trip_id'], []).append((int(r['stop_sequence']), sec(r['arrival_time']), sec(r['departure_time']), float(r['shape_dist_traveled'] or 0), SN.get(r['stop_id'], '')))
 out = []
 for t in trips:
     if routes[RI[t['route_id']]][1] != 2 and len(routes[RI[t['route_id']]][0]) > 4: continue   # poptávková doprava apod. bez pravidelné trasy; vlaky mají dlouhá čísla
@@ -71,5 +106,5 @@ for t in trips:
     out.append([RI[t['route_id']], SI[t['shape_id']], t['service_id'], t0, seq, nid(t['trip_headsign'] or s[-1][4]), zs])
 out.sort(key=lambda q: q[3])
 json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names,
-           'feed': [r for r in T('feed_info')][0].get('feed_version', '')}, open('site/mhd.json', 'w'), separators=(',', ':'), ensure_ascii=False)
+           'feed': next(iter(T('feed_info')), {}).get('feed_version', '') if 'feed_info.txt' in zf.namelist() else time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(Z)))}, open('site/mhd.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 print('linek', len(routes), 'tras', len(shapes), 'spojů', len(out), 'kB', os.path.getsize('site/mhd.json') // 1000)

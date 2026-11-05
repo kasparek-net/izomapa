@@ -119,6 +119,8 @@ Kód je pod licencí **AGPL-3.0** (soubor `LICENSE`). Kdo ho upraví a pustí ja
 ## Co potřebujete
 
 - Mac s Apple Silicon (M1 a novější), nebo PC s grafickou kartou. Bez GPU (v cloudu) to jde taky, ale řádově pomaleji.
+  Na Windows skripty spouštějte v Git Bash (`sh ./setup.sh`, `sh ./postav.sh`) a před ručním spuštěním
+  Pythonu (`novy_mesto.py` apod.) nastavte `export PYTHONUTF8=1`.
 - Python 3.9+, Node 18+.
 - Disk: malé město jednotky GB, krajské město desítky GB.
 - Hosting pro statický web. Výsledek je obyčejná složka `site/` s tisíci obrázků, nahrajete ji kamkoli, kde zvládnou
@@ -143,7 +145,8 @@ prep.py         data -> scéna čtverce (budovy, stromy, textury terénu podle r
 render.html     renderer (three.js), render.mjs ho pouští po dlaždicích v Chromiu
 dzi.py          dlaždice -> Deep Zoom pyramidy (WebP) do site/tiles/
 overlay.py      klikací vrstva: obrysy budov, adresy, ulice, místa, doprava
-mhd.py          jízdní řády GTFS -> site/mhd.json
+mhd.py          jízdní řády GTFS -> site/mhd.json (krajské GTFS ořízne na mapu)
+road_route.py   trasy autobusů po silnicích pro GTFS bez shapes.txt (např. IDS JMK)
 nastroje/mhd_cisjr.py  oficiální jízdní řády autobusů a vlaků CIS JŘ (bez GTFS dopravce) -> build/gtfs.zip pro mhd.py
 hlaseni/        volitelný server: hlášení nepřesností a administrace /admin
 web/app.html    prohlížeč, build_html.py z něj udělá site/index.html
@@ -169,6 +172,11 @@ přepíše pro jiný hosting.
 Ukládá se jen text hlášení, místo na mapě a otisk (hash) IP adresy kvůli limitu 3 hlášení za hodinu, ne IP samotná.
 Bez `"hlaseni": true` se tlačítko nezobrazí a web zůstane čistě statický.
 
+**Před ostrým provozem nastavte ještě `SALT`:** `npx wrangler secret put SALT` (libovolný dlouhý náhodný řetězec).
+Bez něj se k otisku IP přidává veřejně známá výchozí „sůl“ z kódu a z otisku pak jde IP adresa zpětně dopočítat,
+kdyby databáze unikla. Před spamem chrání jen limit 3 hlášení za hodinu na IP adresu (`worker.js` umí i Cloudflare
+Turnstile přes `TURNSTILE_SECRET`, ale formulář v mapě zatím token neposílá, takže ho nezapínejte).
+
 ## Známé pasti
 
 - **Chyby v OpenStreetMap** se do mapy propíšou: kostel na špatném místě, potok pod domy, rybník jako asfalt.
@@ -185,6 +193,8 @@ Bez `"hlaseni": true` se tlačítko nezobrazí a web zůstane čistě statický.
 Repozitář dávám k dispozici, jak je. Podporu neposkytuju, na issues a pull requesty se podívám, až budu mít čas.
 
 Když vám repo ušetřilo práci, můžete mi [koupit kafe ☕](https://donate.stripe.com/3cI6oA0PE7u65Y9cim8g000).
+Až bude vaše mapa venku, pošlete mi ji do [katalogu map](https://izomapa.fun/mesta/) (tlačítko „Přidat město“),
+rád ji tam zveřejním.
 Budu rád, když v mapě necháte nenápadný odkaz „Vytvořeno nástrojem izomapa“ (je v O projektu a v nápovědě).
 
 Prosím, nepojmenovávejte svoje projekty „Izomapa“ a nepoužívejte domény izomapa.fun a izomapa.cz. Pojmenujte je po svém městě.

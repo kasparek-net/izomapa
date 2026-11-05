@@ -269,17 +269,21 @@ ZSAD = [g for g in map(_zpoly, ZAB['sad']) if g.intersects(_zb)]
 for g in ZTTP: fill(g, C['meadow'])
 CROPS = ['wheat'] * 4 + ['rape'] * 2 + ['maize'] * 2 + ['soil'] * 2
 for g in ZORNA:
+    # plodina a směr řádků podle celého pole (ne podle kusu v tomto čtverci), aby pole na švu čtverců navazovalo
+    o = g.minimum_rotated_rectangle; oc = list(o.exterior.coords)[:4]
+    e1 = np.subtract(oc[1], oc[0]); e2 = np.subtract(oc[2], oc[1])
+    if np.linalg.norm(e1) < np.linalg.norm(e2): e1, e2 = e2, e1
+    u = e1 / np.linalg.norm(e1)
+    if u[0] < 0 or (u[0] == 0 and u[1] < 0): u = -u              # stejná orientace ve všech čtvercích
+    v = np.array([-u[1], u[0]]); c0 = np.array(g.centroid.coords[0])
+    cr = CROPS[int(h01(wkey(c0[0] + CX, c0[1] + CY) + 'pole') * len(CROPS))]
     for p in polys(g.intersection(DRAWBOX)):
         if p.area < 400: continue
-        cr = CROPS[int(h01(wkey(p.centroid.x + CX, p.centroid.y + CY) + 'pole') * len(CROPS))]
         fill(p, C[cr])
-        o = p.minimum_rotated_rectangle; oc = list(o.exterior.coords)[:4]
-        e1 = np.subtract(oc[1], oc[0]); e2 = np.subtract(oc[2], oc[1])
-        if np.linalg.norm(e1) < np.linalg.norm(e2): e1, e2 = e2, e1
-        u = e1 / np.linalg.norm(e1); v = np.array([-u[1], u[0]]); c0 = np.array(p.centroid.coords[0]); R_ = math.hypot(*np.subtract(p.bounds[2:], p.bounds[:2]))
-        k = -R_
-        while k < R_:                                # řádky po 2 m
-            l = LineString([tuple(c0 + v * k - u * R_), tuple(c0 + v * k + u * R_)]).intersection(p)
+        pc = np.array(p.exterior.coords) - c0; pu_, pv_ = pc @ u, pc @ v
+        k = math.floor(pv_.min() / 2.0) * 2.0
+        while k < pv_.max():                         # řádky po 2 m na mřížce celého pole
+            l = LineString([tuple(c0 + v * k + u * (pu_.min() - 1)), tuple(c0 + v * k + u * (pu_.max() + 1))]).intersection(p)
             if not l.is_empty: line(l, C[cr + '2'], 0.6)
             k += 2.0
 
@@ -305,6 +309,9 @@ for _, r in wat.iterrows():
         line(g, C['stream'], 6, block=True)
 
 seg = load('segment')
+# dálnice ve výstavbě se nekreslí (staveniště je vidět ve využití území)
+_uc = lambda r: r['class'] == 'motorway' and any('is_under_construction' in list(f.get('values')) for f in (r.road_flags if r.road_flags is not None else []))
+seg = seg[[not _uc(r) for _, r in seg.iterrows()]].reset_index(drop=True)
 TUNNEL_MIN = 60.0     # kratší „tunel“ je podjezd pod silnicí nebo tratí: kreslí se jako cesta, nad ní vede most
 def tunnel_parts(r):
     """části segmentu mimo tunel (0..1); dlouhé tunely se nekreslí, silnice je pod zemí"""
@@ -355,13 +362,13 @@ for _, r in seg.iterrows():
         if isb and g.length >= BRIDGE_MIN: bridge_segs.append((g, r)); continue
         q = r.copy(); q['geom'] = g; _rows.append(q)
 seg = pd.DataFrame(_rows).reset_index(drop=True)
-RW = {'trunk': 12, 'primary': 10, 'secondary': 9, 'tertiary': 8, 'residential': 6, 'unclassified': 6,
+RW = {'motorway': 18, 'trunk': 12, 'primary': 10, 'secondary': 9, 'tertiary': 8, 'residential': 6, 'unclassified': 6,
       'living_street': 5, 'service': 3.6, 'pedestrian': 4, 'track': 3, 'footway': 1.8, 'path': 1.6,
       'cycleway': 2, 'steps': 2, 'bridleway': 1.6, 'unknown': 3}
 def rwidth(r):
     """šířka silnice: RW je obousměrná; jednosměrný pás dvoupásové silnice ~60 %, sjezd (link) jeden pruh 5 m"""
     w = RW.get(r['class'], 3)
-    if r['class'] not in ('trunk', 'primary', 'secondary', 'tertiary'): return w
+    if r['class'] not in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary'): return w
     if str(r.get('subclass')) == 'link': return min(w, 5.0)
     acc = r.get('access_restrictions')
     oneway = acc is not None and not isinstance(acc, float) and any(
@@ -369,7 +376,7 @@ def rwidth(r):
     return round(w * 0.6, 1) if oneway else w
 RCLS = {'track': 'dirt', 'path': 'dirt', 'bridleway': 'dirt', 'footway': 'footway', 'cycleway': 'footway',
         'steps': 'paved', 'pedestrian': 'cobble'}
-DRIVE = {'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'living_street', 'service'}
+DRIVE = {'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'living_street', 'service'}
 roads = []
 for _, r in seg.iterrows():
     c = r['class']
@@ -520,7 +527,7 @@ for pl in UP.get('plochy', []):
     fill(g_, C[pl['k']])
 # středová přerušovaná čára
 for _, g, c, w, _n in roads:
-    if c in ('trunk', 'primary', 'secondary', 'tertiary'):
+    if c in ('trunk', 'primary', 'secondary', 'tertiary') or (c == 'motorway' and w >= 7):     # dálnice: čára mezi pruhy, ne na sjezdu
         for l in lines(g.intersection(AREA)):
             d = 0.0
             while d < l.length - 3:
@@ -529,7 +536,7 @@ for _, g, c, w, _n in roads:
 
 drive_lines = [(l, w, c, n) for _, g, c, w, n in roads if c in DRIVE for l in lines(g)]
 # kanály (poklopy) a stopčáry u vjezdu na důležitější silnici
-RANK = {'service': 0, 'living_street': 1, 'residential': 2, 'unclassified': 2, 'tertiary': 3, 'secondary': 4, 'primary': 5, 'trunk': 6}
+RANK = {'service': 0, 'living_street': 1, 'residential': 2, 'unclassified': 2, 'tertiary': 3, 'secondary': 4, 'primary': 5, 'trunk': 6, 'motorway': 7}
 nodes_rank = {}
 for l, w, c, n in drive_lines:
     for pt in (l.coords[0], l.coords[-1]):
@@ -1272,7 +1279,7 @@ for _, r in inf.iterrows():
 lamp_tree = shapely.STRtree(lamp_pts) if lamp_pts else None
 bm_arr = np.asarray(bmask)
 for l, w, c, n in drive_lines:
-    if c == 'service': continue
+    if c in ('service', 'motorway'): continue          # dálnice bez lamp
     d, side = 12.0, 1
     while d < l.length - 5:
         q = l.interpolate(d)

@@ -1,6 +1,27 @@
 """Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap). Výsledná složka site/ je statický web."""
 import hashlib, html, json, os, re
+from PIL import Image
+import geo
 from geo import MESTO
+
+
+def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=1):
+    """náhled pro sdílení (og:image) 1200×630: výřez středu města z letních dlaždic (o úroveň menší než plné rozlišení)"""
+    t = json.load(open('site/tiles.json')); base = t['base']; I = t['summer']['Image']
+    T = int(I['TileSize']); SW, SH = int(I['Size']['Width']), int(I['Size']['Height'])
+    lv = max(int(n) for n in os.listdir('site/tiles/summer') if n.isdigit()) - dolu; k = 2 ** dolu
+    vx, vy, _ = geo.view(0, 0, 0)
+    cx, cy = (vx - base['x0']) / base['mpp'] / k, (base['y1'] - vy) / base['mpp'] / k
+    lw, lh = -(-SW // k), -(-SH // k)
+    x0 = int(min(max(cx - W / 2, 0), max(lw - W, 0))); y0 = int(min(max(cy - H / 2, 0), max(lh - H, 0)))
+    img = Image.new('RGB', (W, H), (27, 33, 48))
+    for i in range(x0 // T, (x0 + W) // T + 1):
+        for j in range(y0 // T, (y0 + H) // T + 1):
+            f = f'site/tiles/summer/{lv}/{i}_{j}.webp'
+            if os.path.exists(f):
+                q = Image.open(f).convert('RGBA'); img.paste(q, (i * T - x0, j * T - y0), q)
+    img.save(out, quality=85)
+
 
 M = MESTO
 SITE_URL = (M.get('url') or '').rstrip('/')          # plná adresa webu (kvůli og:image a sitemap); prázdné = bez nich
@@ -81,3 +102,7 @@ a{{color:#f2c66d}}
 if M.get('hlaseni'):                                  # volitelná administrace hlášení (server v hlaseni/)
     open('site/admin.html', 'w', encoding='utf-8').write(open('hlaseni/admin.html', encoding='utf-8').read())
 print('site/index.html', len(page))
+
+# og:image: vyrobí se jednou ze středu města; vlastní site/og.jpg (1200×630) se nepřepisuje
+if SITE_URL and not os.path.exists('site/og.jpg') and os.path.exists('site/tiles.json'):
+    og_obrazek(); print('site/og.jpg')
