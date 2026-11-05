@@ -11,7 +11,7 @@ fill = {
     'PODTITUL': E(M['podtitul']),
     'HLASENI': 'true' if M.get('hlaseni') else 'false',
     'MHD': 'true' if mhd.get('gtfs') else 'false',
-    'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
+    'MHD_ZDROJ': f', jízdní řády © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                  if mhd.get('gtfs') and mhd.get('zdroj') else '',
 }
 app = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], open('web/app.html', encoding='utf-8').read())

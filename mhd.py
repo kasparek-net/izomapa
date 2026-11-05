@@ -7,6 +7,7 @@ python mhd.py [--stahnout]   stáhne build/gtfs.zip (při --stahnout nebo když 
   trips    [linka, trasa, služba, začátek (s od půlnoci), [Δt, vzdálenost po trase (m)] × zastávky, cíl, [zastávka, Δt příjezdu] × zastávky]
   heads, stops  názvy cílů a zastávek (indexy v trips)
 Prohlížeč z toho podle skutečného času dopočítá, kde je každé vozidlo. Bez mhd.gtfs skript nic neudělá.
+Místo adresy může být v mhd.gtfs "build/gtfs.zip" z nastroje/gtfs_cz.py, pak se nic nestahuje.
 """
 import csv, io, json, os, subprocess, sys, time, zipfile
 import shapely
@@ -15,7 +16,7 @@ from geo import MESTO, to_local
 URL = (MESTO.get('mhd') or {}).get('gtfs')
 if not URL: sys.exit('mesto.json nemá mhd.gtfs – MHD se vynechá')
 Z = 'build/gtfs.zip'
-if '--stahnout' in sys.argv or not os.path.exists(Z) or time.time() - os.path.getmtime(Z) > 86400:
+if URL.startswith('http') and ('--stahnout' in sys.argv or not os.path.exists(Z) or time.time() - os.path.getmtime(Z) > 86400):
     subprocess.run(['curl', '-sL', '-m', '120', '-o', Z + '.tmp', URL], check=True)
     zipfile.ZipFile(Z + '.tmp').testzip(); os.replace(Z + '.tmp', Z)
 zf = zipfile.ZipFile(Z)
