@@ -19,4 +19,13 @@ res = {str(i): [150 + i % 3, 140 + i % 3, 125 + i % 3] for i in range(30)}; res[
 out = s.tone(res)
 assert abs(out['0'][0] - out['0'][2]) < 6, out['0']                   # teplý nádech snímku zmizí
 assert out['r'][0] - out['r'][1] > 95, out['r']                 # barevná střecha zesílí
+assert 'stin' not in s.tone({**res, 'stin': [24, 45, 60]})             # střecha ve stínu nesmí zmodrat, zůstane náhodná barva
+assert 'cerna' not in s.tone({**res, 'cerna': [30, 30, 30]})
+assert 'panely' in s.tone({**res, 'panely': [90, 105, 125]})          # světlá modrošedá krytina zůstává
+import dzi
+from PIL import Image
+sample = Image.fromarray(np.vstack([px((70, 120, 80), 90000), px((84, 110, 108), 9000), px((150, 150, 150), 9000)]).reshape(-1, 300, 3))
+pal = dzi.palette_with_water(sample, 160).getpalette()
+near = lambda c: min((pal[i:i + 3] for i in range(0, 477, 3)), key=lambda q: sum((a - b) ** 2 for a, b in zip(q, c)))
+n = near((78, 94, 111)); assert n[2] > n[1] + 8, n                    # plechová střecha nezezelená ani v převaze zeleně
 print('ok')

@@ -54,6 +54,11 @@ def roof_color(px):
     return [int(v) for v in np.median(q, axis=0)]
 
 
+def in_shade(c):
+    """střecha celá ve stínu je tmavá a do modra (stín svítí obloha): skutečnou barvu nevidíme"""
+    return c.mean() < 50 or (c.mean() < 90 and c[2] - c[0] > 25)
+
+
 def tone(res):
     """snímek má barevný nádech: vyvážit podle téměř neutrálních střech, pak přidat sytost, aby barvy seděly k vzhledu mapy"""
     a = np.array(list(res.values()), float)
@@ -63,7 +68,7 @@ def tone(res):
     for k, v in res.items():
         c = np.array(v, float) * gain; g = c.mean()
         c = np.clip((g + (c - g) * SAT) * VAL, 0, 255)
-        out[k] = [int(round(x)) for x in c]
+        if not in_shade(c): out[k] = [int(round(x)) for x in c]
     return out
 
 

@@ -62,6 +62,10 @@ def build(variant, chunk=None):
 WATER = [(64, 124, 190), (92, 196, 230), (72, 132, 196), (186, 210, 228), (150, 168, 184), (58, 96, 136), (236, 240, 240)]
 
 
+# modrošedé střechy (plech, panely): jsou vzácné a median cut je posouval k převládající zeleni do tyrkysové
+ROOF_COOL = [(120, 135, 150), (102, 116, 131), (89, 107, 126), (70, 84, 100), (130, 136, 150)]
+
+
 # ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou.
 # Mají sloty za paletou a dostanou je jen pixely přesně té barvy, ostatní barvy mapy se tak neposunou.
 SURFACES = [(176, 176, 174), (120, 125, 139), (195, 195, 189), (133, 138, 151), (138, 98, 83), (94, 70, 66)]
@@ -69,9 +73,9 @@ SURFACES_WINTER = [(197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152,
 
 
 def palette_with_water(sample, colors):
-    q = sample.quantize(colors=colors - 1 - 3 * len(WATER), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER))]
-    for r, g, b in WATER:
+    q = sample.quantize(colors=colors - 1 - 3 * len(WATER + ROOF_COOL), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER + ROOF_COOL))]
+    for r, g, b in WATER + ROOF_COOL:
         for k in (1.0, 0.8, 0.66):         # stupně osvětlení terénu ve stínu
             p += [int(r * k), int(g * k), int(b * k)]
     im = Image.new('P', (1, 1)); im.putpalette(p + [0] * (768 - len(p)))
