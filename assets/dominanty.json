@@ -148,5 +148,65 @@
   }
  },
   {"name": "Výstavní pavilon", "lat": 49.5987, "lon": 18.145053, "text": "Skleněný pavilon s vozem Tatra. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "pavilon", "wc": [150, 178, 192], "rc": [128, 124, 92], "r": "flat", "h": 4, "win": 5}},
-  {"name": "Lašská brána", "lat": 49.598898, "lon": 18.14536, "text": "Portál z bílého betonu, výška 5 m, šířka 17 m. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "brana", "wc": [255, 253, 246], "rc": [255, 253, 246], "r": "flat", "h": 5, "win": 5}}
+  {"name": "Lašská brána", "lat": 49.598898, "lon": 18.14536, "text": "Portál z bílého betonu, výška 5 m, šířka 17 m. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "brana", "wc": [255, 253, 246], "rc": [255, 253, 246], "r": "flat", "h": 5, "win": 5}},
+ {
+  "name": "Tatrovanka",
+  "lat": 49.599134, "lon": 18.145935,
+  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0) a ortofota ČÚZK: bílá fasáda, pásy oken, plochá střecha.",
+  "spec": {"wc": [236, 236, 228], "rc": [112, 112, 116], "r": "flat", "win": 3}
+ },
+ {
+  "name": "Poliklinika Therapon",
+  "lat": 49.595536, "lon": 18.145879,
+  "text": "Podle fotky z Wikimedia Commons (CC BY-SA 4.0) a ortofota ČÚZK: cihlově červené zdi, vyšší střední trakt. Výška z laseru je jen odhad, půdorys má více výšek.",
+  "spec": {"wc": [166, 92, 70], "rc": [98, 100, 104], "r": "flat", "h": 10, "win": 1, "blocks": [{"l": 0.62, "w": 0.2, "h": 18, "rc": [172, 92, 62]}]}
+ },
+ {
+  "name": "Zimní stadion",
+  "lat": 49.593511, "lon": 18.145826,
+  "text": "Podle fotek z Wikimedia Commons (Jan Polák, CC BY-SA 3.0) a ortofota ČÚZK: betonové zdi, bílá klenutá střecha.",
+  "spec": {"wc": [170, 164, 152], "rc": [226, 228, 226], "r": "flat", "h": 9, "win": 15, "deco": [{"k": "barrel", "axis": 1, "h": 8, "c": [226, 228, 226]}]}
+ },
+ {
+  "name": "Muzeum nákladních automobilů Tatra",
+  "lat": 49.594143, "lon": 18.148617,
+  "text": "Podle fotky z Wikimedia Commons (RomanM82, CC BY-SA 4.0) a ortofota ČÚZK: šedé zdi, tmavá střecha.",
+  "spec": {"wc": [152, 152, 150], "rc": [58, 60, 64], "r": "flat", "h": 10, "win": 15}
+ },
+ {
+  "name": "Muzeum nákladních automobilů, vstupní hala",
+  "lat": 49.593752, "lon": 18.148465,
+  "text": "Stejné podklady: tmavé sklo a ocel.",
+  "spec": {"wc": [72, 86, 94], "rc": [50, 52, 56], "r": "flat", "h": 9, "win": 14}
+ },
+ {
+  "name": "Dům podnikatelů",
+  "lat": 49.599043, "lon": 18.146873,
+  "text": "Podle fotky z Wikimedia Commons (Jan Polák, CC BY-SA 3.0): světlé zdi, červená atika.",
+  "spec": {"wc": [232, 222, 186], "rc": [168, 72, 52], "r": "flat"}
+ },
+ {
+  "name": "Sportovní hala",
+  "lat": 49.598884, "lon": 18.13835,
+  "text": "Podle ortofota ČÚZK: tmavá střecha, bílá fasáda s pásem oken. Fotku jsem nenašel, barva zdí je z ortofota.",
+  "spec": {"wc": [236, 234, 226], "rc": [96, 98, 102], "r": "flat", "win": 3}
+ },
+ {
+  "name": "Krytý bazén",
+  "lat": 49.59052, "lon": 18.15206,
+  "text": "Podle ortofota ČÚZK: světlá střecha. Fotku jsem nenašel, barva zdí je odhad.",
+  "spec": {"rc": [226, 226, 222], "r": "flat", "win": 3}
+ },
+ {
+  "name": "Sportovní hala SOU",
+  "lat": 49.59106, "lon": 18.15284,
+  "text": "Podle ortofota ČÚZK: světlá střecha. Fotku jsem nenašel, barva zdí je odhad.",
+  "spec": {"rc": [226, 226, 222], "r": "flat", "win": 3}
+ },
+ {
+  "name": "Hotel Stadion",
+  "lat": 49.59343, "lon": 18.1453,
+  "text": "Podle ortofota ČÚZK: plochá šedá střecha, ne červená sedlová.",
+  "spec": {"wc":[232,224,204],"rc":[176,176,172],"r":"flat","h":10,"win":1}
+ }
 ]
