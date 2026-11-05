@@ -10,6 +10,7 @@ fill = {
     'TITULEK': E(M['titulek']), 'POPIS': E(M['popis']), 'MESTO': E(M['nazev']), 'H1_A': E(M['h1'][0]), 'H1_B': E(M['h1'][1]),
     'PODTITUL': E(M['podtitul']),
     'HLASENI': 'true' if M.get('hlaseni') else 'false',
+    'MHD': 'true' if mhd.get('gtfs') else 'false',
     'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                  if mhd.get('gtfs') and mhd.get('zdroj') else '',
 }
@@ -44,6 +45,28 @@ open('site/index.html', 'w', encoding='utf-8').write(page)
 open('site/robots.txt', 'w').write('User-agent: *\nAllow: /\n' + (f'Sitemap: {SITE_URL}/sitemap.xml\n' if SITE_URL else ''))
 if SITE_URL:
     open('site/sitemap.xml', 'w').write(f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>{SITE_URL}/</loc></url></urlset>\n')
+# tiles and previews carry ?v= from set_status.py, so they can be cached forever; Pages reads _headers, other hosts ignore it
+open('site/_headers', 'w').write(''.join(f'/{d}/*\n  Cache-Control: public, max-age=31536000, immutable\n' for d in ('tiles', 'preview')))
+open('site/404.html', 'w', encoding='utf-8').write(f'''<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stránka nenalezena | {E(M['titulek'])}</title>
+<style>
+body{{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;box-sizing:border-box;background:#1b2333;color:#eef1e6;font:18px/1.5 system-ui,sans-serif;text-align:center}}
+a{{color:#f2c66d}}
+</style>
+</head>
+<body>
+<main>
+<h1>Tato stránka tu není</h1>
+<p><a href="/">Zpět na mapu: {E(M['titulek'])}</a></p>
+</main>
+</body>
+</html>
+''')
 if M.get('hlaseni'):                                  # volitelná administrace hlášení (server v hlaseni/)
     open('site/admin.html', 'w', encoding='utf-8').write(open('hlaseni/admin.html', encoding='utf-8').read())
 print('site/index.html', len(page))
