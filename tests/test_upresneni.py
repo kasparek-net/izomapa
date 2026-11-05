@@ -16,3 +16,5 @@ for d in json.loads((R / 'assets/dominanty.json').read_text()):
 palette = prep[prep.index("'summer': {"):prep.index("sp = dict(SEASON_PAL")]
 for k in ('plaza', 'plaza2', 'deck'): assert f"'{k}'" in palette, k
 print('upresneni ok')
+dzi = (R / 'dzi.py').read_text()
+assert 'for c in SURFACES: p += list(c)' in dzi

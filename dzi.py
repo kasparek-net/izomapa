@@ -61,9 +61,16 @@ def build(variant, chunk=None):
 WATER = [(64, 124, 190), (92, 196, 230), (72, 132, 196), (186, 210, 228), (150, 168, 184), (58, 96, 136), (236, 240, 240)]
 
 
+# ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou
+SURFACES = [(176, 176, 174), (120, 125, 139), (195, 195, 189), (133, 138, 151), (138, 98, 83), (94, 70, 66),
+            (197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152, 176), (167, 151, 151), (114, 107, 121)]
+
+
 def palette_with_water(sample, colors):
-    q = sample.quantize(colors=colors - 1 - 3 * len(WATER), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER))]
+    n = colors - 1 - 3 * len(WATER) - len(SURFACES)
+    q = sample.quantize(colors=n, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    p = q.getpalette()[:3 * n]
+    for c in SURFACES: p += list(c)
     for r, g, b in WATER:
         for k in (1.0, 0.8, 0.66):         # stupně osvětlení terénu ve stínu
             p += [int(r * k), int(g * k), int(b * k)]
