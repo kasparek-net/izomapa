@@ -22,7 +22,7 @@ await ctx.route('**/openseadragon.min.js', (r) => r.fulfill({ path: 'node_module
 await ctx.route('**/fonts.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 const page = await ctx.newPage();
 await page.clock.setFixedTime(new Date('2026-11-05T15:30:00+01:00'));
-await page.goto(`http://127.0.0.1:${server.address().port}/#@${lat},${lon},${km}`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${server.address().port}/#leto@${lat},${lon},${km}`, { waitUntil: 'load' });
 await page.waitForTimeout(9000);
 const font = fs.readFileSync('build/PixelifySans.ttf').toString('base64');
 await page.evaluate(([font, line1, line2, sub, domain]) => {
