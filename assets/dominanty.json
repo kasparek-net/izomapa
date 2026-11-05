@@ -12,10 +12,10 @@
  {
   "name": "Rozhledna Bílá hora",
   "lat": 49.594296, "lon": 18.126402,
-  "text": "Podle fotek z Wikimedia Commons (public domain): válcová věž se zelenými ochozy a tmavou stříškou, výška 43 m podle OpenStreetMap.",
+  "text": "Podle fotek z Wikimedia Commons (public domain): světlý sloup, kolem něj točité schodiště se zeleným zábradlím, tmavá hlava s plošinou a anténní stožár, u paty kamenná budova. Výška 43 m a plošina ve 26 m podle Wikipedie, výška hlavy je odhad z fotek.",
   "spec": {
    "wc": [78, 150, 128], "rc": [70, 66, 62], "r": "flat", "h": 3, "rh": 0,
-   "towers": [{"at": "c", "w": 11, "h": 39, "top": "cone", "to": 43, "tc": [70, 66, 62], "round": 1}]
+   "towers": [{"at": "c", "w": 11, "h": 33, "top": "cone", "to": 34, "tc": [52, 54, 54], "round": 1, "spiral": 9}]
   }
  },
  {
