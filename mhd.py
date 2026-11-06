@@ -25,8 +25,8 @@ T = lambda n: (csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='ut
 sec = lambda t: (lambda h, m, s: h * 3600 + m * 60 + s)(*map(int, t.split(':')))
 
 AREA = shapely.union_all([shapely.box(x - HALF, y - HALF, x + HALF, y + HALF) for x, y in map(chunk_center, CHUNKS)])
-# tramvaj 0 / 900–906, autobus 3 / 700–716, trolejbus 11 / 800 (kreslí se jako autobus); vlak 2; lanovky prohlížeč nekreslí
-KIND = lambda t: 0 if t == 0 or 900 <= t <= 906 else 3 if t in (3, 11, 800) or 700 <= t <= 716 else 2 if t == 2 else None
+# tramvaj 0 / 900–906, autobus 3 / 700–716, trolejbus 11 / 800 (kreslí se jako autobus); vlak 2, jen s volbou "vlak"; lanovky prohlížeč nekreslí
+KIND = lambda t: 0 if t == 0 or 900 <= t <= 906 else 3 if t in (3, 11, 800) or 700 <= t <= 716 else 2 if t == 2 and MESTO.get('vlak') else None
 RT = {r['route_id']: r for r in T('routes') if KIND(int(r['route_type'] or 3)) is not None}
 trips = [t for t in T('trips') if t['route_id'] in RT]
 SN, SXY = {}, {}
