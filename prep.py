@@ -1407,6 +1407,7 @@ for a, e, k in UP['buses']:
 portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
 if os.path.exists('assets/mobiliar_mesta.json'):  # mobiliář z pasportů města (nastroje/mobiliar_mesta.py): přednost před OSM, co v pasportu chybí, zůstává
     _mm = json.load(open('assets/mobiliar_mesta.json'))
+    _voz = shapely.unary_union([l_.buffer(w_ / 2) for _a, l_, c_, w_, _n in roads if c_ in DRIVE]); _vozp = shapely.prepared.prep(_voz)
     for k_ in _mm: props.setdefault(k_, [])
     for k_, pl_ in _mm.items():
         pts_ = [q_ for q_ in (Point(*(float(v) for v in to_local(lo, la))) for la, lo in pl_) if AREA.contains(q_)]
@@ -1417,6 +1418,10 @@ if os.path.exists('assets/mobiliar_mesta.json'):  # mobiliář z pasportů měst
         for q_ in pts_:
             nd_ = nearest_dir(q_, all_tree, all_lines, 15)
             props[k_].append([q_.x, q_.y, float(ground(q_.x, q_.y)), nd_[0] if nd_ else h01(wkey(q_.x, q_.y)) * 6.28])
+    for k_ in _mm:                                     # šířka silnice v mapě je odhad, věci u krajnice by jinak stály ve vozovce
+        for p_ in props[k_]:
+            x_, y_ = geo.mimo_vozovku(p_[0], p_[1], _voz, _vozp, 1.5 if k_ == 'shelter' else 0.6)
+            if (x_, y_) != (p_[0], p_[1]): p_[0], p_[1], p_[2] = x_, y_, float(ground(x_, y_))
 if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
     lines_out['pipe'] = []
     for q in json.load(open('assets/potrubi.json')):
@@ -1517,9 +1522,11 @@ for _o in OBL.values():                      # "skryt": změřené stromy na kon
 if os.path.exists('assets/stromy_mesta.json'):
     _oq = [shapely.prepared.prep(Polygon([to_local(lo, la) for la, lo in _o['poly']])) for _o in OBL.values()]
     _bm = np.asarray(bmask); _sm = []
+    _voz_s = shapely.unary_union([l_.buffer(w_ / 2) for _a, l_, c_, w_, _n in roads if c_ in DRIVE]); _voz_sp = shapely.prepared.prep(_voz_s)
     for la, lo, hh, con, ker in {tuple(q) for q in json.load(open('assets/stromy_mesta.json'))}:
         x, y = (float(v) for v in to_local(lo, la))
         if not EXT_P.contains(Point(x, y)) or any(q.contains(Point(x, y)) for q in _oq): continue
+        x, y = geo.mimo_vozovku(x, y, _voz_s, _voz_sp, 0.8)
         px_, py_ = pix(x, y)
         if 0 <= px_ < TWE and 0 <= py_ < TWE and _bm[py_, px_]: continue          # uvnitř budovy
         _sm.append((x, y, hh, con, ker))

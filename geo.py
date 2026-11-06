@@ -37,6 +37,16 @@ def bbox_lonlat(margin=300.0):
     return float(a), float(b), float(c), float(d)
 
 
+def mimo_vozovku(x, y, plocha, pripravena, rezerva=0.6):
+    """bod na vozovce posune k nejbližšímu okraji a kousek za něj, jinak ho nechá"""
+    from shapely.geometry import Point
+    from shapely.ops import nearest_points
+    p = Point(x, y)
+    if not pripravena.contains(p): return x, y
+    k = nearest_points(plocha.boundary, p)[0]; d = max(p.distance(k), 1e-6)
+    return k.x + (k.x - x) / d * rezerva, k.y + (k.y - y) / d * rezerva
+
+
 def chunk_of(x, y):
     """čtverec, do kterého patří bod v souřadnicích čtverce (0, 0)"""
     return int(math.floor((x + HALF) / (2 * HALF))), int(math.floor((y + HALF) / (2 * HALF)))
