@@ -1698,10 +1698,28 @@ def piece_oneway(l):
         src, o = _ow2[k]
         if src.distance(m_) < 0.5: return o * _along(src, l)
     return 0
+# rychlostní limity z dat (km/h): jen trvalé, bez podmínek
+def _limit(r):
+    sl = r.get('speed_limits')
+    if sl is None or isinstance(sl, float): return 0
+    for q in sl:
+        m_ = q.get('max_speed')
+        if m_ and not q.get('when') and q.get('between') is None and m_.get('unit') == 'km/h': return int(m_['value'])
+    return 0
+_sl = [(l, _limit(r)) for _, r in seg.iterrows() if r['class'] in DRIVE and _limit(r) for l in lines(r.geom)]
+_sl_tree = shapely.STRtree([l for l, _q in _sl]) if _sl else None
+def piece_limit(l):
+    if _sl_tree is None: return 0
+    m_ = l.interpolate(0.5, normalized=True)
+    for k in _sl_tree.query(m_.buffer(0.5)):
+        if _sl[k][0].distance(m_) < 0.5: return _sl[k][1]
+    return 0
 def _road(p3, l, c, n):
     o = {'p': p3, 'c': c, 'n': n}
     d_ = piece_oneway(l)
     if d_: o['o'] = d_
+    lim = piece_limit(l)
+    if lim: o['l'] = lim
     if _v_tree is not None and c != 'service':
         v_, t_ = piece_intensity(l)
         o['v'] = int(v_ or _V_CLASS.get(c, 300))

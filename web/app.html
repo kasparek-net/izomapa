@@ -924,8 +924,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const n0 = cars.length, n = wsum ? Math.min(300, Math.round(wsum / 450 / 1000)) : Math.min(110, Math.round(main.length / 6));
     const pickMain = (u) => { if (!wsum) return main[Math.floor(u * main.length)]; let x = u * wsum; for (let k = 0; k < main.length; k++) { x -= weights[k]; if (x <= 0) return main[k]; } return main[main.length - 1]; };
     for (let j = 0; j < n && main.length; j++) {
-      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, v: 7 + rnd(i + 5) * 6, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
-      if (c.truck) { c.v = 6 + rnd(i + 5) * 3; c.col = TRUCKC[i % TRUCKC.length]; }
+      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, f: 0.85 + rnd(i + 5) * 0.25, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
+      if (c.truck) c.col = TRUCKC[i % TRUCKC.length];
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
     }
@@ -952,9 +952,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return 1 - 0.85 * state.night;
   };
   let tShare = 1, tShareT = 0;
+  // rychlost podle limitu z dat, jinak odhad podle třídy silnice; c.f je povaha řidiče
+  const CLASS_KMH = { motorway: 110, trunk: 90, primary: 50, secondary: 50, tertiary: 50, unclassified: 40, residential: 30, living_street: 20 };
+  const roadSpeed = (r) => (r.l || CLASS_KMH[r.c] || 40) / 3.6;
+  const carSpeed = (c, r) => (c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r)) * c.f;
   function stepCar(c, dt) {
-    c.s += c.v * dt * c.dir;
     const r = roads[c.r];
+    c.s += carSpeed(c, r) * dt * c.dir;
     if (c.s < 0 || c.s > r.L) {
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
       const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
