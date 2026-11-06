@@ -1264,6 +1264,23 @@ for d in DOMS:
     if not own: b['gh'] = 1
     buildings.append(b)
     r_ = 14 + sp['towers'][0]['w']; nd.ellipse([*P([(x - r_, y + r_)])[0], *P([(x + r_, y - r_)])[0]], fill=255)   # bez stromů kolem
+# komíny a chladicí věže z OSM (nastroje/kominy.py), vzhled jednotlivých v assets/upresneni.json: "kominy": [{"lat", "lon", "wc", "pr"}]
+for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/kominy.json') else []):
+    x, y = to_local(k_['lon'], k_['lat'])
+    if not EXT_P.contains(Point(x, y)): continue
+    own = AREA.contains(Point(x, y)); g = float(ground(x, y)); h_ = float(k_['h'])
+    vz = next((q for q in UP.get('kominy', []) if math.dist((x, y), to_local(q['lon'], q['lat'])) < 20), {})
+    vez = k_['k'] == 'vez'
+    rp = (k_.get('r') or 10.0) if vez else max(2.5, h_ * 0.045)
+    wc = list(vz.get('wc', [176, 172, 160] if vez else [168, 162, 150]))
+    b = {'p': [[round(x - 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y + 0.1, 2)]],
+         'b': round(g - 0.6, 2), 'g': round(g, 2), 'e': round(g + h_, 2), 'r': 'flat', 'rh': 0.0, 'parts': [], 'wc': tuple(wc), 'rc': tuple(wc),
+         's': 4, 'id': len(buildings), 'lm': 'dom', 'dn': 'komín', 'only': 1, 'tw': [],
+         'stk': {'k': 'v' if vez else 'c', 'x': round(x, 2), 'y': round(y, 2), 'r': round(rp, 2), 'wc': wc, 'pr': vz.get('pr', 1 if h_ >= 100 else 0)}}   # vysoké komíny mívají výstražné pruhy
+    if not own: b['gh'] = 1
+    elif not vez: chimneys.append([x, y, g + h_, b['id']])
+    buildings.append(b)
+    r_ = rp + 3; nd.ellipse([*P([(x - r_, y + r_)])[0], *P([(x + r_, y - r_)])[0]], fill=255)   # bez stromů kolem
 # hráze nádrží: kamenná zeď s korunou (v datech polygon), budova bez oken
 for _, r in inf.iterrows():
     if r['class'] != 'dam' or r.geom.geom_type not in ('Polygon', 'MultiPolygon'): continue

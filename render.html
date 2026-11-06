@@ -713,6 +713,25 @@ function roofDeco(b, X, eave, rc) {
       }
       if (t.top !== 'none') pushBox(X, f, -0.07, 0.07, -0.07, 0.07, t.to, t.to + Math.max(1.2, H * 0.06), GOLDC, [0, 1, 0, 0]);
     }
+    if (b.stk) {                                                        // velký komín nebo chladicí věž
+      const s = b.stk, f = frameAt(s.x, s.y, 0, 0), c = C255(s.wc), aw = [0, 1, 1, 0], z0 = b.b, H = b.e - b.g, DARK = [0.10, 0.10, 0.11];
+      if (s.k === 'v') {                                                // hyperboloid: pata, pas, koruna
+        const P = [[0, 1], [0.14, 0.82], [0.72, 0.60], [1, 0.68]];
+        for (let i = 0; i < 3; i++) ring(X, f, s.r * P[i][1], s.r * P[i + 1][1], i ? b.g + P[i][0] * H : z0, b.g + P[i + 1][0] * H, 16, c, aw);
+        ring(X, f, s.r * 0.68, 0.001, b.e, b.e - 2, 16, DARK, aw);
+      } else {
+        const R = (t) => s.r * (1 - 0.52 * t), RED = [0.72, 0.20, 0.15], WHITE = [0.90, 0.88, 0.83], RUST = [0.40, 0.24, 0.17];
+        const seg = (t0, t1, col) => ring(X, f, R(t0), R(t1), t0 ? b.g + t0 * H : z0, b.g + t1 * H, 12, col, aw);
+        if (s.pr) {                                                     // spodek holý beton, nahoře střídavé pruhy
+          seg(0, 0.5, c);
+          for (let i = 0; i < 6; i++) seg(0.5 + i * 0.07, 0.5 + (i + 1) * 0.07, i % 2 ? WHITE : RED);
+          seg(0.92, 1, RUST);
+        } else { seg(0, 0.96, c); seg(0.96, 1, RUST); }
+        const g0 = b.g + 0.92 * H;                                      // ochoz
+        ring(X, f, R(0.92) * 1.35, R(0.92) * 1.35, g0 - 0.5, g0, 12, [0.20, 0.20, 0.22], aw);
+        ring(X, f, R(1), 0.001, b.e, b.e - 2, 12, DARK, aw);
+      }
+    }
     for (const [x, y, z0, z1, r, col] of b.chs || []) {                 // komíny
       const f = frameAt(x, y, 0, 0), c = C255(col);
       ring(X, f, r * 1.25, r, z0, z1, 10, c, [0, 1, 1, 0]);
