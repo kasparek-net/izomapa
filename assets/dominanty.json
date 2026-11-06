@@ -208,5 +208,27 @@
   "lat": 49.59343, "lon": 18.1453,
   "text": "Podle ortofota ČÚZK: plochá šedá střecha, ne červená sedlová.",
   "spec": {"wc":[232,224,204],"rc":[176,176,172],"r":"flat","h":10,"win":1}
+ },
+{
+ "name": "Medical Care Centre",
+ "lat": 49.59966,
+ "lon": 18.14222,
+ "text": "Podle Street View ze září 2025 a RÚIAN: pět pater, tmavá valbová střecha, červené a šedé pásy na fasádě. Laser ČÚZK je starší než stavba.",
+ "spec": {
+  "wc": [
+   168,
+   92,
+   80
+  ],
+  "rc": [
+   56,
+   60,
+   68
+  ],
+  "r": "hipped",
+  "h": 15.0,
+  "rh": 3.2,
+  "win": 1
  }
+}
 ]
