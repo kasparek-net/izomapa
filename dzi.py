@@ -30,7 +30,7 @@ def build(variant, chunk=None):
             img.paste(t.convert('RGBA' if alpha else 'RGB'), (i * T, j * T))
     if alpha: return build_alpha(variant, chunk, img, info)
     # jednotná paleta pro celou mapu; paleta se hledá na zmenšenině, pak se aplikuje na celek
-    colors = 64 if variant == 'lights' else 160
+    colors = 64 if variant.startswith('lights') else 160
     sample = img.resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
     pal = sample.quantize(colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     full = img.quantize(palette=pal, dither=Image.Dither.NONE)
@@ -101,10 +101,10 @@ def quant_alpha(rgba, colors, pal=None, keep=()):
 
 
 def build_alpha(variant, chunk, img, info):
-    colors = 64 if variant == 'lights' else 160 + 3 * len(ROOF_COOL)       # sloty navíc: ostatní barvy mapy se neposunou
+    colors = 64 if variant.startswith('lights') else 160 + 3 * len(ROOF_COOL)       # sloty navíc: ostatní barvy mapy se neposunou
     sample = img.convert('RGB').resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
-    pal = palette_with_water(sample, colors) if variant != 'lights' else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    keep = () if variant == 'lights' else SURFACES_WINTER if variant == 'winter' else SURFACES
+    pal = palette_with_water(sample, colors) if not variant.startswith('lights') else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    keep = () if variant.startswith('lights') else SURFACES_WINTER if variant == 'winter' else SURFACES
     name = f'c{chunk[0]}_{chunk[1]}' if chunk else None
     d0 = f'{OUT}/{name}/{variant}' if name else f'{OUT}/{variant}'
     shutil.rmtree(d0, ignore_errors=True)
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     chunk = None
     if args[:1] == ['--chunk']:
         chunk = tuple(int(v) for v in args[1].split(',')); args = args[2:]
-    variants = args or ['autumn', 'winter', 'spring', 'summer', 'lights']
+    variants = args or ['autumn', 'winter', 'spring', 'summer', 'lights'] + [v for v in ('lights_prace', 'lights_noc') if os.path.exists(f'build/tiles_{v}/info.json')]
     if chunk:
         name = f'c{chunk[0]}_{chunk[1]}'
         ch = out.setdefault('chunks', {}).setdefault(name, {'chunk': list(chunk), 'status': CHUNKS[chunk]})

@@ -694,6 +694,7 @@ FLAT_CLS = {'garage', 'garages', 'apartments', 'industrial', 'warehouse', 'comme
 ROOF_MAP = {'gabled': 'gabled', 'hipped': 'hipped', 'half_hipped': 'hipped', 'pyramidal': 'pyramidal',
             'saltbox': 'gabled', 'gambrel': 'gabled', 'skillion': 'gabled', 'mansard': 'hipped', 'flat': 'flat',
             'round': 'flat', 'dome': 'pyramidal'}
+WORK_CLS = {'industrial', 'warehouse', 'commercial', 'retail', 'office', 'school', 'university', 'kindergarten', 'hospital', 'civic', 'service'}   # v noci svítí jinak než byty
 CLS_CZ = {'house': 'rodinný dům', 'detached': 'rodinný dům', 'residential': 'obytný dům', 'apartments': 'bytový dům',
           'garage': 'garáž', 'garages': 'garáže', 'industrial': 'průmyslová budova', 'warehouse': 'sklad',
           'civic': 'občanská stavba', 'school': 'škola', 'university': 'univerzita', 'retail': 'obchod',
@@ -1232,6 +1233,7 @@ for _, r in bld.iterrows():
             if z: b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0; b.pop('rt', None)
             deco = zs.get('deco') if z else dsp.get('deco')
             if deco: b['dz'] = roof_deco(p, deco, b['e'], key + str(pi))
+        if c in WORK_CLS: b['wk'] = 1
         if not own: b['gh'] = 1                  # budova sousedního čtverce (jen kvůli švu)
         buildings.append(b)
         bmd.polygon(P(p.exterior.coords), fill=255)

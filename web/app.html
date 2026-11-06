@@ -443,7 +443,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     // tónování soumraku a noci jen přes pixely mapy (source-atop), jinak byl v noci vidět obdélník kolem mapy
     warmItem = await add({ tileSource: { type: 'image', url: solid(255, 160, 90) }, x: -60, y: -60, width: 200, opacity: 0, compositeOperation: 'source-atop' });
     darkItem = await add({ tileSource: { type: 'image', url: solid(14, 20, 52) }, x: -60, y: -60, width: 200, opacity: 0, compositeOperation: 'source-atop' });
-    for (const l of LAYERS) if (l.src('lights')) l.light = await add({ tileSource: l.src('lights'), x: l.x, y: l.y, width: l.w, opacity: 0, compositeOperation: 'lighter', preload: false });
+    for (const l of LAYERS) if (l.src('lights')) l.light = await add({ tileSource: l.src(lightNow = wantStage()) || l.src('lights'), x: l.x, y: l.y, width: l.w, opacity: 0, compositeOperation: 'lighter', preload: false });
     for (const n of OV.needs || []) {
       const el = document.createElement('div'); el.className = 'pin need'; el.textContent = '📷 ' + n.name; el.title = n.text; n.el = el;
       viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(n.xy[0] / W, n.xy[1] / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
@@ -488,12 +488,40 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   viewer.addOnceHandler('open', () => {});
   initLayers();
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // stupně nočních světel: vždy se kreslí jen jedna vrstva, výměna je párkrát za noc (noční režim je nejnáročnější)
+  // časy jsou odhad tvaru dne, ne měření; mapa bez stupňů má jen 'lights'
+  const lightStage = (wd, s) => { const h = s / 3600; return h < 5 || h >= 23 ? 'lights_noc' : wd < 5 && h < 18 ? 'lights_prace' : h < 7 ? 'lights_noc' : 'lights'; };
+  const wantStage = () => { if (!$('realTime').checked) return 'lights'; const n = pragueNow(); return lightStage(n.wd, n.s); };
+  const lightLevel = (l) => (shown(l.key) ? smooth(0.5, 0.95, state.night) : 0);
+  let lightNow = 'lights';
+  function setLightStage(v) {
+    if (!ready || v === lightNow) return;
+    lightNow = v;
+    for (const l of LAYERS) if (l.light && l.src(v)) swapLight(l, v);
+  }
+  async function swapLight(l, v) {
+    const tok = l.lightTok = {}, vis = lightLevel(l) > 0;
+    const next = await add({ tileSource: l.src(v), x: l.x, y: l.y, width: l.w, opacity: 0, compositeOperation: 'lighter', preload: vis });
+    if (!next) { lightNow = null; return; }                                 // příští minutu znovu
+    if (l.lightTok !== tok) { viewer.world.removeItem(next); return; }
+    if (vis) {
+      if (!next.getFullyLoaded()) await new Promise((res) => { next.addOnceHandler('fully-loaded-change', res); setTimeout(res, 5000); });
+      if (l.lightTok !== tok) { viewer.world.removeItem(next); return; }
+      l.lightFade = true;
+      for (let a = 0.25; a <= 1 && !(eco || SLOW); a += 0.25) {                // krátké prolnutí, šetřící režim rovnou vymění
+        const q = lightLevel(l); next.setOpacity(q * a); l.light.setOpacity(q * (1 - a));
+        await new Promise((res) => setTimeout(res, 200));
+      }
+      l.lightFade = false;
+    }
+    next.setOpacity(lightLevel(l)); viewer.world.removeItem(l.light); l.light = next;
+  }
   function applyTime() {
     const t = state.night;
     const warm = Math.max(0, 1 - Math.abs(t - 0.42) / 0.32) * 0.8;
     if (warmItem) warmItem.setOpacity(warm * 0.32);
     if (darkItem) darkItem.setOpacity(smooth(0.35, 0.95, t) * 0.78);
-    for (const l of LAYERS) if (l.light) l.light.setOpacity(shown(l.key) ? smooth(0.5, 0.95, t) : 0);
+    for (const l of LAYERS) if (l.light && !l.lightFade) l.light.setOpacity(lightLevel(l));
     const d = smooth(0.35, 0.95, t);
     const mix = (a, b) => Math.round(a + (b - a) * d);
     $('map').style.background = $('osd').style.background = `rgb(${mix(27 + warm * 30, 9)},${mix(35 + warm * 12, 12)},${mix(51, 24)})`;
@@ -566,7 +594,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   document.querySelectorAll('[data-wip]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.wip === '1') === state.wip)));
   setSeason(state.season); setWeather(state.weather); applyRealWeather();
   $('night').value = Math.round(state.night * 100);
-  $('night').addEventListener('input', (e) => { state.night = e.target.value / 100; $('realTime').checked = false; saveRT(false); applyTime(); });
+  $('night').addEventListener('input', (e) => { state.night = e.target.value / 100; $('realTime').checked = false; saveRT(false); applyTime(); setLightStage('lights'); });
   // denní doba podle skutečné výšky slunce nad městem (vypnutí si pamatuje prohlížeč)
   function sunAlt(d) {
     const rad = Math.PI / 180, lat = OV.cam.lat0, lon = OV.cam.lon0;
@@ -580,15 +608,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const saveRT = (v) => { try { localStorage.setItem('izo-realtime', v ? '1' : '0'); } catch {} };
   function tickReal() {
     if (!$('realTime').checked) return;
-    state.night = Math.round(nightFromSun(sunAlt(new Date())) * 100) / 100; $('night').value = Math.round(state.night * 100); applyTime();
+    state.night = Math.round(nightFromSun(sunAlt(new Date())) * 100) / 100; $('night').value = Math.round(state.night * 100); applyTime(); if (ready) setLightStage(wantStage());
   }
-  $('realTime').addEventListener('change', (e) => { saveRT(e.target.checked); tickReal(); });
+  $('realTime').addEventListener('change', (e) => { saveRT(e.target.checked); tickReal(); setLightStage(wantStage()); });
   // výchozí stav: období a denní doba podle skutečnosti; odkaz s obdobím nebo denní dobou a vlastní vypnutí mají přednost
   let realOff = false;
   try { realOff = localStorage.getItem('izo-realtime') === '0'; } catch {}
   if (!pinnedView && !realOff) { $('realTime').checked = true; tickReal(); }
   setInterval(tickReal, 60000);
-  $('mTime').addEventListener('click', () => { $('realTime').checked = false; saveRT(false); state.night = state.night < 0.25 ? 0.42 : state.night < 0.7 ? 1 : 0; $('night').value = Math.round(state.night * 100); applyTime(); });
+  $('mTime').addEventListener('click', () => { $('realTime').checked = false; saveRT(false); state.night = state.night < 0.25 ? 0.42 : state.night < 0.7 ? 1 : 0; $('night').value = Math.round(state.night * 100); applyTime(); setLightStage('lights'); });
 
   // ---------- souřadnice ----------
   const cam = OV.cam;

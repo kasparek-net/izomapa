@@ -14,6 +14,8 @@ const TILE = parseInt(PARAMS.tile || '1024');
 const SEASON = PARAMS.season || 'autumn';
 const SEASON_ID = { spring: 0, summer: 1, autumn: 2, winter: 3 }[SEASON];
 const LIGHTS = PARAMS.mode === 'lights';
+// stupeň nočních světel: podíl svítících oken v bytech a v budovách, kde se pracuje (odhad tvaru dne, ne měření)
+const STAGE = { vecer: [0.56, 0.25], prace: [0.35, 0.70], noc: [0.08, 0.05] }[PARAMS.stage || 'vecer'];
 const PAD = 4;
 const DIR = PARAMS.dir || 'build';
 const ALPHA = PARAMS.alpha === '1';            // průhledné pozadí (čtverce se skládají přes sebe)
@@ -48,7 +50,7 @@ const SUN = new THREE.Vector3(0.38, 0.62, 0.68).normalize();
 
 // ---------- společné shadery ----------
 const COMMON = /* glsl */`
-uniform vec3 uSun; uniform vec3 uCam; uniform sampler2D uShadow; uniform mat4 uLightVP; uniform float uSeason; uniform float uLights; uniform vec2 uOff;
+uniform vec3 uSun; uniform vec3 uCam; uniform sampler2D uShadow; uniform mat4 uLightVP; uniform float uSeason; uniform float uLights; uniform vec2 uOff; uniform vec2 uLit;
 vec3 fn(vec3 n){ return dot(n, uCam) < 0.0 ? -n : n; }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float band(float d){ return d > 0.72 ? 1.0 : d > 0.42 ? 0.88 : d > 0.12 ? 0.76 : 0.66; }
@@ -92,7 +94,7 @@ function mat(frag, extra = {}, side = THREE.FrontSide) {
   const m = new THREE.ShaderMaterial({
     uniforms: {
       uSun: { value: SUN }, uCam: { value: camDir }, uShadow: { value: shadowRT.depthTexture }, uLightVP: { value: new THREE.Matrix4() },
-      uSeason: { value: SEASON_ID }, uLights: { value: LIGHTS ? 1 : 0 }, uOff: { value: new THREE.Vector2(OFFX, -OFFY) }, ...extra,
+      uSeason: { value: SEASON_ID }, uLights: { value: LIGHTS ? 1 : 0 }, uOff: { value: new THREE.Vector2(OFFX, -OFFY) }, uLit: { value: new THREE.Vector2(STAGE[0], STAGE[1]) }, ...extra,
     },
     vertexShader: VERT, fragmentShader: COMMON + frag, side,
   });
@@ -296,8 +298,9 @@ const wallMat = mat(/* glsl */`
     if (uLights > 0.5) {
       vec3 e = vec3(0.0);
       if (w) {
-        if (hh > 0.52) e = vec3(1.0, 0.80, 0.46) * (0.75 + 0.25 * hh);
-        else if (hh > 0.44) e = vec3(0.62, 0.74, 1.0) * 0.55;     // televize / chladné světlo
+        float on = fract(st) > 0.1 ? uLit.y : uLit.x;             // stejná okna ve všech stupních: další se jen přidávají
+        if (hh > 1.0 - on * 0.857) e = vec3(1.0, 0.80, 0.46) * (0.75 + 0.25 * hh);
+        else if (hh > 1.0 - on) e = vec3(0.62, 0.74, 1.0) * 0.55;     // televize / chladné světlo
       }
       if (st > 3.5 && st < 4.5 && w) e = vec3(1.0, 0.72, 0.38) * 0.9;
       gl_FragColor = vec4(e, 1.0); return;
@@ -451,7 +454,7 @@ function roofDeco(b, X, eave, rc) {
       const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length];
       const len = Math.hypot(x1 - x0, y1 - y0);
       if (len < 0.05) continue;
-      const st = wst, lo = b.b - b.g;
+      const st = wst + (b.wk ? 0.25 : 0), lo = b.b - b.g;
       pushQuad(W, tv(x0, y0, b.b), tv(x1, y1, b.b), tv(x1, y1, eave), tv(x0, y0, eave), wcol,
         [[0, lo, len, st], [len, lo, len, st], [len, eRel, len, st]]);
       // druhý trojúhelník čtyřúhelníku má jiné rohy -> doplnit atributy ručně
