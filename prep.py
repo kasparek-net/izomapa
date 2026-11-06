@@ -1405,6 +1405,18 @@ for a, e, k in UP['buses']:
     x1, y1 = to_local(a[1], a[0]); x2, y2 = to_local(e[1], e[0]); x, y = (x1 + x2) / 2, (y1 + y2) / 2
     if AREA.contains(Point(x, y)): buses.append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(math.atan2(y2 - y1, x2 - x1), 3), k])
 portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
+if os.path.exists('assets/mobiliar_mesta.json'):  # mobiliář z pasportů města (nastroje/mobiliar_mesta.py): přednost před OSM, co v pasportu chybí, zůstává
+    _mm = json.load(open('assets/mobiliar_mesta.json'))
+    props['susak'], props['klepadlo'] = [], []
+    for k_, pl_ in _mm.items():
+        pts_ = [q_ for q_ in (Point(*(float(v) for v in to_local(lo, la))) for la, lo in pl_) if AREA.contains(q_)]
+        if k_ == 'bench': pts_ = [q_ for q_ in pts_ if not any(math.hypot(q_.x - to_local(u[1], u[0])[0], q_.y - to_local(u[1], u[0])[1]) < u[2] for u in UP.get('bez_lavicek', []))]
+        if k_ in ('bench', 'bin', 'recycling', 'shelter') and pts_:
+            _t = shapely.STRtree(pts_)
+            props[k_] = [p_ for p_ in props[k_] if not len(_t.query(Point(p_[0], p_[1]), predicate='dwithin', distance=6.0))]
+        for q_ in pts_:
+            nd_ = nearest_dir(q_, all_tree, all_lines, 15)
+            props[k_].append([q_.x, q_.y, float(ground(q_.x, q_.y)), nd_[0] if nd_ else h01(wkey(q_.x, q_.y)) * 6.28])
 if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
     lines_out['pipe'] = []
     for q in json.load(open('assets/potrubi.json')):

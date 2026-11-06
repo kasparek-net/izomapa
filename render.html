@@ -820,6 +820,17 @@ function roofDeco(b, X, eave, rc) {
   });
   const id = (it) => it;
   inst(lampG, P.lamp, id);
+  const STEEL = [0.46, 0.48, 0.50];
+  const susakG = make((B) => {                                       // sušák na prádlo: dva sloupky s rameny, šňůry
+    for (const s of [-2.6, 2.6]) { pushBox(B, F, s - 0.05, s + 0.05, -0.05, 0.05, 0, 1.9, STEEL, [0, 1, 0, 0]); pushBox(B, F, s - 0.04, s + 0.04, -0.7, 0.7, 1.82, 1.9, STEEL, [0, 1, 0, 0]); }
+    for (const t of [-0.6, 0, 0.6]) pushBox(B, F, -2.6, 2.6, t - 0.012, t + 0.012, 1.84, 1.87, [0.80, 0.80, 0.78], [0, 1, 0, 0]);
+  });
+  const klepadloG = make((B) => {                                    // klepadlo na koberce: rám ze dvou sloupků a tyče
+    for (const s of [-1.3, 1.3]) pushBox(B, F, s - 0.05, s + 0.05, -0.05, 0.05, 0, 1.75, STEEL, [0, 1, 0, 0]);
+    pushBox(B, F, -1.35, 1.35, -0.05, 0.05, 1.68, 1.78, STEEL, [0, 1, 0, 0]);
+  });
+  inst(susakG, P.susak || [], id);
+  inst(klepadloG, P.klepadlo || [], id);
   inst(benchG, P.bench, id);
   inst(binG, P.bin, id);
   inst(recG, P.recycling, id);
