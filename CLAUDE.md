@@ -63,6 +63,8 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Barvy střech:** `.venv/bin/python nastroje/strechy.py` (ortofoto po 0,4 m/px, 7 km čtverec ~10 min) vyrobí `assets/strechy_orto.json`, `prep.py` je pak použije u všech budov místo náhodných. Dominanty a `upresneni.json` mají přednost.
 - **Směr hřebene:** `.venv/bin/python nastroje/hrebeny.py` (po `dmp_fetch.py`) zapíše do `assets/hrebeny.json` jen jisté případy, kde laser ukazuje hřeben podél kratší strany.
 - **Zeleň na zpevněných plochách:** po `nastroje/strechy.py` spusť `nastroje/povrchy.py` (`build/zelen_maska.png`). Zpevněné a průmyslové plochy, které jsou na ortofotu zelené, se změní na trávu a náměstí, které je z více než poloviny zelené, na park se stromy.
+- **Typy budov (jen Česko):** `.venv/bin/python nastroje/ruian.py` vyrobí `assets/ruian_budovy.json` (způsob využití a podlaží z veřejné služby RÚIAN). `prep.py` jím doplní jen prázdný nebo obecný typ a podlaží tam, kde není laser. Třída `apartments` znamená plochou střechu, proto ji dostane jen budova, u které plochou střechu potvrdí laser. Po změně je potřeba nový render.
+- **Semafory:** `.venv/bin/python nastroje/semafory.py` vyrobí `assets/semafory.json` z OSM. Bez něj auta nezastavují. Délka cyklu je odhad.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 

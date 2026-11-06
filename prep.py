@@ -1714,12 +1714,25 @@ def piece_limit(l):
     for k in _sl_tree.query(m_.buffer(0.5)):
         if _sl[k][0].distance(m_) < 0.5: return _sl[k][1]
     return 0
+# semafory (nastroje/semafory.py): kus silnice si nese [metry od začátku, křižovatka, osa], osy mají zelenou střídavě
+_sig = json.load(open('assets/semafory.json')) if os.path.exists('assets/semafory.json') else []
+_sig_pts = [Point(to_local(lo, la)) for la, lo, _g in _sig]
+_sig_tree = shapely.STRtree(_sig_pts) if _sig_pts else None
+def piece_signals(l):
+    if _sig_tree is None: return []
+    out = []
+    for k in _sig_tree.query(l.buffer(10)):
+        s_ = l.project(_sig_pts[k]); a_, b_ = l.interpolate(max(0, s_ - 1)), l.interpolate(min(l.length, s_ + 1))
+        out.append([round(s_, 1), _sig[k][2], 0 if abs(b_.x - a_.x) >= abs(b_.y - a_.y) else 1])
+    return sorted(out)
 def _road(p3, l, c, n):
     o = {'p': p3, 'c': c, 'n': n}
     d_ = piece_oneway(l)
     if d_: o['o'] = d_
     lim = piece_limit(l)
     if lim: o['l'] = lim
+    z_ = piece_signals(l) if c != 'service' else []
+    if z_: o['z'] = z_
     if _v_tree is not None and c != 'service':
         v_, t_ = piece_intensity(l)
         o['v'] = int(v_ or _V_CLASS.get(c, 300))
