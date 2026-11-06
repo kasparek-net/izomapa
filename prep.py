@@ -1529,6 +1529,10 @@ props['socha'] = []                    # ruční sochy (assets/upresneni.json, "
 for so_ in UP.get('sochy', []):
     x, y = (float(v) for v in to_local(so_['lon'], so_['lat']))
     if AREA.contains(Point(x, y)): props['socha'].append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), so_.get('a', 0.0)])
+props['kruhy'] = []                    # ruční kruhy s písmeny (assets/upresneni.json, "kruhy"): stojí v řadě, "p" je písmeno
+for kr_ in UP.get('kruhy', []):
+    x, y = (float(v) for v in to_local(kr_['lon'], kr_['lat']))
+    if AREA.contains(Point(x, y)): props['kruhy'].append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), kr_.get('a', 0.0), kr_['p']])
 props['wheelie'] = [[round(v, 3) for v in q] for q in props['wheelie']]
 print('hrobů', len(graves), 'soch', len(statues))
 

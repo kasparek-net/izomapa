@@ -829,6 +829,19 @@ function roofDeco(b, X, eave, rc) {
     pushBox(B, F, 0.0, 0.3, -0.13, 0.13, 2.3, 2.62, BR, [0, 1, 0, 0]);
   });
   inst(sochaG, P.socha || [], id);
+  // kruhy s písmeny: ocelový červený prstenec na sloupku, uvnitř bílé písmeno z mřížky 3 × 5 (ruční položka "kruhy")
+  const GLYPH = { T: ['###', '.#.', '.#.', '.#.', '.#.'], A: ['.#.', '#.#', '###', '#.#', '#.#'], R: ['##.', '#.#', '##.', '#.#', '#.#'] };
+  const kruhG = (ch) => make((B) => {
+    const RED = [0.82, 0.1, 0.1], WH = [0.96, 0.96, 0.94], DK = [0.16, 0.16, 0.18], cy = 1.75, q = 0.14, R0 = 1.25, R1 = 0.98;
+    pushBox(B, F, -0.09, 0.09, -0.09, 0.09, -0.2, 0.55, DK, [0, 1, 1, 0]);
+    for (let s = -R0; s < R0; s += q) for (let y = -R0; y < R0; y += q) {
+      const d = Math.hypot(s + q / 2, y + q / 2);
+      if (d <= R0 && d >= R1) pushBox(B, F, s, s + q, -0.14, 0.14, cy + y, cy + y + q, RED, [0, 1, 1, 0]);
+    }
+    const u = 0.26, g = GLYPH[ch];
+    g.forEach((row, j) => [...row].forEach((c, i) => { if (c === '#') pushBox(B, F, (i - 1.5) * u, (i - 0.5) * u, -0.05, 0.05, cy + (1.5 - j) * u, cy + (2.5 - j) * u, WH, [0, 1, 1, 0]); }));
+  });
+  for (const ch of ['T', 'A', 'R']) inst(kruhG(ch), (P.kruhy || []).filter((k) => k[4] === ch), id);
   // popelnice před domy (černá komunál, modrá papír, žlutá plast)
   const wheelG = make((B) => {
     pushBox(B, F, -0.3, 0.3, -0.35, 0.35, 0, 1.0, [1, 1, 1], [0, 0, 1, 0]);
