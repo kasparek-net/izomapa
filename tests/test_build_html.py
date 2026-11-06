@@ -28,4 +28,7 @@ if config.get('url'):
 
 missing = open('site/404.html', encoding='utf-8').read()
 assert 'noindex' in missing and 'href="/"' in missing and config['titulek'] in missing
+train = config.get('vlak', 'regionova')
+for name in ([train] if isinstance(train, str) else [train.get('vychozi', 'regionova'), *train.get('linky', {}).values()]):
+    assert re.search(rf'\n    {name}: \{{ h:', page), f'unknown train model {name}'
 print('ok')
