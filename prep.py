@@ -1407,7 +1407,7 @@ for a, e, k in UP['buses']:
 portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
 if os.path.exists('assets/mobiliar_mesta.json'):  # mobiliář z pasportů města (nastroje/mobiliar_mesta.py): přednost před OSM, co v pasportu chybí, zůstává
     _mm = json.load(open('assets/mobiliar_mesta.json'))
-    props['susak'], props['klepadlo'] = [], []
+    for k_ in _mm: props.setdefault(k_, [])
     for k_, pl_ in _mm.items():
         pts_ = [q_ for q_ in (Point(*(float(v) for v in to_local(lo, la))) for la, lo in pl_) if AREA.contains(q_)]
         if k_ == 'bench': pts_ = [q_ for q_ in pts_ if not any(math.hypot(q_.x - to_local(u[1], u[0])[0], q_.y - to_local(u[1], u[0])[1]) < u[2] for u in UP.get('bez_lavicek', []))]

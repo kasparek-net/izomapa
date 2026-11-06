@@ -10,4 +10,8 @@ v = m.roztrid([{'lat': 1, 'lon': 1, 'typ': 'Lavičky, sedátka', 'stav': 'Stáva
 assert v['bench'] == [(1, 1)]
 assert v['bin'] == [(3, 3), (5, 5)]
 assert v['recycling'] == [(6, 6)]
+h = m.hriste('TYP\tWKT\nskluzavka\tMULTIPOINT(18.1 49.6)\nsloupek\tMULTIPOINT(18.2 49.7)\n')
+assert h['skluzavka'] == [(49.6, 18.1)] and not h['branka']
+p = m.pamatky([{'lat': 1, 'lon': 2, 'np': 'Socha – Žena'}, {'lat': 3, 'lon': 4, 'np': 'Pamětní deska – Socha'}, {'lat': 5, 'lon': 6, 'np': 'Kamenný kříž'}, {'lat': 7, 'lon': 8, 'np': 'Kostel'}])
+assert p['plastika'] == [[1, 2]] and p['kriz'] == [[5, 6]] and not p['pomnik']
 print('ok')
