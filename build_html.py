@@ -34,6 +34,7 @@ fill = {
     'MHD': 'true' if mhd.get('gtfs') else 'false',
     'VITR': 'true' if M.get('vitr') else 'false',
     'POCASI': 'true' if M.get('pocasi') else 'false',
+    'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
     'DOPRAVA_ZDROJ': ', intenzity dopravy © <a href="https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy" target="_blank" rel="noopener">ŘSD ČR</a> (Celostátní sčítání dopravy)' if M.get('doprava') else '',
     'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' + (', kvalita ovzduší z modelu <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener">Copernicus CAMS</a>' if M.get('pocasi') else '') if M.get('vitr') or M.get('pocasi') else '',
     'ZDROJOVY_KOD': f'<p class="muted"><a href="{E(M["zdrojovy_kod"])}" target="_blank" rel="noopener">Zdrojový kód této mapy</a> (AGPL-3.0).</p>'

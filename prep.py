@@ -45,6 +45,8 @@ UP = json.load(open('assets/upresneni.json')) if os.path.exists('assets/upresnen
 if os.path.exists('assets/strechy_orto.json'):
     for _k, _v in json.load(open('assets/strechy_orto.json')).items(): SAT['b'].setdefault(_k, {})['rc'] = _v
 for _k, _v in UP['b'].items(): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
+# typy a podlaží z RÚIAN (nastroje/ruian.py): jen kde data typ nemají nebo je obecný
+RUIAN = json.load(open('assets/ruian_budovy.json')) if os.path.exists('assets/ruian_budovy.json') else {}
 # oblasti podle skutečnosti (tuning/oblast.py): stromy z ortofota a DMP, barvy střech, ruční úpravy budov
 OBL = json.load(open('assets/oblasti.json')) if os.path.exists('assets/oblasti.json') else {}
 for _o in OBL.values():
@@ -698,7 +700,8 @@ CLS_CZ = {'house': 'rodinný dům', 'detached': 'rodinný dům', 'residential': 
           'commercial': 'komerční budova', 'church': 'kostel', 'chapel': 'kaple', 'kindergarten': 'mateřská škola',
           'shed': 'kůlna', 'barn': 'stodola', 'service': 'technická budova', 'office': 'kanceláře',
           'semidetached_house': 'dvojdům', 'terrace': 'řadový dům', 'bungalow': 'bungalov', 'hotel': 'hotel',
-          'dormitory': 'kolej', 'hospital': 'zdravotnictví', 'greenhouse': 'skleník', 'roof': 'přístřešek'}
+          'dormitory': 'kolej', 'hospital': 'zdravotnictví', 'greenhouse': 'skleník', 'roof': 'přístřešek',
+          'cabin': 'chata', 'farm': 'usedlost', 'farm_auxiliary': 'hospodářská budova', 'transportation': 'stavba pro dopravu'}
 
 
 def hexcol(s, fallback):
@@ -1042,8 +1045,13 @@ for _, r in bld.iterrows():
         c = r['class'] if isinstance(r['class'], str) else ''
         nm = sname(r)
         key = r.id; area = p.area
+        _ru = RUIAN.get(r.id)
+        if _ru and _ru[0] and c in ('', 'yes', 'residential'):
+            # třída apartments znamená plochou střechu, ale bytový dům může mít šikmou: bez potvrzení laserem zůstane obytný
+            c = 'residential' if _ru[0] == 'apartments' and not (r.id in DMP and DMP[r.id][1] - DMP[r.id][0] < 0.4) else _ru[0]
         if not c and area < 45 and garage_row(p): c = 'garages'
         floors = r.num_floors if r.num_floors == r.num_floors and r.num_floors else None
+        if not floors and _ru and _ru[1] and r.id not in DMP: floors = _ru[1]      # laser má přednost
         hgt = r.height if r.height == r.height and r.height else None
         lm = None
         if c == 'chapel': lm = 'chapel'
