@@ -1270,15 +1270,15 @@ for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/komin
     if not EXT_P.contains(Point(x, y)): continue
     own = AREA.contains(Point(x, y)); g = float(ground(x, y)); h_ = float(k_['h'])
     vz = next((q for q in UP.get('kominy', []) if math.dist((x, y), to_local(q['lon'], q['lat'])) < 20), {})
-    vez = k_['k'] == 'vez'
-    rp = (k_.get('r') or 10.0) if vez else max(2.5, h_ * 0.045)
-    wc = list(vz.get('wc', [176, 172, 160] if vez else [168, 162, 150]))
+    vez = k_['k'] == 'vez'; dr = {'vez': 'v', 'stozar': 'm', 'nadrz': 't'}.get(k_['k'], 'c')
+    rp = k_.get('r') or {'v': 10.0, 'm': 2.5, 't': 5.0, 'c': max(2.5, h_ * 0.045)}[dr]
+    wc = list(vz.get('wc', {'v': [176, 172, 160], 'm': [150, 152, 156], 't': [186, 184, 176]}.get(dr, [168, 162, 150])))
     b = {'p': [[round(x - 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y + 0.1, 2)]],
          'b': round(g - 0.6, 2), 'g': round(g, 2), 'e': round(g + h_, 2), 'r': 'flat', 'rh': 0.0, 'parts': [], 'wc': tuple(wc), 'rc': tuple(wc),
          's': 4, 'id': len(buildings), 'lm': 'dom', 'dn': 'komín', 'only': 1, 'tw': [],
-         'stk': {'k': 'v' if vez else 'c', 'x': round(x, 2), 'y': round(y, 2), 'r': round(rp, 2), 'wc': wc, 'pr': vz.get('pr', 1 if h_ >= 100 else 0)}}   # vysoké komíny mívají výstražné pruhy
+         'stk': {'k': dr, 'x': round(x, 2), 'y': round(y, 2), 'r': round(rp, 2), 'wc': wc, 'pr': vz.get('pr', 1 if h_ >= 100 and dr == 'c' else 0)}}   # vysoké komíny mívají výstražné pruhy
     if not own: b['gh'] = 1
-    elif not vez: chimneys.append([x, y, g + h_, b['id']])
+    elif dr == 'c': chimneys.append([x, y, g + h_, b['id']])
     buildings.append(b)
     r_ = rp + 3; nd.ellipse([*P([(x - r_, y + r_)])[0], *P([(x + r_, y - r_)])[0]], fill=255)   # bez stromů kolem
 # hráze nádrží: kamenná zeď s korunou (v datech polygon), budova bez oken
@@ -1405,6 +1405,12 @@ for a, e, k in UP['buses']:
     x1, y1 = to_local(a[1], a[0]); x2, y2 = to_local(e[1], e[0]); x, y = (x1 + x2) / 2, (y1 + y2) / 2
     if AREA.contains(Point(x, y)): buses.append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(math.atan2(y2 - y1, x2 - x1), 3), k])
 portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
+if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
+    lines_out['pipe'] = []
+    for q in json.load(open('assets/potrubi.json')):
+        for l in lines(LineString([to_local(lo, la) for la, lo in q]).intersection(EXT)):
+            xy_ = shapely.get_coordinates(shapely.segmentize(l, 10.0))
+            lines_out['pipe'].append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(xy_, ground(xy_[:, 0], xy_[:, 1]))])
 print({k: len(v) for k, v in props.items()}, 'aut', len(cars), {k: len(v) for k, v in lines_out.items()})
 
 # ---------------- stromy ----------------
