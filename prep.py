@@ -1543,6 +1543,9 @@ if os.path.exists('assets/stromy_mesta.json'):
         _nc = len(cars); cars = [c_ for c_ in cars if not len(_st.query(Point(c_[0], c_[1]), predicate='dwithin', distance=1.5))]   # auto nemá stát v kmeni
         print('aut pod stromy pasportu', _nc - len(cars))
     print('stromů z pasportu', len(_sm), 'skrytých náhodných', sum(t[4] == 2 for t in T))
+# rozhledna v lese: bez mýtiny by ji koruny schovaly celou
+_rz = [to_local(k_['lon'], k_['lat']) for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/kominy.json') else []) if k_['k'] == 'rozhledna']
+if _rz: T = [t[:4] + (2,) if any(math.hypot(t[0] - q[0], t[1] - q[1]) < 11 for q in _rz) else t for t in T]
 tz = ground(np.array([t[0] for t in T]), np.array([t[1] for t in T]))
 trees = [[round(t[0], 2), round(t[1], 2), round(float(z), 2), round(t[2], 1), t[3], t[4]] for t, z in zip(T, tz)]
 print('stromů', len(trees))
