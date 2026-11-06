@@ -108,6 +108,8 @@ ale i tak se může splést, proto fakta před zveřejněním ověřte.
 | jízdní řády GTFS dopravce | MHD | **podmínky konkrétního dopravce si ověřte** |
 | CIS JŘ, Ministerstvo dopravy | autobusy a vlaky bez GTFS dopravce | **podmínky si ověřte** na md.gov.cz, polohy zastávek z OSM, trasy jsou odhad |
 | [Celostátní sčítání dopravy ŘSD](https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy) (volitelné, `"doprava"` v `mesto.json`) | kolik aut jezdí po které silnici | **podmínky si ověřte**: web ŘSD uvádí CC BY-SA 4.0, u souboru licence není; denní křivka je odhad |
+| OpenStreetMap přes Overpass (volitelné, `nastroje/kominy.py`) | komíny, chladicí věže, vysílače, nádrže, rozhledny, nadzemní potrubí | ODbL: uvést „© přispěvatelé OpenStreetMap“ |
+| Pasporty města Kopřivnice (jen tato mapa, `nastroje/stromy_mesta.py`, `nastroje/mobiliar_mesta.py`) | stromy, lavičky, koše, zastávky, hřiště, drobné památky | se souhlasem města, data nejsou součástí repozitáře; uvést „© Město Kopřivnice“ |
 | [Open-Meteo](https://open-meteo.com/) (volitelné, `"vitr": true` a `"pocasi": true` v `mesto.json`) | skutečný vítr pro kouř z komínů, skutečné počasí v mapě | CC BY 4.0, zdarma jen pro nekomerční použití; prohlížeč návštěvníka se k službě připojuje přímo |
 | [Copernicus CAMS](https://atmosphere.copernicus.eu/) přes Open-Meteo (s `"pocasi": true`) | opar podle PM2,5 (model, ne měření ve městě) | s uvedením zdroje |
 
