@@ -19,4 +19,5 @@ assert {p['k'] for p in t} == {'stozar', 'nadrz'}
 assert [p for p in t if p['k'] == 'nadrz'][0]['h'] == k.VYCHOZI_H['nadrz']
 assert len(k.potrubi([{'geometry': [{'lat': 1, 'lon': 2}, {'lat': 1, 'lon': 3}], 'tags': {'location': 'underground'}},
                       {'geometry': [{'lat': 1, 'lon': 2}, {'lat': 1, 'lon': 3}], 'tags': {}}])) == 1
+assert [p['k'] for p in k.vyber([{'lat': 49, 'lon': 18, 'tags': {'tower:type': 'observation', 'height': '13'}}, {'lat': 50, 'lon': 18, 'tags': {'tower:type': 'observation', 'building': 'yes'}}])] == ['rozhledna']
 print('ok')

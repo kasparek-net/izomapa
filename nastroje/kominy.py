@@ -1,11 +1,11 @@
 # komíny, chladicí věže, vysílače, nádrže a nadzemní potrubí z OpenStreetMap (Overpass, ODbL, bez registrace)
-# assets/kominy.json: [{"lat", "lon", "h", "k": "komin" | "vez" | "stozar" | "nadrz", "r": poloměr paty nebo null}]
+# assets/kominy.json: [{"lat", "lon", "h", "k": "komin" | "vez" | "stozar" | "nadrz" | "rozhledna", "r": poloměr paty nebo null}]
 # assets/potrubi.json: [[[lat, lon], ...]]; spouštět z kořene repa: python nastroje/kominy.py
 import json, math, subprocess, sys; sys.path.insert(0, '.')
 import geo
 
 SHODA_M = 15          # stejný komín bývá v OSM jako bod i jako plocha
-VYCHOZI_H = {'komin': 25.0, 'vez': 40.0, 'stozar': 30.0, 'nadrz': 10.0}
+VYCHOZI_H = {'komin': 25.0, 'vez': 40.0, 'stozar': 30.0, 'nadrz': 10.0, 'rozhledna': 13.0}
 
 
 def vyska(t):
@@ -20,7 +20,8 @@ def vyber(prvky):
         t = e.get('tags', {}); b = e.get('bounds')
         c = {'lat': (b['minlat'] + b['maxlat']) / 2, 'lon': (b['minlon'] + b['maxlon']) / 2} if b else e.get('center') or e   # Overpass u "center bb" vrací jen bounds
         tt = t.get('tower:type')
-        k = 'vez' if tt == 'cooling' else 'nadrz' if t.get('man_made') == 'storage_tank' else 'stozar' if tt == 'communication' else 'komin'
+        if tt == 'observation' and 'building' in t: continue         # zděné rozhledny jsou v datech jako budovy
+        k = 'rozhledna' if tt == 'observation' else 'vez' if tt == 'cooling' else 'nadrz' if t.get('man_made') == 'storage_tank' else 'stozar' if tt == 'communication' else 'komin'
         r = None
         if b:
             sirka = (b['maxlon'] - b['minlon']) * 111320 * math.cos(math.radians(c['lat'])); delka = (b['maxlat'] - b['minlat']) * 111320
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         t = subprocess.run(['curl', '-s', '-f', '-m', '120', '-A', 'izomapa-tools/1.0', '--data-urlencode', f'data={q}', 'https://overpass-api.de/api/interpreter'],
                            check=True, capture_output=True, text=True).stdout
         return json.loads(t)['elements']
-    v = vyber(dotaz(f'[out:json][timeout:60];(nwr["man_made"="chimney"]({b});nwr["tower:type"~"^(stack|cooling|communication)$"]({b});nwr["man_made"="storage_tank"]({b}););out tags center bb;'))
+    v = vyber(dotaz(f'[out:json][timeout:60];(nwr["man_made"="chimney"]({b});nwr["tower:type"~"^(stack|cooling|communication|observation)$"]({b});nwr["man_made"="storage_tank"]({b}););out tags center bb;'))
     json.dump(v, open('assets/kominy.json', 'w'), indent=0)
     tr = potrubi(dotaz(f'[out:json][timeout:60];way["man_made"="pipeline"]({b});out tags geom;'))
     json.dump(tr, open('assets/potrubi.json', 'w'))

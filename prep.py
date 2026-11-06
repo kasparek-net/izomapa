@@ -1270,9 +1270,9 @@ for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/komin
     if not EXT_P.contains(Point(x, y)): continue
     own = AREA.contains(Point(x, y)); g = float(ground(x, y)); h_ = float(k_['h'])
     vz = next((q for q in UP.get('kominy', []) if math.dist((x, y), to_local(q['lon'], q['lat'])) < 20), {})
-    vez = k_['k'] == 'vez'; dr = {'vez': 'v', 'stozar': 'm', 'nadrz': 't'}.get(k_['k'], 'c')
-    rp = k_.get('r') or {'v': 10.0, 'm': 2.5, 't': 5.0, 'c': max(2.5, h_ * 0.045)}[dr]
-    wc = list(vz.get('wc', {'v': [176, 172, 160], 'm': [150, 152, 156], 't': [186, 184, 176]}.get(dr, [168, 162, 150])))
+    vez = k_['k'] == 'vez'; dr = {'vez': 'v', 'stozar': 'm', 'nadrz': 't', 'rozhledna': 'r'}.get(k_['k'], 'c')
+    rp = k_.get('r') or {'v': 10.0, 'm': 2.5, 't': 5.0, 'r': 3.2, 'c': max(2.5, h_ * 0.045)}[dr]
+    wc = list(vz.get('wc', {'v': [176, 172, 160], 'm': [150, 152, 156], 't': [186, 184, 176], 'r': [176, 112, 62]}.get(dr, [168, 162, 150])))
     b = {'p': [[round(x - 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y - 0.1, 2)], [round(x + 0.1, 2), round(y + 0.1, 2)]],
          'b': round(g - 0.6, 2), 'g': round(g, 2), 'e': round(g + h_, 2), 'r': 'flat', 'rh': 0.0, 'parts': [], 'wc': tuple(wc), 'rc': tuple(wc),
          's': 4, 'id': len(buildings), 'lm': 'dom', 'dn': 'komín', 'only': 1, 'tw': [],
