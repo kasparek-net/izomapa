@@ -1093,6 +1093,11 @@ for _, r in bld.iterrows():
         if not lm and not panel and so.get('rs') == 'pitched' and rs in (None, 'flat') and area < 700 and c not in FLAT_CLS \
                 and not (floors and floors >= 6) and not (hgt and hgt >= 18):
             rs = 'hipped' if h01(key + 't') < 0.6 else 'gabled'
+        # dlouhá budova s hřebenem podle laseru (stodola, dílna) je sedlová i nad 650 m² (ověřeno na ortofotu)
+        if rs is None and area > 650 and c not in FLAT_CLS and r.id in DMP and DMP[r.id][1] - DMP[r.id][0] >= 2:
+            _oc = list(p.minimum_rotated_rectangle.exterior.coords)
+            _a, _b = math.dist(_oc[0], _oc[1]), math.dist(_oc[1], _oc[2])
+            if max(_a, _b) >= 3 * min(_a, _b): rs = 'gabled'
         if rs is None:
             if c in FLAT_CLS or area > 650: rs = 'flat'
             elif c in PITCHED_CLS or (not c and 25 < area < 400): rs = 'gabled' if h01(key) < 0.62 else 'hipped'
