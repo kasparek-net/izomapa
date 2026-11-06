@@ -14,6 +14,7 @@ h = m.hriste('TYP\tWKT\nskluzavka\tMULTIPOINT(18.1 49.6)\nsloupek\tMULTIPOINT(18
 assert h['skluzavka'] == [(49.6, 18.1)] and not h['branka']
 p = m.pamatky([{'lat': 1, 'lon': 2, 'np': 'Socha – Žena'}, {'lat': 3, 'lon': 4, 'np': 'Pamětní deska – Socha'}, {'lat': 5, 'lon': 6, 'np': 'Kamenný kříž'}, {'lat': 7, 'lon': 8, 'np': 'Kostel'}])
 assert p['plastika'] == [[1, 2]] and p['kriz'] == [[5, 6]] and not p['pomnik']
+assert not any(m.pamatky([{'lat': 1, 'lon': 2, 'np': 'Socha houslistky', 'umisteni': 'Předsálí v 1.patře'}, {'lat': 3, 'lon': 4, 'np': 'Ohradní zeď'}, {'lat': 5, 'lon': 6, 'np': 'Kostel s křížem'}]).values())
 sys.path.insert(0, '.')
 import geo, shapely, shapely.prepared
 from shapely.geometry import LineString

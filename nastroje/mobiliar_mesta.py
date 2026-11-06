@@ -57,7 +57,8 @@ def pamatky(rows):
     v = {'plastika': [], 'kriz': [], 'sloup': [], 'pomnik': []}
     for r in rows:
         n = r.get('np', '')
-        if r.get('zanikly') == 'Ano' or re.search(r'deska|hal[ey]|Reliéf|Graffiti|Firemní|mozaik|Rozvoj', n, re.I): continue
+        if r.get('zanikly') == 'Ano' or re.search(r'deska|hal[ey]|Reliéf|Graffiti|Firemní|mozaik|Rozvoj|Ohradní|^Kostel', n, re.I): continue
+        if re.search(r'předsál|patře|interiér', r.get('umisteni', ''), re.I): continue
         k = ('kriz' if re.search(r'kříž', n, re.I) else 'sloup' if re.search(r'sloup', n, re.I) else
              'pomnik' if re.search(r'pomník|obětem|Zeď', n, re.I) else
              'plastika' if re.search(r'socha|plastika|sousoší|Běžci|Rychlá kola|Malí čtenáři|Člověk', n, re.I) else None)
