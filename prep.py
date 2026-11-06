@@ -1693,12 +1693,15 @@ for n, ls in streets.items():
     pt = m.interpolate(0.5, normalized=True) if m.geom_type == 'LineString' else max(lines(m), key=lambda q: q.length).interpolate(0.5, normalized=True)
     street_out.append({'name': n, 'x': round(pt.x, 1), 'y': round(pt.y, 1), 'z': round(float(ground(pt.x, pt.y)), 1)})
 # jednosměrky pro auta: +1 = jen ve směru geometrie, -1 = jen proti němu
+def _none(v):
+    """prázdná hodnota z Overture: None, prázdný seznam nebo prázdné numpy pole (`not pole` s víc prvky spadne)"""
+    return v is None or (not isinstance(v, str) and hasattr(v, '__len__') and len(v) == 0)
 def _oneway(r):
     acc = r.get('access_restrictions')
     if acc is None or isinstance(acc, float): return 0
     for a in acc:
         w_ = a.get('when') or {}
-        if a.get('access_type') == 'denied' and a.get('between') is None and not w_.get('mode') and not w_.get('using') and not w_.get('recognized'):
+        if a.get('access_type') == 'denied' and a.get('between') is None and _none(w_.get('mode')) and _none(w_.get('using')) and _none(w_.get('recognized')):
             if w_.get('heading') == 'backward': return 1
             if w_.get('heading') == 'forward': return -1
     return 0
