@@ -1312,7 +1312,10 @@ for _, r in inf.iterrows():
     z = float(ground(g.x, g.y))
     nd_ = nearest_dir(g, all_tree, all_lines, 15)
     ang = nd_[0] if nd_ else h01(wkey(g.x, g.y)) * 6.28
-    if k == 'bench': props['bench'].append([g.x, g.y, z, ang])
+    if k == 'bench':
+        # ruční výjimka (assets/upresneni.json, "bez_lavicek": [[lat, lon, poloměr v m]]): nakupené lavičky bez lavičky v mapě
+        if any(math.hypot(g.x - to_local(q[1], q[0])[0], g.y - to_local(q[1], q[0])[1]) < q[2] for q in UP.get('bez_lavicek', [])): continue
+        props['bench'].append([g.x, g.y, z, ang])
     elif k == 'street_lamp': props['lamp'].append([g.x, g.y, z, ang]); lamp_pts.append(g)
     elif k in ('waste_basket', 'waste_disposal'): props['bin'].append([g.x, g.y, z, ang])
     elif k == 'recycling': props['recycling'].append([g.x, g.y, z, ang])
