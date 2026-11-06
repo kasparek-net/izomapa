@@ -101,7 +101,7 @@ ale i tak se může splést, proto fakta před zveřejněním ověřte.
 |---|---|---|
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) přes [Overture Maps](https://overturemaps.org/) | budovy, adresy, ulice, voda, využití území, místa | ODbL: uvést „© přispěvatelé OpenStreetMap“ |
 | [ČÚZK](https://geoportal.cuzk.cz/): DMP 1G | výšky budov a tvar střech (laserové skenování) | CC BY 4.0: uvést „© ČÚZK“ |
-| ČÚZK: ortofoto | kde je les, barvy polí | CC BY 4.0 |
+| ČÚZK: ortofoto | kde je les, barvy polí, barvy střech, zeleň na zpevněných plochách | CC BY 4.0 |
 | ČÚZK: ZABAGED | orná půda, louky, sady | CC BY 4.0 |
 | [Terrarium](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | terén | s uvedením zdroje |
 | jízdní řády GTFS dopravce | MHD | **podmínky konkrétního dopravce si ověřte** |
