@@ -490,7 +490,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // stupně nočních světel: vždy se kreslí jen jedna vrstva, výměna je párkrát za noc (noční režim je nejnáročnější)
   // časy jsou odhad tvaru dne, ne měření; mapa bez stupňů má jen 'lights'
-  const lightStage = (wd, s) => { const h = s / 3600; return h < 5 || h >= 23 ? 'lights_noc' : wd < 5 && h < 18 ? 'lights_prace' : h < 7 ? 'lights_noc' : 'lights'; };
+  const lightStage = (wd, s) => { const h = s / 3600; return h < 5 || h >= 23 ? 'lights_noc' : wd < 5 && h < 17 ? 'lights_prace' : h < 7 ? 'lights_noc' : 'lights'; };
   const wantStage = () => { if (!$('realTime').checked) return 'lights'; const n = pragueNow(); return lightStage(n.wd, n.s); };
   const lightLevel = (l) => (shown(l.key) ? smooth(0.5, 0.95, state.night) : 0);
   let lightNow = 'lights';
@@ -973,8 +973,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (const o of opts) { x -= roads[o[0]].v || 0; if (x <= 0) return o; }
     return opts[opts.length - 1];
   }
-  // podíl aut podle denní doby: odhad tvaru dne, ne měření ze sčítání (špička 7 a 16 h, v noci málo)
-  const DAY_SHARE = [.08, .05, .04, .04, .08, .25, .6, 1, .85, .65, .6, .65, .7, .7, .8, .95, 1, .9, .7, .5, .35, .25, .18, .12];
+  // podíl aut podle denní doby: odhad tvaru dne, ne měření ze sčítání (špička 6 a 15 h, v noci málo)
+  const DAY_SHARE = [.08, .05, .04, .04, .08, .4, 1, .9, .75, .65, .6, .65, .7, .75, .85, 1, .9, .7, .55, .4, .3, .22, .16, .12];
   const trafficShare = () => {
     if (!roads.some((r) => r.v)) return 1;
     if ($('realTime').checked) return DAY_SHARE[+new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(new Date())];
