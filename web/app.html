@@ -138,10 +138,6 @@ dialog.help .muted { color: var(--muted); margin-top: 14px; }
   background: var(--panel); border: 2px solid var(--edge); box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); font-size: .9rem; max-width: calc(100vw - 32px); }
 .follow b { font-family: var(--display); font-weight: 500; }
 .follow .px-btn { width: 32px; height: 32px; padding: 0; flex: none; }
-@media (max-height: 500px) {                /* telefon na šířku: minimapa by zabrala polovinu výšky a panel by neměl místo */
-  .minimap { display: none; }
-  .panel { max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
-}
 @media (max-width: 640px) { .follow { bottom: 72px; } }
 dialog.help .vd-hero { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
 dialog.help .vd-hero img { width: 56px; height: 132px; image-rendering: pixelated; }
@@ -211,6 +207,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   .card .close { top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-height: 500px) {                /* telefon na šířku: minimapa by zabrala polovinu výšky a panel by neměl místo */
+  .minimap { display: none; }
+  .panel { max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+}
 </style>
 
 <div id="map" aria-label="Izometrická pixel-art mapa {{MESTO}}"><div id="osd"></div><canvas id="fx"></canvas></div>
