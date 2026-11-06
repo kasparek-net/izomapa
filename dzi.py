@@ -101,7 +101,7 @@ def quant_alpha(rgba, colors, pal=None, keep=()):
 
 
 def build_alpha(variant, chunk, img, info):
-    colors = 64 if variant.startswith('lights') else 160 + 3 * len(ROOF_COOL)       # sloty navíc: ostatní barvy mapy se neposunou
+    colors = 64 if variant.startswith('lights') else 225 + 3 * len(ROOF_COOL)       # víc odstínů: zeleň stromů jinak bere sloty vzácným barvám střech a ploch
     sample = img.convert('RGB').resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
     pal = palette_with_water(sample, colors) if not variant.startswith('lights') else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     keep = () if variant.startswith('lights') else SURFACES_WINTER if variant == 'winter' else SURFACES

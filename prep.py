@@ -1495,6 +1495,27 @@ for _o in OBL.values():                      # "skryt": změřené stromy na kon
     for la, lo, hh, con in _o['trees']:
         x, y = (float(v) for v in to_local(lo, la))
         if EXT_P.contains(Point(x, y)): T.append((x, y, hh, con, 0))
+# stromy z pasportu města (nastroje/stromy_mesta.py): pasport není úplný, náhodné stromy se proto skryjí jen kolem změřených a na veřejných trávnících bez koruny na ortofotu
+if os.path.exists('assets/stromy_mesta.json'):
+    _oq = [shapely.prepared.prep(Polygon([to_local(lo, la) for la, lo in _o['poly']])) for _o in OBL.values()]
+    _bm = np.asarray(bmask); _sm = []
+    for la, lo, hh, con, ker in {tuple(q) for q in json.load(open('assets/stromy_mesta.json'))}:
+        x, y = (float(v) for v in to_local(lo, la))
+        if not EXT_P.contains(Point(x, y)) or any(q.contains(Point(x, y)) for q in _oq): continue
+        px_, py_ = pix(x, y)
+        if 0 <= px_ < TWE and 0 <= py_ < TWE and _bm[py_, px_]: continue          # uvnitř budovy
+        _sm.append((x, y, hh, con, ker))
+    _sm.sort()
+    if _sm:
+        _st = shapely.STRtree([Point(q[0], q[1]) for q in _sm]); _Tp = shapely.points([t[0] for t in T], [t[1] for t in T])
+        _u6 = set(_st.query(_Tp, predicate='dwithin', distance=6.0)[0].tolist()); _u12 = set(_st.query(_Tp, predicate='dwithin', distance=12.0)[0].tolist())
+        _tr = shapely.prepared.prep(shapely.unary_union([Polygon([to_local(lo, la) for la, lo in q]).buffer(0) for q in json.load(open('assets/zelen_mesta.json')) if len(q) >= 4]))
+        def _kor(t):
+            px_, py_ = pix(t[0], t[1])
+            return LESM is not None and 0 <= px_ < TWE and 0 <= py_ < TWE and bool(LESM[py_, px_])
+        T = [t[:4] + (2,) if i in _u6 or (_tr.contains(Point(t[0], t[1])) and (i in _u12 or not _kor(t))) else t for i, t in enumerate(T)]
+        T += _sm
+    print('stromů z pasportu', len(_sm), 'skrytých náhodných', sum(t[4] == 2 for t in T))
 tz = ground(np.array([t[0] for t in T]), np.array([t[1] for t in T]))
 trees = [[round(t[0], 2), round(t[1], 2), round(float(z), 2), round(t[2], 1), t[3], t[4]] for t, z in zip(T, tz)]
 print('stromů', len(trees))
