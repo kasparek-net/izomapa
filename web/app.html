@@ -985,6 +985,16 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const f = Math.max(0, Math.min(1, (el - q[i - 2]) / ((q[i] - q[i - 2]) || 1)));
     return q[i - 1] + (q[i + 1] - q[i - 1]) * f;
   };
+  const busWait = new Map();                               // zpoždění autobusů a tramvají (s) čekajících na přejezdu
+  function busDelay(i, trip, el, dt) {                     // před zavřeným přejezdem stát, po otevření zpoždění dohnat (o polovinu rychleji)
+    let d = busWait.get(i) || 0, wait = false;
+    if (!XC.size && !d) return 0;
+    const s = trainS(trip, el - d);
+    for (const c of XC.values()) if (c.closed && c.on) for (const [sh, sc] of c.on) if (sh === trip[1] && s > sc - 10 && s < sc - 2) wait = true;
+    d = wait ? d + dt : Math.max(0, d - dt * 0.5);
+    if (d) busWait.set(i, d); else busWait.delete(i);
+    return d;
+  }
   function updateXings() {
     if (!XC.size) return;
     const trains = MHD.on ? MHD.act.filter(([i]) => MHD.routes[MHD.trips[i][0]][1] === 2) : [];
@@ -1210,7 +1220,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait };       // ladění v lokálním náhledu
   function drawSkier(q, sx, ox, oy) {
     const L = q.r.len; let i = 1; while (i < L.length - 1 && L[i] < q.s) i++;
     const a = q.r.w[i - 1], b = q.r.w[i], t = Math.max(0, Math.min(1, (q.s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));
@@ -1759,10 +1769,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         MHD.drawn = [];
         if (MHD.follow !== null) {
           const a = MHD.act.find((q) => q[0] === MHD.follow);
-          if (a) { const o = mhdPos(MHD.trips[a[0]], a[1] + (now / 1000 - ns)); viewer.viewport.panTo(new OpenSeadragon.Point(o.ix / W, o.iy / W), true); }
+          if (a) { const o = mhdPos(MHD.trips[a[0]], a[1] + (now / 1000 - ns) - (busWait.get(a[0]) || 0)); viewer.viewport.panTo(new OpenSeadragon.Point(o.ix / W, o.iy / W), true); }
         }
         if (sx > 0.12) for (const [i, el] of MHD.act) {
-          const trip = MHD.trips[i], o = mhdPos(trip, el + (now / 1000 - ns)), [line, typ] = MHD.routes[trip[0]];
+          const trip = MHD.trips[i], [line, typ] = MHD.routes[trip[0]], o = mhdPos(trip, el + (now / 1000 - ns) - (typ === 2 ? 0 : busDelay(i, trip, el + (now / 1000 - ns), dt)));
           if (!vis(o.ix, o.iy, 120) || !cam.grounds.some((q) => Math.abs(o.x - q.cx) <= cam.half && Math.abs(o.y - q.cy) <= cam.half)) continue;   // mimo čtverce mapy
           const shown_ = typ === 0 ? drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2) : typ === 2 ? drawTrain(trip, el + (now / 1000 - ns), line, sx, ox, oy, night) : drawVehicle(o, 12, 2.5, '#e9e6dc', sx, ox, oy, night, true);
           if (shown_) MHD.drawn.push([Math.round(ox + o.ix * sx), Math.round(oy + o.iy * sx) - Math.round(8 * sx), i]);
