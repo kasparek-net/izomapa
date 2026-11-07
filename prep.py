@@ -1916,6 +1916,8 @@ if os.path.exists('assets/prejezdy.json'):
         j_ = [q for q in _pj.na_kusu(g_['p'], _pj_pts) if len(_rails.query(Point(q[1], q[2]), predicate='dwithin', distance=3.0))]   # silnice opravdu kříží kolej (ne souběžná ulice)
         if j_: g_['j'] = j_
 for g_ in graph:
+    if 'z' in g_: g_['z'] = piece_signals(LineString([(q[0], q[1]) for q in g_['p']]))   # kus mohl být rozdělen: metry od začátku tohoto kusu
+    if not g_.get('z'): g_.pop('z', None)
     g_.pop('_deck', None)
 print('železničních přejezdů', sum(len(g_.get('j', [])) for g_ in graph))
 stops = [{'name': sname(r), 'x': r.geom.x, 'y': r.geom.y} for _, r in inf.iterrows()
