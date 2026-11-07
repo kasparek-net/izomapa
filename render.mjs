@@ -44,6 +44,13 @@ await page.waitForFunction(() => window.READY === true, null, { timeout: 240000,
 const info = await page.evaluate(() => window.INFO);
 console.log('scéna připravena za', (Date.now() - t0) / 1000, 's', info);
 fs.writeFileSync(path.join(outDir, 'info.json'), JSON.stringify(info));
+if (args.stromy) {                             // jen kresby stromů pro prohlížeč: node render.mjs stromy=site/stromy season=summer
+  const t = await page.evaluate(() => window.TREE_EXPORT());
+  fs.mkdirSync(path.join(ROOT, args.stromy), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, args.stromy, `${args.season}.png`), Buffer.from(t.url.split(',')[1], 'base64'));
+  delete t.url; fs.writeFileSync(path.join(ROOT, args.stromy, `${args.season}.json`), JSON.stringify(t));
+  await browser.close(); server.close(); process.exit(0);
+}
 const only = args.only ? args.only.split(',').map(Number) : null;
 const list = args.tiles ? new Set(args.tiles.split(';')) : null;
 for (let j = 0; j < info.rows; j++) for (let i = 0; i < info.cols; i++) {

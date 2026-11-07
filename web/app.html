@@ -953,17 +953,28 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const i0 = roads.length;
     for (const r of d.roads) {
       const len = [0]; for (let i = 1; i < r.w.length; i++) len.push(len[i - 1] + Math.hypot(r.w[i][0] - r.w[i - 1][0], r.w[i][1] - r.w[i - 1][1]));
-      if (len[len.length - 1] > 5) { roads.push({ ...r, k, len, L: len[len.length - 1] }); for (const z of r.z || []) sigs.push([roads[roads.length - 1], z]); }
+      if (len[len.length - 1] > 1) { roads.push({ ...r, k, len, L: len[len.length - 1] }); for (const z of r.z || []) sigs.push([roads[roads.length - 1], z]); }   // i krátké kousky (kruhový objezd u vjezdů), jinak v okruhu zůstanou mezery a auta tam stojí
     }
     for (let i = i0; i < roads.length; i++) { const r = roads[i]; for (const [end, dir] of [[r.w[0], 1], [r.w[r.w.length - 1], -1]]) { const q = ek(end); if (!ends.has(q)) ends.set(q, []); ends.get(q).push([i, dir]); } }
+    // konce, které se v datech minou o pár metrů (rozdělená vozovka, mostovka), propojit, ať auto nemusí otáčet ani mizet
+    for (let i = i0; i < roads.length; i++) for (const end of [roads[i].w[0], roads[i].w[roads[i].w.length - 1]]) {
+      const q = ek(end); if (ends.get(q).length > 1) continue;
+      let best = null, bd = 36; const X = Math.round(end[0]), Y = Math.round(end[1]);
+      for (let dx = -6; dx <= 6; dx++) for (let dy = -6; dy <= 6; dy++) {
+        const d = dx * dx + dy * dy, l2 = (dx || dy) && d < bd && ends.get((X + dx) + ',' + (Y + dy));
+        if (l2) { bd = d; best = l2; }
+      }
+      if (best) { const mine = ends.get(q).slice(); ends.get(q).push(...best.filter((e) => e[0] !== i)); best.push(...mine); }
+    }
     const main = []; for (let i = i0; i < roads.length; i++) if (roads[i].c !== 'service') main.push(i);
     // s daty sčítání (r.v = vozidla za 24 h) je na silnici tolik aut, kolik odpovídá intenzitě a délce:
     // ve špičce projede za hodinu asi 10 % denní intenzity, při 45 km/h je to v / 450 aut na kilometr (odhad)
     const weights = main.map((i) => (roads[i].v || 0) * roads[i].L), wsum = weights.reduce((a, b) => a + b, 0);
-    const n0 = cars.length, n = wsum ? Math.min(300, Math.round(wsum / 450 / 1000)) : Math.min(110, Math.round(main.length / 6));
+    const n0 = cars.length, n = wsum ? Math.min(300, Math.round(wsum / 450 / 1000 * CAR_DENS)) : Math.min(110, Math.round(main.length / 6));
     const pickMain = (u) => { if (!wsum) return main[Math.floor(u * main.length)]; let x = u * wsum; for (let k = 0; k < main.length; k++) { x -= weights[k]; if (x <= 0) return main[k]; } return main[main.length - 1]; };
     for (let j = 0; j < n && main.length; j++) {
-      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * 50, f: 0.85 + rnd(i + 5) * 0.25, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
+      const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * roads[r_].L,   // po celé délce, jinak se na dlouhé silnici auta nalepí do hloučku
+        f: 0.85 + rnd(i + 5) * 0.25, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
       if (c.truck) c.col = TRUCKC[i % TRUCKC.length];
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
@@ -973,7 +984,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const L = r.len; let i = 1; while (i < L.length - 1 && L[i] < s) i++;
     const t = Math.max(0, Math.min(1, (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));
     const a = r.w[i - 1], b = r.w[i], pa = r.p[i - 1], pb = r.p[i];
-    return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, ix: pa[0] + (pb[0] - pa[0]) * t, iy: pa[1] + (pb[1] - pa[1]) * t, d: pa[2] + (pb[2] - pa[2]) * t, dx: b[0] - a[0], dy: b[1] - a[1] };
+    return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, ix: pa[0] + (pb[0] - pa[0]) * t, iy: pa[1] + (pb[1] - pa[1]) * t, d: pa[2] + (pb[2] - pa[2]) * t, dx: b[0] - a[0], dy: b[1] - a[1], z: a.length > 2 ? a[2] + (b[2] - a[2]) * t : undefined };
   }
   function pickExit(all, truck) {
     const big = truck ? all.filter(([i]) => roads[i].t) : all, opts = big.length ? big : all;   // nákladní auta drží sčítané silnice
@@ -990,12 +1001,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if ($('realTime').checked) return DAY_SHARE[+new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(new Date())];
     return 1 - 0.85 * state.night;
   };
-  // strop aut na celou mapu; rozděluje se rovnoměrně přes c.q, takže platí pro všechny čtverce stejně
-  const MAX_CARS = 1000, MAX_CARS_SLOW = 300;
+  // pevná hustota na silnici (ne strop na celou mapu: ten se dělil podle počtu načtených čtverců a auta chodila ve vlnách);
+  // CAR_DENS = zlomek špičkové hustoty ze sčítání, slabší zařízení kreslí jen část aut
+  const CAR_DENS = 0.4, SLOW_SHARE = 0.35;
+  const MAX_CARS = 1000, MAX_CARS_SLOW = 300;                  // pojistka pro velká města: víc aut na celé mapě nebude
   let tShare = 1, tShareT = 0;
   // rychlost podle limitu z dat, jinak odhad podle třídy silnice; c.f je povaha řidiče
   const CLASS_KMH = { motorway: 110, trunk: 90, primary: 50, secondary: 50, tertiary: 50, unclassified: 40, residential: 30, living_street: 20 };
-  const roadSpeed = (r) => (r.l || CLASS_KMH[r.c] || 40) / 3.6;
+  const roadSpeed = (r) => (r.x ? Math.min(r.l || 50, 50) : r.l || CLASS_KMH[r.c] || 40) / 3.6;   // r.x = nájezdová rampa
   const carSpeed = (c, r) => (c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r)) * c.f;   // nákladní auta o něco pomaleji
   // semafory: dvě osy křižovatky se střídají (40 s cyklus je odhad); auta na červenou stojí ve frontě po 8 m
   const sigGreen = (z) => { const t = (performance.now() / 1000 + z[1] * 7) % 40; return z[2] ? t >= 20 && t < 37 : t < 17; };
@@ -1012,6 +1025,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
       const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
       if (opts.length) { const [i, dir] = pickExit(opts, c.truck); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
+      else if (r.o && (ends.get(ek(endPt)) || []).some(([i]) => i !== c.r && roads[i].c !== 'service')) {   // data mají navazující kus opačně: radši pokračovat než zmizet
+        const [i, dir] = pickExit((ends.get(ek(endPt)) || []).filter(([i]) => i !== c.r && roads[i].c !== 'service'), c.truck); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L;
+      }
       else if (r.o) {                  // konec jednosměrky: otočit se nesmí, auto se objeví jinde
         let i = c.r; for (let k = 0; k < 20; k++) { i = Math.floor(Math.random() * roads.length); if (roads[i].c !== 'service') break; }
         c.r = i; c.dir = roads[i].o || 1; c.s = c.dir > 0 ? 0 : roads[i].L;
@@ -1088,7 +1104,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     let k = 1; while (k < L.length - 1 && L[k] < s) k++;
     const a = sh.w[k - 1], b = sh.w[k], u = Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));
     const x = a[0] + (b[0] - a[0]) * u, y = a[1] + (b[1] - a[1]) * u, h = deckZ(x, y, b[0] - a[0], b[1] - a[1]) ?? gz(x, y), [ix, iy] = toImg(x, y, h);
-    return { x, y, ix, iy, dx: b[0] - a[0], dy: b[1] - a[1], dirSign: 1 };
+    return { x, y, z: h, ix, iy, dx: b[0] - a[0], dy: b[1] - a[1], dirSign: 1 };   // z: autobus, tramvaj a vlak na mostě ve výšce mostovky
   }
   function stepShuttle(b, dt, stopWait, endWait) {
     if (b.wait > 0) { b.wait -= dt; return; }
@@ -1347,12 +1363,60 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const TG = new Map(), tgk = (x, y) => Math.floor(x / 16) + ',' + Math.floor(y / 16);
   onChunk.push((k, d) => { for (const t of d.trees || []) { const q = tgk(t[0], t[1]); if (!TG.has(q)) TG.set(q, []); TG.get(q).push(t); } });
   // obrysy korun před bodem (x, y, z) v obrazových pixelech: elipsa listnáče, trojúhelník jehličnanu (jako v renderu)
+  // stromy před vozidlem: auto se schová přesně za pixely stromu. Kresby stromů jsou z rendereru (site/stromy/<období>.png,
+  // node render.mjs stromy=…); kresbu strom vybírá stejně jako render.html: podle hashe světových souřadnic, velikost podle výšky.
+  const STROMY = {};
+  const stromy = () => {
+    const s = state.season;
+    if (!STROMY[s]) {
+      STROMY[s] = { ok: false };
+      Promise.all([fetch(`stromy/${s}.json`).then((r) => r.json()), new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `stromy/${s}.png`; })])
+        .then(([m, im]) => Object.assign(STROMY[s], m, { im, ok: true })).catch(() => {});
+    }
+    return STROMY[s].ok ? STROMY[s] : null;
+  };
+  const tHash = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
+  function treeSprite(A, t) {                                   // [slot, měřítko] stejně jako render.html
+    const [x, y, , h, conif, kind] = t; let list, Hc;
+    if (kind === 1) { list = A.slots.bush; Hc = A.BUSH_H; }
+    else if (kind === 3) { const si = h < 8 ? 0 : 1; list = A.slots.col[si]; Hc = A.COL_H[si]; }
+    else if (conif) { const si = h < 12 ? 0 : h < 18 ? 1 : 2; list = A.slots.con[si]; Hc = A.CON_H[si]; }
+    else { const si = h < 10.5 ? 0 : h < 16 ? 1 : 2; list = A.slots.dec[si]; Hc = A.DEC_H[si]; }
+    return [list[Math.floor(tHash(Math.round(x * 100) / 100, Math.round(y * 100) / 100) * list.length)], Math.max(0.75, Math.min(1.3, h / Hc))];
+  }
+  // mostovky jako překážka: auto pod mostem nebo za ním se schová (deska ~1,2 m pod povrchem, zábradlí ~1,1 m nad ním)
+  const DG = new Map();
+  for (const d of OV.decks || []) for (let i = 0; i < d.p.length - 1; i++) {
+    const a = d.p[i], b = d.p[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L * (d.w / 2 + 0.5), ny = (b[0] - a[0]) / L * (d.w / 2 + 0.5);
+    const sg = { a, b, nx, ny, zmin: Math.min(a[2], b[2]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2] };
+    for (let k = 0; k <= Math.ceil(L / 16); k++) { const q = tgk(a[0] + (b[0] - a[0]) * k / Math.ceil(L / 16 || 1), a[1] + (b[1] - a[1]) * k / Math.ceil(L / 16 || 1)); if (!DG.has(q)) DG.set(q, new Set()); DG.get(q).add(sg); }
+  }
+  function deckShapes(x, y, z, dv, bb, out) {
+    const cx = Math.floor(x / 16), cy = Math.floor(y / 16), seen = new Set();
+    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const s of DG.get(i + ',' + j) || []) {
+      if (seen.has(s)) continue; seen.add(s);
+      if (z > s.zmin - 2.5) continue;                                          // vozidlo jede po mostě nebo vedle něj
+      { const ex = s.b[0] - s.a[0], ey = s.b[1] - s.a[1], t = Math.max(0, Math.min(1, ((x - s.a[0]) * ex + (y - s.a[1]) * ey) / ((ex * ex + ey * ey) || 1)));
+        if (depth(s.a[0] + ex * t, s.a[1] + ey * t, s.a[2] + (s.b[2] - s.a[2]) * t) >= dv) continue; }   // nejbližší bod mostovky je za vozidlem
+      const { a, b, nx, ny } = s, P = (p, sg, dz) => toImg(p[0] + nx * sg, p[1] + ny * sg, p[2] + dz);
+      const q = [P(a, 1, 1.1), P(b, 1, 1.1), P(b, 1, -1.2), P(b, -1, -1.2), P(a, -1, -1.2), P(a, -1, 1.1), P(b, -1, 1.1)];
+      const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+      if (Math.min(...xs) > bb[2] || Math.max(...xs) < bb[0] || Math.min(...ys) > bb[3] || Math.max(...ys) < bb[1]) continue;
+      out.push([3, [P(a, 1, 1.1), P(b, 1, 1.1), P(b, -1, 1.1), P(a, -1, 1.1)]], [3, [P(a, 1, 1.1), P(b, 1, 1.1), P(b, 1, -1.2), P(a, 1, -1.2)]], [3, [P(a, -1, 1.1), P(b, -1, 1.1), P(b, -1, -1.2), P(a, -1, -1.2)]]);
+    }
+  }
   function treeShapes(x, y, z, bb) {
-    const dv = depth(x, y, z), out = [], cx = Math.floor(x / 16), cy = Math.floor(y / 16);
-    for (let i = cx - 2; i <= cx + 2; i++) for (let j = cy - 2; j <= cy + 2; j++) for (const t of TG.get(i + ',' + j) || []) {
+    const dv = depth(x, y, z), out = [], cx = Math.floor(x / 16), cy = Math.floor(y / 16), A = stromy(), k0 = 0.2 / cam.mpp;
+    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const t of TG.get(i + ',' + j) || []) {   // stromy před vozidlem (k jihozápadu) až ~60 m
       const [tx, ty, tz, h, con] = t;
       if (depth(tx, ty, tz) >= dv - 0.3) continue;                               // strom je za vozidlem
-      if (con) {
+      if (A) {                                                                    // přesná kresba stromu
+        const [slot, s] = treeSprite(A, t), k = k0 * s, b = toImg(tx, ty, tz);
+        const L = b[0] - A.CW / 2 * k, T = b[1] - (A.CH - 3) * k;
+        if (L > bb[2] || L + A.CW * k < bb[0] || T > bb[3] || T + A.CH * k < bb[1]) continue;
+        out.push([2, slot, L, T, k]); continue;
+      }
+      if (con) {                                                                  // kresby se ještě načítají: odhad tvaru
         const a = toImg(tx, ty, tz + h), b = toImg(tx, ty, tz + h * 0.12), r = h * 0.2 / cam.mpp;
         if (a[0] + r < bb[0] || a[0] - r > bb[2] || a[1] > bb[3] || b[1] < bb[1]) continue;
         out.push([0, a, b, r]);
@@ -1362,10 +1426,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         out.push([1, c, rx, ry]);
       }
     }
+    if (DG.size) deckShapes(x, y, z, dv, bb, out);
     return out;
   }
   const occC = document.createElement('canvas'), occX = occC.getContext('2d');
-  // obrázek vozidla na mapu, s vyříznutými korunami stromů, které stojí před ním
   function drawBehindTrees(img, ix, iy, iw, ih, x, y, z, sx, ox, oy) {
     const X0 = Math.round(ox + ix * sx), Y0 = Math.round(oy + iy * sx), w = Math.round(iw * sx), h = Math.round(ih * sx);
     const sh = treeShapes(x, y, z, [ix, iy, ix + iw, iy + ih]);
@@ -1373,42 +1437,51 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (occC.width < w || occC.height < h) { occC.width = Math.max(occC.width, w); occC.height = Math.max(occC.height, h); }
     occX.clearRect(0, 0, w, h); occX.imageSmoothingEnabled = false; occX.globalCompositeOperation = 'source-over';
     occX.drawImage(img, 0, 0, w, h);
-    occX.globalCompositeOperation = 'destination-out'; occX.fillStyle = '#000'; occX.beginPath();
-    const P = (p) => [ox + p[0] * sx - X0, oy + p[1] * sx - Y0];
-    for (const q of sh) {
-      if (q[0] === 0) { const [ax, ay] = P(q[1]), [bx, by] = P(q[2]), r = q[3] * sx; occX.moveTo(ax, ay); occX.lineTo(bx + r, by); occX.lineTo(bx - r, by); occX.closePath(); }
-      else { const [cx, cy] = P(q[1]); occX.moveTo(cx + q[2] * sx, cy); occX.ellipse(cx, cy, q[2] * sx, q[3] * sx, 0, 0, Math.PI * 2); }
+    occX.globalCompositeOperation = 'destination-out';
+    const A = STROMY[state.season], P = (p) => [ox + p[0] * sx - X0, oy + p[1] * sx - Y0];
+    for (const q of sh) if (q[0] === 2) {                                         // pixely kresby stromu vyříznou auto
+      const [, slot, L, T, k] = q, cw = A.CW, chh = A.CH;
+      occX.drawImage(A.im, (slot % 16) * cw, Math.floor(slot / 16) * chh, cw, chh, ox + L * sx - X0, oy + T * sx - Y0, cw * k * sx, chh * k * sx);
     }
-    occX.fill(); occX.globalCompositeOperation = 'source-over';
+    occX.fillStyle = '#000'; occX.beginPath(); let any = false;
+    for (const q of sh) {
+      if (q[0] === 0) { const [ax, ay] = P(q[1]), [bx, by] = P(q[2]), r = q[3] * sx; occX.moveTo(ax, ay); occX.lineTo(bx + r, by); occX.lineTo(bx - r, by); occX.closePath(); any = true; }
+      else if (q[0] === 1) { const [cx, cy] = P(q[1]); occX.moveTo(cx + q[2] * sx, cy); occX.ellipse(cx, cy, q[2] * sx, q[3] * sx, 0, 0, Math.PI * 2); any = true; }
+      else if (q[0] === 3) { q[1].forEach((p, k) => { const [px, py] = P(p); k ? occX.lineTo(px, py) : occX.moveTo(px, py); }); occX.closePath(); any = true; }   // mostovka
+    }
+    if (any) occX.fill();
+    occX.globalCompositeOperation = 'source-over';
     ctx.drawImage(occC, 0, 0, w, h, X0, Y0, w, h);
   }
-  // vlak po článcích podle koleje, vzdálenější článek první, aby ho bližší zakryl
-  function drawTrain(trip, el, line, sx, ox, oy, night) {
-    const name = trainOf(line), cars = TRAINS[name].cars, T = cars.reduce((a, c) => a + c.len + 0.4, -0.4);
-    let at = T / 2; const parts = cars.map((c, i) => { const o = mhdPos(trip, el, T, at - c.len / 2); at -= c.len + 0.4; o.lane = 0; o.noLights = i > 0; return [o, c, i]; });
-    parts.sort((a, b) => (b[0].x + b[0].y) - (a[0].x + a[0].y));
-    let any = false;
-    for (const [o, c, i] of parts) if (drawVehicle(o, c.len, 2.82, `train|${name}|${i}`, sx, ox, oy, night, 4)) any = true;
-    return any;
+  // světla vozidel v noci: sesbírat za celý snímek a nakreslit třemi cestami (kužely, přední, zadní) místo stovek fill()
+  const LIGHTS_SX = 0.35, NL = { beams: [], head: [], tail: [] };
+  function flushLights(night, sx) {
+    if (NL.beams.length) {
+      const a = Math.min(1, (night - 0.3) / 0.4), q = Math.max(1, sx * 3);
+      ctx.globalAlpha = a * 0.35; ctx.fillStyle = '#ffe7a3'; ctx.beginPath();
+      for (const b of NL.beams) { b.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); }
+      ctx.fill(); ctx.globalAlpha = a;
+      ctx.fillStyle = '#fff4c8'; ctx.beginPath(); for (const [x, y] of NL.head) ctx.rect(x - q / 2, y - q / 2, q, q); ctx.fill();
+      ctx.fillStyle = '#ff3b2f'; ctx.beginPath(); for (const [x, y] of NL.tail) ctx.rect(x - q / 2, y - q / 2, q, q); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    NL.beams.length = NL.head.length = NL.tail.length = 0;
   }
   function drawVehicle(o, len, wid, col, sx, ox, oy, night, isBus) {
     const L = Math.hypot(o.dx, o.dy) || 1, fx_ = o.dx / L * (o.dirSign || 1), fy_ = o.dy / L * (o.dirSign || 1);
     const sxv = -fy_, syv = fx_;
     const lane = o.lane ?? 1.6, cxw = o.x - sxv * lane, cyw = o.y - syv * lane;
-    const h0 = gz(cxw, cyw);
+    const h0 = o.z ?? gz(cxw, cyw);                                            // výška silnice (na mostovce mostovka), jinak terén
     const base = toImg(cxw, cyw, h0);
     if (occluded(base[0], base[1], depth(cxw, cyw, h0))) return false;
     const k = ((Math.round(Math.atan2(fy_, fx_) / (Math.PI * 2) * NDIR) % NDIR) + NDIR) % NDIR;
     const spr = vehicleSprite(col, k, isBus, len, wid, state.season === 'winter');
     drawBehindTrees(spr.c, base[0] + spr.x0, base[1] + spr.y0, spr.c.width, spr.c.height, cxw, cyw, h0, sx, ox, oy);
-    if (night > 0.3 && !o.noLights) {
+    if (night > 0.3 && !o.noLights && sx >= LIGHTS_SX) {                                    // světla jen při přiblížení; kreslí se najednou (flushLights)
       const P = (s, t, h) => { const p = toImg(cxw + fx_ * s + sxv * t, cyw + fy_ * s + syv * t, h0 + h); return [ox + p[0] * sx, oy + p[1] * sx]; };
-      const poly = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); };
-      const l = len / 2, w = wid / 2, a = Math.min(1, (night - 0.3) / 0.4);
-      ctx.globalAlpha = a * 0.35; poly([P(l, -w, 0.6), P(l + 14, -w - 4, 0.1), P(l + 14, w + 4, 0.1), P(l, w, 0.6)], '#ffe7a3');
-      ctx.globalAlpha = a; const q = Math.max(1, sx * 3);
-      for (const t of [-w * 0.7, w * 0.7]) { const [x, y] = P(l, t, 0.7); ctx.fillStyle = '#fff4c8'; ctx.fillRect(x - q / 2, y - q / 2, q, q); const [x2, y2] = P(-l, t, 0.7); ctx.fillStyle = '#ff3b2f'; ctx.fillRect(x2 - q / 2, y2 - q / 2, q, q); }
-      ctx.globalAlpha = 1;
+      const l = len / 2, w = wid / 2;
+      NL.beams.push([P(l, -w, 0.6), P(l + 14, -w - 4, 0.1), P(l + 14, w + 4, 0.1), P(l, w, 0.6)]);
+      for (const t of [-w * 0.7, w * 0.7]) { NL.head.push(P(l, t, 0.7)); NL.tail.push(P(-l, t, 0.7)); }
     }
     return true;
   }
@@ -1527,7 +1600,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     // doprava
     if ($('l-traffic').checked) {
       for (const c of cars) if (c.q <= tShare || c.hold) stepCar(c, dt);
-      if (now - tShareT > 5000) { tShareT = now; tShare = trafficShare() * Math.min(1, (eco || SLOW ? MAX_CARS_SLOW : MAX_CARS) / (cars.length || 1)); }
+      if (now - tShareT > 5000) { tShareT = now; tShare = trafficShare() * Math.min(eco || SLOW ? SLOW_SHARE : 1, (eco || SLOW ? MAX_CARS_SLOW : MAX_CARS) / (cars.length || 1)); }
       if (sx > 0.25) for (const [r, z] of sigs) {          // sloup se světlem kousek před křižovatkou
         if (!shown(r.k)) continue;
         const o = along(r, z[0] < r.L / 2 ? Math.min(r.L, z[0] + 8) : Math.max(0, z[0] - 8));
@@ -1575,6 +1648,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         const o = along(tr.r, tr.s); o.dirSign = tr.dir;
         if (vis(o.ix, o.iy, 120)) drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2);
       }
+      flushLights(night, sx);
     }
     // lyžaři (jen v zimě)
     if (snowy && skiers.length) {

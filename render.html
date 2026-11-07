@@ -1249,6 +1249,7 @@ function roofDeco(b, X, eave, rc) {
     const pal = winter ? P('#2e2620', '#4a3e34', '#625244', '#d6dde8', '#f4f7fb') : decPals[v * 2 % decPals.length];
     blobCrown(B, CW / 2, CH - 3 - BUSH_H * 0.4 / PX, 2.2 / PX, BUSH_H * 0.42 / PX, pal, 4); outline(B, pal[0]);
   }));
+  window.TREE_EXPORT = () => ({ url: atlas.toDataURL(), slots, CW, CH, DEC_H, CON_H, COL_H, BUSH_H });   // kresby stromů pro prohlížeč (node render.mjs stromy=site/stromy)
   const tex = new THREE.CanvasTexture(atlas);
   tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.colorSpace = THREE.NoColorSpace;
   // instance billboardů

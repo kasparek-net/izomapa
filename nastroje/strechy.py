@@ -67,12 +67,14 @@ def tone(res):
     out = {}
     for k, v in res.items():
         c = np.array(v, float) * gain; g = c.mean()
+        if in_shade(np.clip((g + (c - g) * 1.45) * 0.92, 0, 255)): continue   # stín se pozná na mírně zesíleném snímku; po odečtení oparu je tmavá i světlá modrošedá krytina
+        c = np.clip((c - HAZE) * 255 / (255 - HAZE), 0, 255); g = c.mean()   # odečíst opar: ortofoto ČÚZK je světlé a zamlžené
         c = np.clip((g + (c - g) * SAT) * VAL, 0, 255)
-        if not in_shade(c): out[k] = [int(round(x)) for x in c]
+        out[k] = [int(round(x)) for x in c]
     return out
 
 
-SAT, VAL = 1.45, 0.92
+SAT, VAL, HAZE = 2.3, 0.86, 32        # vyzkoušeno v Liberci proti Mapy.cz: s 1,45 / 0,92 bez odečtení oparu vycházely červené střechy lososové
 if __name__ == '__main__':
     for ty in range(0, H, T):
         for tx in range(0, W, T):

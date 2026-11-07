@@ -21,6 +21,7 @@ for c in $CH; do ./render_chunk.sh $c; done
 rm -rf site/tiles && mkdir -p site/tiles && rm -f site/tiles.json
 python dzi.py
 for c in $CH; do [ "$c" = "0,0" ] || python dzi.py --chunk $c; done
+for s in summer autumn winter spring; do node render.mjs mpp=0.2 dir=build season=$s alpha=1 stromy=site/stromy > /dev/null; done   # kresby stromů: auta se schovají přesně za ně
 python preview.py
 python overlay.py
 python mhd.py || true                                         # jízdní řády jen když je v mesto.json mhd.gtfs

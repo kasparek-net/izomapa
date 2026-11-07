@@ -384,14 +384,14 @@ def bridge_parts(r):
         out.append((max(a, t0), t1, True)); a = max(a, t1)
     if a < 1: out.append((a, 1.0, False))
     return out
-_rows, bridge_segs = [], []
+_rows, bridge_segs, _bridge_raw = [], [], []          # _bridge_raw: kusy mostů před spojením (jednosměrky pro mostovky)
 for _, r in seg.iterrows():
     bp = bridge_parts(r)
     if bp is None: _rows.append(r); continue
     for a, b_, isb in bp:
         if b_ - a < 1e-6: continue
         g = shapely.ops.substring(r.geom, a, b_, normalized=True)
-        if isb and g.length >= BRIDGE_MIN: bridge_segs.append((g, r)); continue
+        if isb and g.length >= BRIDGE_MIN: bridge_segs.append((g, r)); _bridge_raw.append((g, r)); continue
         q = r.copy(); q['geom'] = g; _rows.append(q)
 seg = pd.DataFrame(_rows).reset_index(drop=True)
 RW = {'motorway': 18, 'trunk': 12, 'primary': 10, 'secondary': 9, 'tertiary': 8, 'residential': 6, 'unclassified': 6,
@@ -1546,6 +1546,19 @@ if os.path.exists('assets/stromy_mesta.json'):
 # rozhledna v lese: bez mýtiny by ji koruny schovaly celou
 _rz = [to_local(k_['lon'], k_['lat']) for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/kominy.json') else []) if k_['k'] == 'rozhledna']
 if _rz: T = [t[:4] + (2,) if any(math.hypot(t[0] - q[0], t[1] - q[1]) < 11 for q in _rz) else t for t in T]
+# koruna nesmí sahat do vozovky, kudy jezdí auta (jinak auta „projíždějí stromy“): strom pryč, když je střed blíž než
+# půl šířky silnice + poloměr koruny (listnatý ~0,33 h, jehličnan ~0,2 h). Platí i pro mostovky a nájezdy.
+_drv = [(l, w) for _a, l, c, w, _n in roads if c in DRIVE and c != 'service'] + [(D[0], D[4]) for D in DECKS if D[6] in DRIVE and D[6] != 'service']
+if _drv:
+    _dt = shapely.STRtree([l for l, _w in _drv]); _n0 = len(T)
+    def _clear(t):
+        r_ = t[2] * (0.2 if t[3] else 0.33); P_ = Point(t[0], t[1])
+        for k in _dt.query(P_.buffer(r_ + 8)):
+            l_, w_ = _drv[k]
+            if l_.distance(P_) < w_ / 2 + r_: return False
+        return True
+    T = [t for t in T if _clear(t)]
+    print('stromů nad vozovkou odstraněno', _n0 - len(T))
 tz = ground(np.array([t[0] for t in T]), np.array([t[1] for t in T]))
 trees = [[round(t[0], 2), round(t[1], 2), round(float(z), 2), round(t[2], 1), t[3], t[4]] for t, z in zip(T, tz)]
 print('stromů', len(trees))
@@ -1736,6 +1749,7 @@ def _oneway(r):
             if w_.get('heading') == 'forward': return -1
     return 0
 _ow = [(l, _oneway(r), r['class']) for _, r in seg.iterrows() if r['class'] in DRIVE and r['class'] != 'service' for l in lines(r.geom)]
+_ow += [(l, _oneway(r), r['class']) for g_, r in _bridge_raw if r['class'] in DRIVE and r['class'] != 'service' for l in lines(g_)]   # mosty jsou ze seg vyčleněné: bez tohohle by mostovka dvouproudé silnice byla obousměrná
 # intenzita dopravy ze sčítání ŘSD ("doprava" v mesto.json, data z nastroje/scitani.py): vozidla za 24 h podle čísla silnice
 _cfg = geo.MESTO.get('doprava')
 _sv = {}
@@ -1751,14 +1765,33 @@ def _intensity(r):
     routes = r.get('routes')
     for x in (routes if routes is not None and not isinstance(routes, float) else []):
         ref = str(x.get('ref') or '').replace(' ', '')
-        if ref in _sv: return _sv[ref], _nak[ref]
-    return _V_CLASS.get(r['class'], 300), 0
-_v = [(l, *_intensity(r)) for _, r in seg.iterrows() if r['class'] in DRIVE and r['class'] != 'service' for l in lines(r.geom)] if _cfg else []
+        if ref in _sv: return _sv[ref], _nak[ref], True
+    return _V_CLASS.get(r['class'], 300), 0, False
+# rampy (subclass link) mají v datech třídu silnice, na kterou vedou -> jen zlomek aut; kusy hlavní silnice bez čísla
+# dostanou medián sčítaných kusů stejné třídy v tomto čtverci (jinak by průtah měl místy 10 000 a místy 25 000 aut)
+_v = []
+if _cfg:
+    for _, r in seg.iterrows():
+        if r['class'] not in DRIVE or r['class'] == 'service': continue
+        lk_ = r.get('subclass') == 'link'
+        for l in lines(r.geom): _v.append([l, *_intensity(r), lk_, r['class']])
+    for c_ in {q[5] for q in _v}:
+        ok_ = [q for q in _v if q[5] == c_ and q[3] and not q[4]]
+        if ok_:
+            med_, nak_ = float(np.median([q[1] for q in ok_])), float(np.median([q[2] for q in ok_]))
+            for q in _v:
+                if q[5] == c_ and not q[3] and not q[4]: q[1], q[2] = med_, nak_
+    for q in _v:
+        if q[4]: q[1] = q[1] * 0.2
 _v_tree = shapely.STRtree([q[0] for q in _v]) if _v else None
-def piece_intensity(l):
+def piece_intensity(l, c):
+    """(vozidla za 24 h, % nákladních, rampa); přednost má kus stejné třídy, ať most nepřevezme intenzitu silnice pod sebou"""
     m_ = l.interpolate(0.5, normalized=True)
-    near = _v_tree.query(m_.buffer(3.0))
-    return _v[min(near, key=lambda k: _v[k][0].distance(m_))][1:] if len(near) else (None, 0)
+    near = list(_v_tree.query(m_.buffer(3.0)))
+    same = [k for k in near if _v[k][5] == c] or near
+    if not same: return None, 0, False
+    q = _v[min(same, key=lambda k: _v[k][0].distance(m_))]
+    return q[1], q[2], q[4]
 # kruhové objezdy data často jednosměrné nemají: malý kruhový prstenec krátkých úseků, doprava proti směru hodinových ručiček
 _short = [l for l, _o, _c in _ow if l.length < 60]
 _ring_lines = []
@@ -1819,9 +1852,10 @@ def _road(p3, l, c, n):
     z_ = piece_signals(l) if c != 'service' else []
     if z_: o['z'] = z_
     if _v_tree is not None and c != 'service':
-        v_, t_ = piece_intensity(l)
+        v_, t_, lk_ = piece_intensity(l, c)
         o['v'] = int(v_ or _V_CLASS.get(c, 300))
         if t_: o['t'] = t_
+        if lk_: o['x'] = 1                    # rampa: pomaleji
     return o
 graph = [_road([[round(x, 1), round(y, 1), round(float(z), 1)] for (x, y), z in zip(l.coords, ground(*np.array(l.coords).T))], l, c, n)
          for l0, w, c, n in drive_lines for l in lines(l0.intersection(AREA.intersection(CLIP.buffer(-4)))) if l.length > 2]   # auta jen uvnitř mapy, přes šev ano
@@ -1829,6 +1863,43 @@ for D in DECKS:                               # po mostech ve výšce mostovky
     if D[6] in DRIVE and AREA.intersects(D[0]):
         p3 = deck_line(D)
         graph.append(_road(p3, LineString([(x, y) for x, y, _z in p3]), D[6], D[7]))
+# nájezd, který se napojí doprostřed jiného kusu (rampa na průtah, cesta na mostovku), by v prohlížeči byl slepý
+# konec – graf spojuje jen konce kusů. Takový kus se v místě napojení rozdělí na dva.
+def _split3(p3, s, at):
+    out_a, out_b, acc = [p3[0]], None, 0.0
+    for i in range(1, len(p3)):
+        a_, b_ = p3[i - 1], p3[i]; seg_ = math.hypot(b_[0] - a_[0], b_[1] - a_[1])
+        if out_b is None and acc + seg_ >= s:
+            t = (s - acc) / (seg_ or 1); m = [at[0], at[1], round(a_[2] + (b_[2] - a_[2]) * t, 1)]   # přesně do konce napojeného kusu
+            out_a.append(m); out_b = [m, b_]
+        elif out_b is None: out_a.append(b_)
+        else: out_b.append(b_)
+        acc += seg_
+    return out_a, out_b
+for _round in range(3):
+    _lines = [LineString([(q[0], q[1]) for q in g_['p']]) for g_ in graph]
+    _tree = shapely.STRtree(_lines); _cuts = {}
+    for i, g_ in enumerate(graph):
+        for e in (g_['p'][0], g_['p'][-1]):
+            P_ = Point(e[0], e[1])
+            for k in _tree.query(P_.buffer(1.0)):
+                if k == i or _lines[k].distance(P_) > 1.0: continue
+                s_ = _lines[k].project(P_)
+                if not 2.0 < s_ < _lines[k].length - 2.0: continue
+                q_ = _split3(graph[k]['p'], s_, (e[0], e[1]))[0][-1]
+                if abs(q_[2] - e[2]) < 2.0: _cuts.setdefault(int(k), {})[round(s_, 1)] = (e[0], e[1])   # jen ve stejné výšce (ne cesta pod mostem)
+    if not _cuts: break
+    _new = []
+    for k, g_ in enumerate(graph):
+        if k not in _cuts: _new.append(g_); continue
+        rest, done = g_['p'], 0.0
+        for s_ in sorted(_cuts[k]):
+            a_, b_ = _split3(rest, s_ - done, _cuts[k][s_])
+            if b_ is None: break
+            _new.append({**g_, 'p': a_}); rest, done = b_, s_
+        _new.append({**g_, 'p': rest})
+    print('napojení doprostřed kusu rozděleno', sum(len(v) for v in _cuts.values()))
+    graph = _new
 print('jednosměrných úseků pro auta', sum(1 for g_ in graph if g_.get('o')), 'kruhových objezdů', len(_ring_lines))
 stops = [{'name': sname(r), 'x': r.geom.x, 'y': r.geom.y} for _, r in inf.iterrows()
          if r['class'] == 'bus_stop' and AREA.contains(r.geom) and sname(r)]
