@@ -19,5 +19,5 @@ for r in oneway:
             a, b = ring.project(l.interpolate(0.25, normalized=True)), ring.project(l.interpolate(0.75, normalized=True))
             assert (1 if b >= a else -1) == r['o'], ('clockwise roundabout piece', r['w'][0])
             on_ring += 1
-assert on_ring, 'no roundabout pieces found'
+assert on_ring or not rings, 'no roundabout pieces found'   # mapa bez kruhového objezdu (Ženklava) nemá co kontrolovat
 print('one-way pieces', len(oneway), 'roundabouts', len(rings), 'checked on rings', on_ring)
