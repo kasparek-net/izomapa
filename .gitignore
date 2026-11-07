@@ -26,6 +26,7 @@ assets/hrebeny.json
 .wrangler/
 assets/ruian_budovy.json
 assets/semafory.json
+assets/prejezdy.json
 assets/kominy.json
 assets/stromy_mesta.json
 assets/zelen_mesta.json

@@ -1864,7 +1864,7 @@ graph = [_road([[round(x, 1), round(y, 1), round(float(z), 1)] for (x, y), z in 
 for D in DECKS:                               # po mostech ve výšce mostovky
     if D[6] in DRIVE and AREA.intersects(D[0]):
         p3 = deck_line(D)
-        graph.append(_road(p3, LineString([(x, y) for x, y, _z in p3]), D[6], D[7]))
+        graph.append({**_road(p3, LineString([(x, y) for x, y, _z in p3]), D[6], D[7]), '_deck': 1})
 # nájezd, který se napojí doprostřed jiného kusu (rampa na průtah, cesta na mostovku), by v prohlížeči byl slepý
 # konec – graf spojuje jen konce kusů. Takový kus se v místě napojení rozdělí na dva.
 def _split3(p3, s, at):
@@ -1903,6 +1903,18 @@ for _round in range(3):
     print('napojení doprostřed kusu rozděleno', sum(len(v) for v in _cuts.values()))
     graph = _new
 print('jednosměrných úseků pro auta', sum(1 for g_ in graph if g_.get('o')), 'kruhových objezdů', len(_ring_lines))
+# železniční přejezdy (nastroje/prejezdy.py, OSM railway=level_crossing): kus silnice v úrovni terénu si nese [metry od začátku, x, y]
+if os.path.exists('assets/prejezdy.json'):
+    sys.path.insert(0, 'nastroje'); import prejezdy as _pj
+    _pj_pts = [tuple(float(v) for v in to_local(lo, la)) for la, lo in json.load(open('assets/prejezdy.json'))]
+    _rails = shapely.STRtree([l for _, g_, c_, _w, _n in roads if c_ == 'rail' for l in lines(g_)] or [Point(1e9, 1e9)])
+    for g_ in graph:
+        if g_.get('c') == 'service' or g_.get('_deck'): continue      # mostovka nad tratí přejezd nemá
+        j_ = [q for q in _pj.na_kusu(g_['p'], _pj_pts) if len(_rails.query(Point(q[1], q[2]), predicate='dwithin', distance=3.0))]   # silnice opravdu kříží kolej (ne souběžná ulice)
+        if j_: g_['j'] = j_
+for g_ in graph:
+    g_.pop('_deck', None)
+print('železničních přejezdů', sum(len(g_.get('j', [])) for g_ in graph))
 stops = [{'name': sname(r), 'x': r.geom.x, 'y': r.geom.y} for _, r in inf.iterrows()
          if r['class'] == 'bus_stop' and AREA.contains(r.geom) and sname(r)]
 def zline(l):

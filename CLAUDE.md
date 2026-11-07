@@ -67,6 +67,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Stupně nočních světel (volitelné):** vedle `lights` vyrenderuj `node render.mjs … mode=lights stage=prace out=build/tiles_lights_prace` a `stage=noc out=build/tiles_lights_noc`; `dzi.py` je přidá sám. Prohlížeč podle hodiny vymění jednu vrstvu za druhou, takže se kreslí pořád jen jedna. Podíly oken a časy jsou odhad. Bez nich svítí jedna vrstva jako dřív.
 - **Komíny, věže, nádrže, potrubí:** `.venv/bin/python nastroje/kominy.py` vyrobí `assets/kominy.json` a `assets/potrubi.json` z OSM (výška z tagu `height`). Komín od 100 m dostane výstražné pruhy. Vzhled jednoho komína: `assets/upresneni.json`, `"kominy": [{"lat", "lon", "wc": barva, "pr": 0}]`. Po změně je potřeba nový render dotčených čtverců.
 - **Semafory:** `.venv/bin/python nastroje/semafory.py` vyrobí `assets/semafory.json` z OSM. Bez něj auta nezastavují. Délka cyklu je odhad.
+- **Železniční přejezdy:** `.venv/bin/python nastroje/prejezdy.py` vyrobí `assets/prejezdy.json` z OSM (`railway=level_crossing`), `prep.py` je přiřadí silnicím, které tam kříží kolej. Přejezd se zavře asi 25 s před příjezdem vlaku podle jízdních řádů a otevře, až projede poslední vůz; auta před ním čekají ve frontě. Bez souboru nebo bez vlaků v MHD auta nečekají.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 
