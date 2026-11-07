@@ -1503,6 +1503,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     occX.globalCompositeOperation = 'source-over';
     ctx.drawImage(occC, 0, 0, w, h, X0, Y0, w, h);
   }
+  // vlak po článcích podle koleje, vzdálenější článek první, aby ho bližší zakryl
+  function drawTrain(trip, el, line, sx, ox, oy, night) {
+    const name = trainOf(line), cars = TRAINS[name].cars, T = cars.reduce((a, c) => a + c.len + 0.4, -0.4);
+    let at = T / 2; const parts = cars.map((c, i) => { const o = mhdPos(trip, el, T, at - c.len / 2); at -= c.len + 0.4; o.lane = 0; o.noLights = i > 0; return [o, c, i]; });
+    parts.sort((a, b) => (b[0].x + b[0].y) - (a[0].x + a[0].y));
+    let any = false;
+    for (const [o, c, i] of parts) if (drawVehicle(o, c.len, 2.82, `train|${name}|${i}`, sx, ox, oy, night, 4)) any = true;
+    return any;
+  }
   // světla vozidel v noci: sesbírat za celý snímek a nakreslit třemi cestami (kužely, přední, zadní) místo stovek fill()
   const LIGHTS_SX = 0.35, NL = { beams: [], head: [], tail: [] };
   function flushLights(night, sx) {
