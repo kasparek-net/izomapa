@@ -24,17 +24,37 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.once('listening', r));
 const port = server.address().port;
 
-// cloud (Linux bez GPU): předinstalovaný Chromium + SwiftShader; Mac: Chromium z Playwrightu + GPU (Metal), Windows: GPU (Direct3D 11)
-const LINUX_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const browser = await chromium.launch({
-  ...(process.platform === 'linux' && fs.existsSync(LINUX_CHROME) ? { executablePath: LINUX_CHROME } : {}),
-  args: process.env.IZO_CHROME_ARGS ? process.env.IZO_CHROME_ARGS.split(' ') : process.platform === 'darwin'
+// Mac: Metal, Windows: Direct3D 11, Linux: HW GPU přes EGL (pokud je v /dev/dri a WebGL není jen SW rasterizer), jinak SwiftShader
+const SWIFTSHADER = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+const linuxExe = process.platform === 'linux' && ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/ms-playwright/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+const launch = (args) => chromium.launch({ ...(linuxExe ? { executablePath: linuxExe } : {}), args });
+let browser, page;
+if (process.env.IZO_CHROME_ARGS) {             // vlastní přepínače (např. SwiftShader v sandboxu)
+  browser = await launch(process.env.IZO_CHROME_ARGS.split(' ')); page = await browser.newPage();
+} else if (process.platform === 'linux') {
+  let hasDri = false;
+  try { hasDri = fs.existsSync('/dev/dri') && fs.readdirSync('/dev/dri').some((f) => f.startsWith('renderD')); }
+  catch { console.warn('GPU: nelze přečíst /dev/dri, zkouším SwiftShader'); }
+  if (hasDri) {
+    try {
+      browser = await launch(['--no-sandbox', '--use-gl=angle', '--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist']);
+      page = await browser.newPage();
+      const gpu = await page.evaluate(() => {
+        const gl = document.createElement('canvas').getContext('webgl2');
+        const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
+        return gl ? String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : '';
+      });
+      if (!gpu || /swiftshader|llvmpipe|softpipe|swrast|lavapipe/i.test(gpu)) { await browser.close(); browser = page = null; }
+      else console.log('GPU:', gpu);
+    } catch { await browser?.close().catch(() => {}); browser = page = null; }
+  }
+  if (!browser) { console.log('GPU: SwiftShader (fallback)'); browser = await launch(SWIFTSHADER); page = await browser.newPage(); }
+} else {
+  browser = await launch(process.platform === 'darwin'
     ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
-    : process.platform === 'win32'
-    ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist']
-    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
-const page = await browser.newPage();
+    : ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist']);
+  page = await browser.newPage();
+}
 page.on('console', (m) => console.log('[page]', m.text()));
 page.on('requestfailed', (r) => console.log('[rf]', r.url(), r.failure()?.errorText));
 page.on('pageerror', (e) => { console.log('[pageerror]', e.message); process.exit(1); });

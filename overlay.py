@@ -77,7 +77,7 @@ def merge_parts(bs):
     for ps in parts.values():
         hull = MultiPoint([q for b in ps for q in b['ring']]).convex_hull
         out.append({**max(ps, key=lambda b: shapely.geometry.Polygon(b['ring']).area), 'ring': [list(q) for q in hull.exterior.coords[:-1]],
-                    'addr': sorted({a for b in ps for a in b['addr']}), 'base': min(b['base'] for b in ps), 'top': max(b['top'] for b in ps)})
+                    'addr': sorted({a for b in ps for a in b['addr']}), 'base': min(b['base'] for b in ps), 'top': max(b['top'] for b in ps), 'merged': True})
     return out
 
 
@@ -104,6 +104,40 @@ for chunk in chunks:
         pts = [px(x, y, z)[:2] for x, y in ring for z in (b['base'], top)]
         hull = MultiPoint(pts).convex_hull
         if hull.geom_type != 'Polygon': continue
+        sil, fb = [], []
+        roof_geom = None if b.get('merged') else b.get('roof_geometry')
+        for rg, b0, t0 in [(b['ring'], b['base'], b['top'])]:
+            t0 = roof_geom['eave'] if roof_geom else t0 + (0 if b.get('roofboxes') else top - b['top'])
+            lo_ = [px(x, y, b0)[:2] for x, y in rg]; hi_ = [px(x, y, t0)[:2] for x, y in rg]
+            fb.append([[round(x), round(y)] for x, y in lo_])
+            sil += [shapely.geometry.Polygon(lo_), shapely.geometry.Polygon(hi_)]
+            sil += [shapely.geometry.Polygon([lo_[i], lo_[(i + 1) % len(rg)], hi_[(i + 1) % len(rg)], hi_[i]]) for i in range(len(rg))]
+        if roof_geom:
+            # Stejné obdélníky, přesah a výška jako u jednotlivých střešních dílů v render.html.
+            eave = roof_geom['eave']; pitch = math.tan(math.radians(roof_geom.get('pitch', 40))); ov = 0.45
+            for cx_, cy_, angle, length, width in roof_geom['parts']:
+                ca, sa = math.cos(angle), math.sin(angle)
+                def pt(s, t, h):
+                    return px(cx_ + ca * s - sa * t, cy_ + sa * s + ca * t, h)[:2]
+                hl, hw = length / 2 + ov, width / 2 + ov
+                ridge_h = eave + min(width / 2 * pitch, roof_geom['height'] or 7)
+                ridge_len = hl if roof_geom.get('shape', b['roof']) == 'gabled' else max(hl - hw, 0)
+                r0, r1 = pt(-ridge_len, 0, ridge_h), pt(ridge_len, 0, ridge_h)
+                z = eave - ov * pitch
+                c00, c10, c11, c01 = pt(-hl, -hw, z), pt(hl, -hw, z), pt(hl, hw, z), pt(-hl, hw, z)
+                sil += [shapely.geometry.Polygon([c00, c10, r1, r0]), shapely.geometry.Polygon([c11, c01, r0, r1])]
+                if roof_geom.get('shape', b['roof']) == 'gabled':
+                    sil += [shapely.geometry.Polygon([pt(-length / 2, -width / 2, eave), pt(-length / 2, width / 2, eave), pt(-length / 2, 0, ridge_h)]),
+                            shapely.geometry.Polygon([pt(length / 2, -width / 2, eave), pt(length / 2, width / 2, eave), pt(length / 2, 0, ridge_h)])]
+                else:
+                    sil += [shapely.geometry.Polygon([c01, c00, r0]), shapely.geometry.Polygon([c10, c11, r1])]
+        if roof_geom:
+            sil_ = shapely.unary_union([q.buffer(0) for q in sil if q.area > 0])
+            if sil_.geom_type == 'Polygon' and sil_.area > 1:
+                candidate = sil_.simplify(0.6)
+                rounded = shapely.geometry.Polygon([(round(x), round(y)) for x, y in candidate.exterior.coords])
+                if rounded.is_valid and rounded.area > 0: hull = candidate
+        dm = min(px(x, y, b['base'])[2] for x, y in ring)
         cx, cy = ring.mean(axis=0)
         d = px(cx, cy, b['base'])[2]
         church = b['cls'] == 'kostel'
@@ -132,7 +166,7 @@ for chunk in chunks:
         if name: addr_index.append([name, K, cxi, cyi, len(buildings), 'budova'])
         buildings.append({k: v for k, v in {
             'pl': pl,
-            'id': f"{K}:{b['id']}", 'oid': b.get('oid'), 'hull': [[round(x), round(y)] for x, y in list(hull.exterior.coords)[:-1]], 'd': d,
+            'id': f"{K}:{b['id']}", 'oid': b.get('oid'), 'hull': [[round(x), round(y)] for x, y in list(hull.exterior.coords)[:-1]], 'd': d, 'dm': dm, 'fb': fb,
             'name': name, 'text': text, 'cls': b['cls'], 'floors': b['floors'], 'h': None if church else b['h'], 'roof': b['roof'], 'addr': b['addr'],
             'lon': b['lon'], 'lat': b['lat'], 'k': K,
         }.items() if v not in (None, [], '')})
@@ -173,9 +207,12 @@ for chunk in chunks:
 
 
 
+OBCE = [json.load(open(f'obce/{f}', encoding='utf-8')) for f in sorted(os.listdir('obce')) if f.endswith('.json')] if os.path.isdir('obce') else []
 # místa s krátkým popisem (fakta z dat + ověřené zdroje)
 # místa s krátkým příběhem: mista.json [{"nazev", "lat", "lon", "text"}, ...] (fakta z ověřených zdrojů)
-PLACES = [(m['nazev'], m['lat'], m['lon'], m['text']) for m in json.load(open('mista.json', encoding='utf-8'))] if os.path.exists('mista.json') else []
+PLACES = [(m['nazev'], m['lat'], m['lon'], m['text'], m.get('obec')) for m in json.load(open('mista.json', encoding='utf-8'))] if os.path.exists('mista.json') else []
+for o in OBCE:
+    PLACES += [(m['nazev'], m['lat'], m['lon'], m['text'], m.get('obec') or o.get('nazev')) for m in o.get('mista', [])]
 def gz(x, y):
     for gr in grounds:
         lx, ly = x - gr['cx'], y - gr['cy']
@@ -189,20 +226,23 @@ def gz(x, y):
 # co je potřeba dodat ručně (fotky): klíčové objekty z assets/dominanty.json, žluté značky v režimu „vč. rozpracovaného“
 NEEDS = []     # fotky ke všem dominantám jsou dodané (dřív žluté značky 📷)
 places = []
-for name, lat, lon, text in PLACES:
+for name, lat, lon, text, obec in PLACES:
     x, y = to_local(lon, lat)
     c = chunk_of(float(x), float(y))
     if c not in CKEY: continue
     OFF = (0.0, 0.0)
-    places.append({'name': name, 'text': text, 'lon': lon, 'lat': lat, 'k': CKEY[c], 'xy': list(px(float(x), float(y), gz(x, y))[:2])})
+    places.append({'name': name, 'text': text, 'lon': lon, 'lat': lat, 'k': CKEY[c], 'xy': list(px(float(x), float(y), gz(x, y))[:2]), **({'obec': obec} if obec else {})})
 
 cam = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'X': list(map(float, CAM_X)), 'Y': list(map(float, CAM_Y)),
        'half': HALF, 'grounds': grounds}
-# vánoční strom na náměstí (zima): mesto.json vanocni_strom = [lat, lon]
-nam = None
-if MESTO.get('vanocni_strom'):
-    _x, _y = to_local(MESTO['vanocni_strom'][1], MESTO['vanocni_strom'][0]); OFF = (0.0, 0.0)
-    nam = list(px(float(_x), float(_y), gz(_x, _y))[:2])
+# vánoční strom na náměstí (zima): mesto.json vanocni_strom = [lat, lon] (příp. více stromů z obce/*.json)
+stromy = []
+for s in [MESTO.get('vanocni_strom')] + [o.get('vanocni_strom') for o in OBCE]:
+    if isinstance(s, list) and len(s) == 2 and all(isinstance(v, (int, float)) for v in s):
+        _x, _y = to_local(s[1], s[0]); OFF = (0.0, 0.0)
+        pt = list(px(float(_x), float(_y), gz(_x, _y))[:2])
+        if pt not in stromy: stromy.append(pt)
+nam = stromy[0] if len(stromy) == 1 else (stromy or None)
 cam.update({'lon0': LON0, 'lat0': LAT0, 'kx': KX, 'ky': KY})
 needs = []
 for name, lat, lon, text in NEEDS:
@@ -222,7 +262,8 @@ for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
     rp = gg.representative_point(); c = chunk_of(rp.x, rp.y)
     if c not in CKEY: continue
     OFF = (0.0, 0.0)
-    nm = nm.replace(MESTO['nazev'] + '-', '')
+    for naz in [MESTO['nazev']] + [o['nazev'] for o in OBCE if o.get('nazev')]:
+        nm = nm.replace(naz + '-', '')
     districts.append({'name': nm, 'xy': list(px(rp.x, rp.y, gz(rp.x, rp.y))[:2]), 'a': round(gg.area / 1e6, 2)})
 print('čtvrtí', len(districts))
 # tramvaje: graf kolejí přes všechny čtverce, linky = nejkratší cesta mezi konečnými (TRAM_LINES), tam a zpět

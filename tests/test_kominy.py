@@ -1,23 +1,45 @@
-"""python tests/test_kominy.py: stejný komín z OSM je jeden, plocha má přednost před bodem, chybějící výška má výchozí hodnotu."""
+"""Regresní příklady pro import průmyslových objektů z OSM."""
+import importlib.util
+from pathlib import Path
 import sys
-sys.path.insert(0, '.'); sys.path.insert(0, 'nastroje')
-import kominy as k
+import types
+import unittest
 
-v = k.vyber([
-    {'lat': 49.6, 'lon': 18.0, 'tags': {'man_made': 'tower', 'tower:type': 'stack', 'height': '109'}},
-    {'bounds': {'minlat': 49.59997, 'maxlat': 49.60009, 'minlon': 17.9999, 'maxlon': 18.0001}, 'tags': {'man_made': 'chimney', 'height': '104 m'}},
-    {'lat': 49.61, 'lon': 18.0, 'tags': {'man_made': 'chimney'}},
-    {'center': {'lat': 49.62, 'lon': 18.0}, 'bounds': {'minlat': 49.6199, 'maxlat': 49.6201, 'minlon': 17.9998, 'maxlon': 18.0002}, 'tags': {'tower:type': 'cooling', 'height': 'x'}},
-])
-assert len(v) == 3
-assert v[0]['h'] == 104 and v[0]['r'], 'plocha přebírá polohu i výšku'
-assert [p for p in v if p['lat'] == 49.61][0]['h'] == k.VYCHOZI_H['komin']
-assert [p for p in v if p['k'] == 'vez'][0]['h'] == k.VYCHOZI_H['vez']
-t = k.vyber([{'lat': 49.0, 'lon': 18.0, 'tags': {'man_made': 'mast', 'tower:type': 'communication', 'height': '42'}},
-             {'bounds': {'minlat': 49.01, 'maxlat': 49.0101, 'minlon': 18.0, 'maxlon': 18.0002}, 'tags': {'man_made': 'storage_tank'}}])
-assert {p['k'] for p in t} == {'stozar', 'nadrz'}
-assert [p for p in t if p['k'] == 'nadrz'][0]['h'] == k.VYCHOZI_H['nadrz']
-assert len(k.potrubi([{'geometry': [{'lat': 1, 'lon': 2}, {'lat': 1, 'lon': 3}], 'tags': {'location': 'underground'}},
-                      {'geometry': [{'lat': 1, 'lon': 2}, {'lat': 1, 'lon': 3}], 'tags': {}}])) == 1
-assert [p['k'] for p in k.vyber([{'lat': 49, 'lon': 18, 'tags': {'tower:type': 'observation', 'height': '13'}}, {'lat': 50, 'lon': 18, 'tags': {'tower:type': 'observation', 'building': 'yes'}}])] == ['rozhledna']
-print('ok')
+sys.modules.setdefault('geo', types.ModuleType('geo'))
+spec = importlib.util.spec_from_file_location('kominy', Path(__file__).resolve().parents[1] / 'nastroje/kominy.py')
+kominy = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(kominy)
+
+class KominyTest(unittest.TestCase):
+    def node(self, kind, lat=50.0):
+        return {'lat': lat, 'lon': 15.0, 'tags': {'man_made': kind}}
+
+    def test_blizke_rozne_druhy_zustavaji(self):
+        got = kominy.vyber([self.node('chimney'), self.node('storage_tank')])
+        self.assertEqual({x['k'] for x in got}, {'komin', 'nadrz'})
+
+    def test_dva_blizke_body_stejneho_druhu_zustavaji(self):
+        self.assertEqual(len(kominy.vyber([self.node('chimney'), self.node('chimney', 50.00002)])), 2)
+
+    def test_bod_a_plocha_stejne_stavby_se_slouci(self):
+        area = {'bounds': {'minlat': 49.99999, 'maxlat': 50.00001, 'minlon': 14.99999, 'maxlon': 15.00001}, 'tags': {'man_made': 'chimney'}}
+        node = self.node('chimney'); node['tags']['height'] = '31'
+        got = kominy.vyber([node, area])
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0]['h'], 31)
+        self.assertIsNotNone(got[0]['r'])
+
+    def test_plocha_nepohlti_vic_nez_jeden_bod(self):
+        area = {'bounds': {'minlat': 49.99999, 'maxlat': 50.00001, 'minlon': 14.99999, 'maxlon': 15.00001}, 'tags': {'man_made': 'chimney'}}
+        got = kominy.vyber([area, self.node('chimney'), self.node('chimney', 50.00002)])
+        self.assertEqual(len(got), 2)
+
+    def test_podzemni_potrubi(self):
+        geom = [{'lat': 50, 'lon': 15}, {'lat': 50.001, 'lon': 15}]
+        elements = [{'geometry': geom, 'tags': t} for t in [
+            {'location':'underground'}, {'location':'underwater'}, {'tunnel':'yes'}, {'tunnel':'culvert'}, {'layer':'-1'},
+            {'location':'overground'}, {'tunnel':'no'}, {'layer':'1'}, {},
+        ]]
+        self.assertEqual(len(kominy.potrubi(elements)), 4)
+
+if __name__ == '__main__': unittest.main()

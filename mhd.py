@@ -12,6 +12,7 @@ Místo adresy může být v mhd.gtfs "build/gtfs.zip" z nastroje/gtfs_cz.py, pak
 """
 import csv, io, json, os, subprocess, sys, time, zipfile
 import shapely
+from nastroje.gtfs_casy import dopln_mezicasy
 from geo import CHUNKS, HALF, MESTO, chunk_center, to_local
 
 URL = (MESTO.get('mhd') or {}).get('gtfs')
@@ -51,8 +52,10 @@ TI = {t['trip_id'] for t in trips}
 st = {}
 for r in T('stop_times'):
     if r['trip_id'] not in TI: continue
-    st.setdefault(r['trip_id'], []).append((int(r['stop_sequence']), sec(r['arrival_time']), sec(r['departure_time']), float(r.get('shape_dist_traveled') or 0), r['stop_id']))
-for v in st.values(): v.sort()
+    ta = r.get('arrival_time') or r.get('departure_time')
+    td = r.get('departure_time') or ta
+    st.setdefault(r['trip_id'], []).append((int(r['stop_sequence']), sec(ta) if ta else None, sec(td) if td else None, float(r.get('shape_dist_traveled') or 0), r['stop_id']))
+st = {trip_id: dopln_mezicasy(rows) for trip_id, rows in st.items()}
 if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tras (např. IDS JMK): trasa mezi zastávkami po silnicích z mapy
     import road_route
     near = AREA.buffer(300)

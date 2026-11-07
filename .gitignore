@@ -18,6 +18,7 @@ assets/hrebeny.json
 
 # konfigurace tvého města (python novy_mesto.py); ukázka je v priklady/mesto.json
 /mesto.json
+/obce/
 
 # hlášení: vlastní konfigurace a hesla serveru
 /wrangler.jsonc

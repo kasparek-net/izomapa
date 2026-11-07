@@ -202,3 +202,10 @@ rád ji tam zveřejním.
 Budu rád, když v mapě necháte nenápadný odkaz „Vytvořeno nástrojem izomapa“ (je v O projektu a v nápovědě).
 
 Prosím, nepojmenovávejte svoje projekty „Izomapa“ a nepoužívejte domény izomapa.fun a izomapa.cz. Pojmenujte je po svém městě.
+
+## Verze
+
+Izomapa dostává nové verze, když se sejde více hotových vylepšení. Přehled změn
+najdete v [přehledu vydání](https://github.com/adamklatovsky/izomapa/releases).
+Před aktualizací si zálohujte vlastní data a úpravy města; podívejte se do poznámek
+k vydání, zda je potřeba znovu připravit data nebo vyrenderovat mapu.

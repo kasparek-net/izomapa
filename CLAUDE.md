@@ -65,7 +65,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Hustota aut (volitelné):** `.venv/bin/python nastroje/scitani.py` a v `mesto.json` `"doprava": {"kraj": "Název kraje"}`. Volitelně `"useky": {"číslo silnice": ["úsek sčítání", …]}` vybere přesné úseky, jinak se bere medián silnice v kraji. Počet aut na mapě je ilustrace poměrů, ne skutečný počet. Na silnici jezdí 40 % špičkové hustoty (`CAR_DENS` v `web/app.html`), na telefonu, při pomalém připojení a v úsporném režimu z toho jen třetina. Pojistka pro velká města: na celé mapě nejvýš 1 000 aut, na slabších zařízeních 300 (`MAX_CARS`). Rampy (`subclass` link) mají pětinu intenzity a nejvýš 50 km/h.
 - **Typy budov (jen Česko):** `.venv/bin/python nastroje/ruian.py` vyrobí `assets/ruian_budovy.json` (způsob využití a podlaží z veřejné služby RÚIAN). `prep.py` jím doplní jen prázdný nebo obecný typ a podlaží tam, kde není laser. Třída `apartments` znamená plochou střechu, proto ji dostane jen budova, u které plochou střechu potvrdí laser. Po změně je potřeba nový render.
 - **Stupně nočních světel (volitelné):** vedle `lights` vyrenderuj `node render.mjs … mode=lights stage=prace out=build/tiles_lights_prace` a `stage=noc out=build/tiles_lights_noc`; `dzi.py` je přidá sám. Prohlížeč podle hodiny vymění jednu vrstvu za druhou, takže se kreslí pořád jen jedna. Podíly oken a časy jsou odhad. Bez nich svítí jedna vrstva jako dřív.
-- **Komíny a chladicí věže:** `.venv/bin/python nastroje/kominy.py` vyrobí `assets/kominy.json` z OSM (výška z tagu `height`). Komín od 100 m dostane výstražné pruhy. Vzhled jednoho komína: `assets/upresneni.json`, `"kominy": [{"lat", "lon", "wc": barva, "pr": 0}]`. Po změně je potřeba nový render dotčených čtverců.
+- **Komíny, věže, nádrže, potrubí:** `.venv/bin/python nastroje/kominy.py` vyrobí `assets/kominy.json` a `assets/potrubi.json` z OSM (výška z tagu `height`). Komín od 100 m dostane výstražné pruhy. Vzhled jednoho komína: `assets/upresneni.json`, `"kominy": [{"lat", "lon", "wc": barva, "pr": 0}]`. Po změně je potřeba nový render dotčených čtverců.
 - **Semafory:** `.venv/bin/python nastroje/semafory.py` vyrobí `assets/semafory.json` z OSM. Bez něj auta nezastavují. Délka cyklu je odhad.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
@@ -115,6 +115,6 @@ Ukazuj uživateli výřezy před a po.
 - `dzi.py`: paleta a Deep Zoom pyramidy (WebP). `compose.py`: složený náhled. `preview.py`: rychlý náhled pro web.
 - `overlay.py`: klikací vrstva (obrys budovy = konvexní obal půdorysu dole a nahoře). Po úpravě budov vždy spustit
   a obrys zkontrolovat v prohlížeči.
-- `build_html.py` vyrobí i `site/og.jpg` (náhled pro sdílení, výřez středu), když je v `mesto.json` vyplněné `url`; vlastní `site/og.jpg` nepřepíše.
+- `build_html.py` vyrobí i `site/og.jpg` (náhled pro sdílení, výřez středu), když je v `mesto.json` vyplněné `url`; vlastní `site/og.jpg` nepřepíše. Pokud existuje složka `obce/*.json` (více obcí v jedné mapě), vyrobí pro každou obec i `site/index_<obec>.html` a `site/obce/<obec>/og.jpg` s vlastním výchozím pohledem (`"pohled": [lat, lon, km]`, volitelně `"domu_celek": true`) a texty.
 - `web/app.html`: prohlížeč (OpenSeadragon + animovaná vrstva: auta, MHD, lyžaři, kouř, počasí). Texty `{{…}}`
-  doplní `build_html.py` z `mesto.json`.
+  doplní `build_html.py` z `mesto.json` (příp. `obce/<obec>.json`).

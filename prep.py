@@ -1246,7 +1246,9 @@ for _, r in bld.iterrows():
             if b.get('dz'): top_ = max(top_, b['e'] + max(q[6] for q in b['dz']))
         binfo.append({'id': bid, 'oid': key, 'name': nm, 'cls': CLS_CZ.get(c, 'budova' if not c else c), 'floors': floors,
                       'h': round(total, 1), 'roof': rs, 'addr': adrs, 'lon': round(float(lon), 6), 'lat': round(float(lat), 6),
-                      'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2)})
+                      'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2),
+                      **({'roof_geometry': {'eave': b['e'], 'height': b['rh'], 'parts': b['parts']}}
+                         if not lm and rs in ('gabled', 'hipped') and b['parts'] else {})})
 # samostatné stavby dominant (zřícenina, rozhledna): jen věž na bodu dominanty
 for d in DOMS:
     sp = d['spec']

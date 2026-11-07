@@ -14,7 +14,7 @@ def vyska(t):
 
 
 def vyber(prvky):
-    """Prvky Overpass -> jedna položka na stavbu; plocha má přednost před bodem, pak vyšší údaj."""
+    """Sloučí blízký bod a plochu stejného druhu; samostatné body a plochy zachová."""
     out = []
     for e in prvky:
         t = e.get('tags', {}); b = e.get('bounds')
@@ -32,17 +32,28 @@ def vyber(prvky):
     for q in out:
         y = (q['lat'] * 111320, q['lon'] * 111320 * math.cos(math.radians(q['lat'])))
         for p in jeden:
-            if math.dist(y, (p['lat'] * 111320, p['lon'] * 111320 * math.cos(math.radians(p['lat'])))) < SHODA_M:
-                p['h'] = p['h'] or q['h']; break
+            if q['k'] == p['k'] and q['plocha'] != p['plocha'] and not p.get('_sparovano') and math.dist(y, (p['lat'] * 111320, p['lon'] * 111320 * math.cos(math.radians(p['lat'])))) < SHODA_M:
+                p['h'] = p['h'] or q['h']; p['_sparovano'] = True; break
         else: jeden.append(q)
-    for p in jeden: p['h'] = p['h'] or VYCHOZI_H[p['k']]; del p['plocha']
+    for p in jeden: p['h'] = p['h'] or VYCHOZI_H[p['k']]; del p['plocha']; p.pop('_sparovano', None)
     return jeden
 
 
 def potrubi(prvky):
-    """Jen nad zemí: podzemní nebo pod vodou se vynechá, u potrubí bez údaje se počítá s nadzemním."""
+    """Vynechá potrubí výslovně pod zemí, pod vodou nebo v tunelu."""
+    def viditelne(e):
+        t = e.get('tags', {})
+        if t.get('location', '').lower() in ('underground', 'underwater'):
+            return False
+        if t.get('tunnel', '').lower() not in ('', 'no', 'false', '0'):
+            return False
+        try:
+            if float(t.get('layer', 0)) < 0: return False
+        except (ValueError, TypeError):
+            pass  # nečitelná vrstva sama o sobě nedokládá podzemní potrubí
+        return True
     return [[[round(p['lat'], 6), round(p['lon'], 6)] for p in e['geometry']] for e in prvky
-            if e.get('geometry') and e.get('tags', {}).get('location') not in ('underground', 'underwater')]
+            if e.get('geometry') and viditelne(e)]
 
 
 if __name__ == '__main__':
