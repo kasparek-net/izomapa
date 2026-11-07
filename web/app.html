@@ -475,9 +475,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     addEventListener('hashchange', () => {
       const tok = location.hash.slice(1).split('@')[0].split('-');
       for (const q of tok) if (SEASON_TOKEN[q]) setSeason(SEASON_TOKEN[q]);
-      if (tok.includes('noc') || tok.includes('soumrak')) {
-        $('realTime').checked = false; state.night = tok.includes('noc') ? 1 : 0.42; $('night').value = Math.round(state.night * 100); applyTime(); setLightStage('lights');
-      }
+      // sdílený odkaz má vždy roční období, noc nebo soumrak jen když platí; odkaz jen s polohou denní dobu nemění
+      const denni = tok.includes('noc') ? 1 : tok.includes('soumrak') ? 0.42 : tok.some((q) => SEASON_TOKEN[q]) ? 0 : null;
+      if (denni !== null) { $('realTime').checked = false; state.night = denni; $('night').value = Math.round(denni * 100); applyTime(); setLightStage('lights'); }
       goToLink(false);
     });
     let hashT = null;
