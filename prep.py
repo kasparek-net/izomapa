@@ -653,7 +653,8 @@ for pid, p in parkings:
             if pp.contains(Point(*c)) and crng.random() < 0.58:
                 cars.append([float(c[0]), float(c[1]), math.atan2(v[1], v[0]), crng.randrange(8)])
             s += 2.5
-# auta podél ulic
+# auta podél ulic (ne na kolejích u přejezdu)
+_rail_park = shapely.STRtree([l for _, g, c, _w, _n in roads if c == 'rail' for l in lines(g)] or [Point(1e9, 1e9)])
 for l, w, c, n in drive_lines:
     if c not in ('residential', 'unclassified', 'living_street', 'tertiary'): continue
     d = 4.0
@@ -665,7 +666,9 @@ for l, w, c, n in drive_lines:
             off = w / 2 - 1.1
             q = l.interpolate(d)
             x, y = q.x + math.cos(ang - math.pi / 2) * off, q.y + math.sin(ang - math.pi / 2) * off
-            if AREA.contains(Point(x, y)): cars.append([x, y, ang, crng.randrange(8)])
+            if AREA.contains(Point(x, y)):
+                ci_ = crng.randrange(8)                      # náhoda se volá stejně, ostatní auta zůstanou na místě
+                if not len(_rail_park.query(Point(x, y), predicate='dwithin', distance=8.0)): cars.append([x, y, ang, ci_])
         d += 7
 
 # ---------------- budovy ----------------
