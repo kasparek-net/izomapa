@@ -68,8 +68,11 @@ def tone(res):
     for k, v in res.items():
         c = np.array(v, float) * gain; g = c.mean()
         if in_shade(np.clip((g + (c - g) * 1.45) * 0.92, 0, 255)): continue   # stín se pozná na mírně zesíleném snímku; po odečtení oparu je tmavá i světlá modrošedá krytina
-        c = np.clip((c - HAZE) * 255 / (255 - HAZE), 0, 255); g = c.mean()   # odečíst opar: ortofoto ČÚZK je světlé a zamlžené
-        c = np.clip((g + (c - g) * SAT) * VAL, 0, 255)
+        haze = HAZE * min(1.0, g / 120)                 # tmavá krytina má oparu míň, celý odečet by z ní udělal černou
+        c = np.clip((c - haze) * 255 / (255 - haze), 0, 255); g = c.mean()   # odečíst opar: ortofoto ČÚZK je světlé a zamlžené
+        chroma = (c.max() - c.min()) / max(c.max(), 1)
+        sat = 1 + (SAT - 1) * min(1.0, chroma / 0.25)    # šedá zůstane šedá: zesílit jen skutečnou barvu, ne šum snímku
+        c = np.clip((g + (c - g) * sat) * VAL, 0, 255)
         out[k] = [int(round(x)) for x in c]
     return out
 

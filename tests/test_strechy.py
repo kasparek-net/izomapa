@@ -29,3 +29,7 @@ pal = dzi.palette_with_water(sample, 160).getpalette()
 near = lambda c: min((pal[i:i + 3] for i in range(0, 477, 3)), key=lambda q: sum((a - b) ** 2 for a, b in zip(q, c)))
 n = near((78, 94, 111)); assert n[2] > n[1] + 8, n                    # plechová střecha nezezelená ani v převaze zeleně
 print('ok')
+
+dark = s.tone({**res, 'antracit': [62, 55, 60], 'tmava': [64, 60, 56]})
+assert min(sum(dark['antracit']), sum(dark['tmava'])) / 3 > 30, dark   # tmavě šedá krytina nezčerná
+assert max(dark['antracit']) - min(dark['antracit']) < 25, dark['antracit']   # a nezfialoví
