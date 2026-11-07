@@ -1073,6 +1073,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const carSpeed = (c, r) => (c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r)) * c.f;   // nákladní auta o něco pomaleji
   // semafory: dvě osy křižovatky se střídají (40 s cyklus je odhad); auta na červenou stojí ve frontě po 8 m
   const sigGreen = (z) => { const t = (performance.now() / 1000 + z[1] * 7) % 40; return z[2] ? t >= 20 && t < 37 : t < 17; };
+  const curbPt = (o, side, off) => {                       // bod u pravého okraje vozovky pro auta jedoucí po kusu (side 1) nebo proti (-1)
+    const L = Math.hypot(o.dx, o.dy) || 1, x = o.x + o.dy / L * side * off, y = o.y - o.dx / L * side * off, h = o.z ?? gz(x, y), [ix, iy] = toImg(x, y, h);
+    return { x, y, ix, iy, d: depth(x, y, h) };
+  };
   const isOpen = (z) => z.xc ? !z.xc.closed : sigGreen(z);   // semafor nebo přejezd
   function stepCar(c, dt) {
     if (c.hold) { if (!isOpen(c.hold)) return; c.hold.q = null; c.hold = null; }
@@ -1711,7 +1715,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       for (const c of cars) if (carActive(c) || c.hold) stepCar(c, dt);
       if (sx > 0.25) for (const [r, z] of sigs) {          // sloup se světlem kousek před křižovatkou
         if (!shown(r.k)) continue;
-        const o = along(r, z[0] < r.L / 2 ? Math.min(r.L, z[0] + 8) : Math.max(0, z[0] - 8)), dp = depth(o.x, o.y, o.z ?? gz(o.x, o.y));
+        const a8 = z[0] < r.L / 2, o = curbPt(along(r, a8 ? Math.min(r.L, z[0] + 8) : Math.max(0, z[0] - 8)), a8 ? -1 : 1, 4), dp = o.d;   // u okraje vozovky
         if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 26, dp)) continue;   // za budovou se nekreslí
         const x = ox + o.ix * sx, y = oy + o.iy * sx, h = 24 * sx, q = Math.max(2, 3 * sx);
         ctx.fillStyle = '#26262a'; ctx.fillRect(x - q * 0.25, y - h, q * 0.5, h); ctx.fillRect(x - q, y - h - q * 2, q * 2, q * 2.4);
@@ -1721,7 +1725,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (!shown(r.k)) continue;
         for (const d of [-6, 6]) {                         // výstražník z obou stran koleje (když kus silnice pokračuje)
         if (z[0] + d < 0 || z[0] + d > r.L) continue;
-        const o = along(r, z[0] + d), dp = depth(o.x, o.y, o.z ?? gz(o.x, o.y));
+        const o = curbPt(along(r, z[0] + d), d < 0 ? 1 : -1, 4), dp = o.d;   // vpravo u okraje vozovky pro auta, která k přejezdu jedou
         if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 30, dp)) continue;   // za budovou (pata nebo výstražník) se nekreslí
         const x = ox + o.ix * sx, y = oy + o.iy * sx, h = 30 * sx, q = Math.max(2.5, 3.4 * sx), ph = Math.floor(now / 500) % 2;
         ctx.fillStyle = '#26262a'; ctx.fillRect(x - q * 0.35, y - h - q * 2.6, q * 0.7, h + q * 2.6);
