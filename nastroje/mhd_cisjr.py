@@ -20,7 +20,6 @@ OUT = 'build/gtfs.zip'
 NS = '{http://www.netex.org.uk/netex}'
 ROAD_COST = {'motorway': 1, 'trunk': 1, 'primary': 1, 'secondary': 1, 'tertiary': 1.05, 'unclassified': 1.3,
              'residential': 1.4, 'living_street': 2, 'service': 2.5}
-TOWNS = ('Kopřivnice'.encode(), 'Štramberk'.encode(), 'Závišice'.encode())      # rychlý výběr souborů linek: obce na mapě
 SNAP = {3: 90.0, 2: 200.0}
 BUS, RAIL = 3, 2
 MAX_DETOUR = 3.0                  # delší objížďka znamená, že spojení po mapě nevede: spoj se v tom místě rozdělí
@@ -291,8 +290,15 @@ def load_trains(stations, first):
     return out
 
 
+def towns(mesto):
+    """obce, jejichž linky se berou: mhd.obce v mesto.json, jinak jen název mapy"""
+    return list((mesto.get('mhd') or {}).get('obce') or [mesto['nazev']])
+
+
 def main():
     from geo import MESTO, to_lonlat
+    obce = towns(MESTO)
+    TOWNS = tuple(o.encode() for o in obce)              # rychlý výběr souborů linek: obce na mapě
     if '--stahnout' in sys.argv or not os.path.exists(SRC): download()
     today = datetime.date.today()
     osm = {BUS: load_stops(('bus_stop', 'bus_station', 'stop_position', 'platform')), RAIL: load_stops(('railway_station', 'railway_halt'))}
@@ -318,7 +324,7 @@ def main():
     def add_trip(kind, code, label, num, start, bits, seq):
         head = stop_label(seq[-1][0])
         for s in seq:
-            if pos(kind, s[0]) is None and stop_key(s[0]).startswith(('kopřivnice', 'štramberk')): unmatched[s[0]] += 1
+            if pos(kind, s[0]) is None and stop_key(s[0]).startswith(tuple(o.lower() for o in obce)): unmatched[s[0]] += 1
         seq = [s for s in seq if pos(kind, s[0])]       # zastávka bez polohy: spoj jede dál bez ní (mimo mapu vypadne celá)
         if len(seq) < 2: return
         parts, cur = [], [seq[0]]

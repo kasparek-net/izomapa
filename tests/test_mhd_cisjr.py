@@ -1,7 +1,7 @@
 """python tests/test_mhd_cisjr.py"""
 import datetime, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'nastroje'))
-from mhd_cisjr import active_versions, clip_bits, drop_days, inside_runs, latest_wins, line_label, shortest, stop_key, stop_label, to_calendar
+from mhd_cisjr import towns, active_versions, clip_bits, drop_days, inside_runs, latest_wins, line_label, shortest, stop_key, stop_label, to_calendar
 
 D = datetime.date
 assert stop_key('Kopřivnice,,Čs.armády') == stop_key('Kopřivnice, Čs. armády')
@@ -31,3 +31,6 @@ assert to_calendar(D(2026, 11, 2), '000') is None
 adj = {'a': [('b', 1, 0), ('c', 5, 1)], 'b': [('c', 1, 2)], 'c': []}
 assert shortest(adj, 'a', 'c') == (2, ['a', 'b', 'c']) and shortest(adj, 'c', 'a') is None
 print('ok')
+
+assert towns({'nazev': 'Ženklava'}) == ['Ženklava']
+assert towns({'nazev': 'Ženklava', 'mhd': {'obce': ['Ženklava', 'Štramberk']}}) == ['Ženklava', 'Štramberk']
