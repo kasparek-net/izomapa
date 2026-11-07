@@ -1,1 +1,26 @@
-[]
+[
+ {
+  "nazev": "Kostel Navštívení Panny Marie",
+  "lat": 49.563591,
+  "lon": 18.108141,
+  "text": "První zmínka o kostele je z roku 1512. Starý kamenný kostel byl zasvěcen Všem svatým. Roku 1857 se začalo stavět nový: starý kostel rozebrali, zachovali jen věž, zvýšili ji a přistavěli k ní kostel Navštívení Panny Marie."
+ },
+ {
+  "nazev": "Škola",
+  "lat": 49.563338,
+  "lon": 18.106713,
+  "text": "První úředně zřízená školní budova je z roku 1786. Roku 1874 obec postavila školu č. p. 144 za 12 000 zlatých a v roce 1926 naproti ní novou školu č. p. 204 za 1,2 milionu korun."
+ },
+ {
+  "nazev": "Dědičná rychta",
+  "lat": 49.55342,
+  "lon": 18.09866,
+  "text": "Fojt byl první osobou v obci: vedl soudní záležitosti a vybíral daně. Ženklavský fojt je poprvé zmíněn roku 1516, rychtu č. p. 1 drželi rodové od Pavla Bayera (1657) po Görigovy (1877)."
+ },
+ {
+  "nazev": "Kotouč",
+  "lat": 49.583972,
+  "lon": 18.112405,
+  "text": "Památná hora Kotouč (539 m) uzavírá údolí Sedlničky ze severu."
+ }
+]
