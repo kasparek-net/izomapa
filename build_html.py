@@ -68,8 +68,8 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
     latlon = (pohled[:2] if isinstance(pohled, list) and len(pohled) >= 2 else strom if isinstance(strom, list) and len(strom) == 2 else None)
     if (site_url or je_obec) and not os.path.exists(og_out) and os.path.exists('site/tiles.json'):
         og_obrazek(og_out, latlon=latlon); print(og_out)
-    og_v = hashlib.sha256(open(og_out, 'rb').read()).hexdigest()[:10] if os.path.exists(og_out) else '1'   # sociální sítě drží obrázek podle URL
-    obrazek_url += f'?v={og_v}' if obrazek_url else ''
+    if obrazek_url and os.path.exists(og_out):     # sociální sítě drží obrázek podle URL, změněný obrázek potřebuje novou
+        obrazek_url += '?v=' + hashlib.sha256(open(og_out, 'rb').read()).hexdigest()[:10]
     app = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], SABLONA)
     og = f'''<meta property="og:image" content="{E(obrazek_url)}">
 <meta property="og:image:width" content="1200">
