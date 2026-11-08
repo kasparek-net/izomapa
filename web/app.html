@@ -288,7 +288,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   </details>
 
   <details class="about">
-    <summary>O projektu</summary>
+    <summary>O&nbsp;projektu</summary>
     <p>Mapa vznikla nástrojem <a href="https://github.com/adamklatovsky/izomapa" target="_blank" rel="noopener">izomapa</a> z otevřených dat. Budovy, adresy, silnice, voda a zeleň pochází z Overture Maps (OpenStreetMap), terén z modelu Terrarium, výšky budov, les a pole z dat ČÚZK. Lampy podél ulic, zaparkovaná auta, popelnice, hroby a část stromů v zahradách jsou doplněné podle typu území, nejde o přesné polohy.</p>
     <p><strong>Co je izometrie?</strong><br>Pohled shora a šikmo bez perspektivy: čáry se do dálky nesbíhají a věci si drží svou skutečnou velikost bez ohledu na to, jak daleko jsou od pozorovatele. Dům na kraji mapy je stejně velký jako ten uprostřed. Tenhle styl si pamatuje každý, kdo koncem 90. let trávil hodiny u SimCity a podobných budovatelských her.</p>
   </details>
@@ -314,7 +314,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 
 <div class="minimap" id="minimap">
   <canvas id="mini" width="220" height="128" aria-label="Minimapa: kliknutím přesunete pohled"></canvas>
-  <div class="scale" id="scale">1 px = 20 cm</div>
+  <div class="scale" id="scale">1&nbsp;px = 20&nbsp;cm</div>
 </div>
 <div class="controls">
   <button class="px-btn" id="zin" type="button" title="Přiblížit">+</button>
@@ -325,7 +325,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 <div class="toast" id="toast" role="status" hidden></div>
 <dialog class="help" id="helpDlg" aria-labelledby="helpTitle">
   <button class="px-btn close" id="helpClose" type="button" aria-label="Zavřít">×</button>
-  <h2 id="helpTitle">O mapě</h2>
+  <h2 id="helpTitle">O&nbsp;mapě</h2>
   <p>{{POPIS}}</p>
   <h3>Ovládání</h3>
   <ul>
@@ -1923,7 +1923,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     drawMini();
     const m = cam.mpp / sx;
-    $('scale').textContent = m < 1 ? `1 px = ${Math.round(m * 100)} cm` : `1 px = ${Math.round(m)} m`;
+    $('scale').textContent = m < 1 ? `1\u00a0px = ${Math.round(m * 100)}\u00a0cm` : `1\u00a0px = ${Math.round(m)}\u00a0m`;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
