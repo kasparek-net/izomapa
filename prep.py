@@ -45,6 +45,12 @@ UP = json.load(open('assets/upresneni.json')) if os.path.exists('assets/upresnen
 if os.path.exists('assets/strechy_orto.json'):
     for _k, _v in json.load(open('assets/strechy_orto.json')).items(): SAT['b'].setdefault(_k, {})['rc'] = _v
 for _k, _v in UP['b'].items(): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
+# vlastní lokální úpravy konkrétního města (assets/custom_prep.py): oddělené hooky pro terén, hřbitov, doplňky
+_CUSTOM_PREP = open('assets/custom_prep.py', encoding='utf-8').read() if os.path.exists('assets/custom_prep.py') else None
+def _hook(phase):
+    if _CUSTOM_PREP:
+        globals()['HOOK'] = phase
+        exec(_CUSTOM_PREP, globals())
 # typy a podlaží z RÚIAN (nastroje/ruian.py): jen kde data typ nemají nebo je obecný
 RUIAN = json.load(open('assets/ruian_budovy.json')) if os.path.exists('assets/ruian_budovy.json') else {}
 # oblasti podle skutečnosti (tuning/oblast.py): stromy z ortofota a DMP, barvy střech, ruční úpravy budov
@@ -152,6 +158,7 @@ RE = HALF + MS * STEP
 gx, gy = np.meshgrid(np.linspace(-RE, RE, NE), np.linspace(RE, -RE, NE))
 HX = dem(gx, gy)
 from numpy.lib.stride_tricks import sliding_window_view
+_hook('terrain')
 HX = sliding_window_view(np.pad(HX, 1, mode='edge'), (3, 3)).mean(axis=(2, 3))
 HMIN = HREF; HX = HX - HMIN              # společná výška pro všechny čtverce
 H = HX[MS:MS + N, MS:MS + N]
@@ -1577,6 +1584,7 @@ cem_prep = shapely.prepared.prep(cem_union)
 # na hřbitovech prořídit stromy (70 % skrýt), aby byly vidět hroby
 trees = [t[:5] + [2] if cem_prep.contains(Point(t[0], t[1])) and h01(wkey(t[0], t[1])) >= 0.3 else t for t in trees]
 nograve = shapely.geometry.GeometryCollection()
+_hook('cemetery')
 trees = [t for t in trees if EXT_P.contains(Point(t[0], t[1]))]
 print('skrytých stromů na hřbitovech', sum(t[5] == 2 for t in trees))
 grng = random.Random(7)
@@ -1631,6 +1639,7 @@ for kr_ in UP.get('kruhy', []):
     x, y = (float(v) for v in to_local(kr_['lon'], kr_['lat']))
     if AREA.contains(Point(x, y)): props['kruhy'].append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), kr_.get('a', 0.0), kr_['p']])
 props['wheelie'] = [[round(v, 3) for v in q] for q in props['wheelie']]
+_hook('props')
 print('hrobů', len(graves), 'soch', len(statues))
 
 # ---------------- textury podle ročního období ----------------

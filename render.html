@@ -24,6 +24,7 @@ const BG = LIGHTS ? [0, 0, 0] : [27 / 255, 35 / 255, 51 / 255];
 const SKIRT = 28;
 
 const scene = await (await fetch(`${DIR}/scene.json`)).json();
+const CUSTOM = await import('./assets/custom_models.js').catch(() => ({}));
 const HALF = scene.half, N = scene.n, HS = scene.heights;
 if (!PARAMS.skirt && scene.skirt !== undefined) SKIRT_EDGES = scene.skirt;
 const FLOOR = scene.floor ?? -SKIRT;                 // spodek řezu zeminou (společný pro všechny čtverce)
@@ -657,6 +658,7 @@ function roofDeco(b, X, eave, rc) {
     for (const k of [0.3, 0.6, 0.85]) pushBox(X, f, -1.3, 1.3, -1.3, 1.3, t.to + (s.mast - t.to) * k, t.to + (s.mast - t.to) * k + 0.8, steel, aw);
   };
   for (const b of scene.buildings) {
+    if (b.lm && CUSTOM.landmarks?.[b.lm]?.(b, { X, W, R, frameAt, ring, pushBox, pushQuad, pushTri, GOLDC, C255, tv })) continue;
     for (const t of b.tw || []) {
       const f = frameAt(t.x, t.y, 0, t.a), T = t.w / 2, n = t.round ? 10 : 4, rot = t.round ? 0 : Math.PI / 4;
       if (t.spiral) { spiralTower(t, f, { from: 4, turns: 5, head: 7, mast: t.to + t.spiral }); continue; }
@@ -937,6 +939,7 @@ function roofDeco(b, X, eave, rc) {
   });
   const CAR = [[0.92, 0.92, 0.90], [0.70, 0.72, 0.75], [0.16, 0.17, 0.19], [0.72, 0.16, 0.14], [0.20, 0.32, 0.62], [0.38, 0.40, 0.43], [0.24, 0.42, 0.30], [0.80, 0.74, 0.60]];
   inst(carG, scene.cars, ([x, y, z, a]) => [x, y, z, a], (it) => CAR[it[4]]);
+  CUSTOM.buildProps?.(P, { make, inst, F, id, pushBox, pushQuad, pushTri });
 
   // ploty, živé ploty, zdi, vedení
   const L = newBuf();
@@ -1350,7 +1353,12 @@ const ext = (x, h, y) => {
     ext(Math.max(-R, Math.min(R, x)), h + 30, Math.max(-R, Math.min(R, y))); ext(Math.max(-R, Math.min(R, x)), FLOOR, Math.max(-R, Math.min(R, y)));
   }
   for (let r = 0; r < N; r += 8) for (let c = 0; c < N; c += 8) ext(-HALF + c * scene.step, HS[r * N + c] + 5, HALF - r * scene.step);   // vrcholy kopců uvnitř
-  for (const b of scene.buildings) for (const [x, y] of b.p) ext(x, Math.max(b.e + b.rh + 2, b.tm ? b.g + b.tm[6] + 22 : 0), y);
+  for (const b of scene.buildings) {
+    let btop = Math.max(b.e + b.rh + 2, b.tm ? b.g + b.tm[6] + 22 : 0);
+    for (const tw of b.tw || []) btop = Math.max(btop, (tw.to || tw.h) + 4);
+    for (const ch of b.chs || []) btop = Math.max(btop, ch[3] + 3);
+    for (const [x, y] of b.p) ext(x, btop, y);
+  }
   for (const t of scene.trees) ext(t[0], t[2] + t[3], t[1]);
 }
 X0 -= 20; Y0 -= 20; X1 += 20; Y1 += 60;     // nahoře rezerva na věže (ručně stavěné dominanty)
