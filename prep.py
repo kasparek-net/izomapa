@@ -1155,6 +1155,7 @@ for _, r in bld.iterrows():
         rc = hexcol(r.roof_color, rp[int(h01(key + 'r') * 1000) % len(rp)])
         if 'rc' in so and not lm: rc = tuple(so['rc'])
         if 'wc' in so and not lm: wc = tuple(so['wc'])
+        if 'win' in so and not lm: style = so['win']
         if dsp:
             if 'wc' in dsp: wc = tuple(dsp['wc'])
             if 'rc' in dsp: rc = tuple(dsp['rc'])
