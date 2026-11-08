@@ -18,7 +18,15 @@ assets/hrebeny.json
 
 # konfigurace tvého města (python novy_mesto.py); ukázka je v priklady/mesto.json
 /mesto.json
+/mista.json
 /obce/
+
+# vlastní úpravy konkrétního města (ukázky jsou v priklady/)
+assets/custom_prep.py
+assets/custom_models.js
+assets/upresneni.json
+assets/dominanty.json
+assets/oblasti.json
 
 # hlášení: vlastní konfigurace a hesla serveru
 /wrangler.jsonc
@@ -30,5 +38,6 @@ assets/prejezdy.json
 assets/kominy.json
 assets/stromy_mesta.json
 assets/zelen_mesta.json
+assets/prejezdy.json
 assets/potrubi.json
 assets/mobiliar_mesta.json

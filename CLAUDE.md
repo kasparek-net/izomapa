@@ -47,10 +47,12 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
     `win` styl oken, `face` [lat, lon] bodu, ke kterému je průčelí (náměstí),
   - `towers` [{`at` front/back/c/n/s/e/w…, `side` posun podél průčelí, `w`, `h`, `top` spire/helm/tiered/dome/pyramid/cone/none,
     `to` výška špičky, `tc` barva, `wc` barva zdí věže (jinak jako budova), `clock`, `round`, `stone`, `ruin`}], `chimneys`, `blocks` (nástavby), `canopy`, `skylights`,
-  - `model` hotový model podle půdorysu (`pavilon` prosklený, `brana` portál), `lm` vlastní model z `render.html` (`radnice` je ukázka, jak model napsat),
+  - `model` hotový model podle půdorysu (`pavilon` prosklený, `brana` portál),
+  - `lm` vlastní model: specifické modely pro dané město nepiš do `render.html`, ale do `assets/custom_models.js` (ukázka v `priklady/custom_models.js`), v `dominanty.json` pak stačí `spec: {"lm": "nazev_modelu"}`.
   - `only`: samostatná stavba bez budovy v datech (zřícenina, rozhledna).
   Napárování na budovu: bod uvnitř půdorysu, jinak největší budova do 25 m (`match_doms` v `prep.py`).
   Ukázka je v `priklady/dominanty.json`.
+- **Vlastní kód a lokální úpravy města nepatří do sdíleného `prep.py` ani `render.html`!** Pro specifické úpravy terénu, hřbitovů a rekvizit použij `assets/custom_prep.py` (fáze `HOOK` `terrain` / `cemetery` / `props`, ukázka v `priklady/custom_prep.py`). Pro specifické 3D modely použij `assets/custom_models.js`. Oba soubory jsou v `.gitignore` a načítají se automaticky, takže hlavní kód zůstává čistý pro upstream git.
 - **Příběhy míst** → `mista.json`: `[{"nazev", "lat", "lon", "text"}]`. Texty piš jen z ověřených zdrojů (web obce,
   Památkový katalog, Wikipedie s odkazem). Když si nejsi jistý, zeptej se uživatele. Nic si nevymýšlej.
   Ukázka je v `priklady/mista.json`.
@@ -67,7 +69,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Stupně nočních světel (volitelné):** vedle `lights` vyrenderuj `node render.mjs … mode=lights stage=prace out=build/tiles_lights_prace` a `stage=noc out=build/tiles_lights_noc`; `dzi.py` je přidá sám. Prohlížeč podle hodiny vymění jednu vrstvu za druhou, takže se kreslí pořád jen jedna. Podíly oken a časy jsou odhad. Bez nich svítí jedna vrstva jako dřív.
 - **Komíny, věže, nádrže, potrubí:** `.venv/bin/python nastroje/kominy.py` vyrobí `assets/kominy.json` a `assets/potrubi.json` z OSM (výška z tagu `height`). Komín od 100 m dostane výstražné pruhy. Vzhled jednoho komína: `assets/upresneni.json`, `"kominy": [{"lat", "lon", "wc": barva, "pr": 0}]`. Po změně je potřeba nový render dotčených čtverců.
 - **Semafory:** `.venv/bin/python nastroje/semafory.py` vyrobí `assets/semafory.json` z OSM. Bez něj auta nezastavují. Délka cyklu je odhad.
-- **Železniční přejezdy:** `.venv/bin/python nastroje/prejezdy.py` vyrobí `assets/prejezdy.json` z OSM (`railway=level_crossing`), `prep.py` je přiřadí silnicím, které tam kříží kolej. Přejezd se zavře asi 25 s před příjezdem vlaku podle jízdních řádů a otevře, až projede poslední vůz; auta před ním čekají ve frontě. Bez souboru nebo bez vlaků v MHD auta nečekají.
+- **Železniční přejezdy (volitelné):** `.venv/bin/python nastroje/prejezdy.py` vyrobí `assets/prejezdy.json` z OSM (`railway=level_crossing`), `prep.py` je přiřadí silnicím, které tam kříží kolej. Přejezd se zavře asi 25 s před příjezdem vlaku podle jízdních řádů a otevře, až projede poslední vůz; auta před ním čekají ve frontě. Bez souboru nebo bez vlaků v MHD auta nečekají. Render není potřeba, stačí `prep.py`, `overlay.py` a `build_html.py`.
 - **Les a pole:** maska lesa z ortofota (`nastroje/les.py`), pole ze ZABAGED (`nastroje/zabaged.py`, `nastroje/pole.py`).
   Když les nesedí, uprav prahy barev v `nastroje/les.py` a ověř na `build/orto_cele.jpg`.
 
