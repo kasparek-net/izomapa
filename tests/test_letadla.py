@@ -16,7 +16,7 @@ class LetadlaTest(unittest.TestCase):
             subprocess.run([sys.executable, str(ROOT / 'build_html.py')], cwd=d, env=env, check=True, capture_output=True)
             html = (d / 'site/index.html').read_text(encoding='utf-8')
             self.assertIn('if (true) {', html)
-            self.assertIn('OpenSky Network', html)
+            self.assertIn('adsb.lol</a> (ODbL)', html)
 
     def test_letadla_vypnuti(self):
         with tempfile.TemporaryDirectory() as td:
