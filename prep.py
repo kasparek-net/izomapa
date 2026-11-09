@@ -1197,6 +1197,9 @@ for _, r in bld.iterrows():
         if dsp:
             b['dn'] = dom['name']
             if dsp.get('model'): b['md'] = dsp['model']
+            if dsp.get('exponat'):
+                ex = dsp['exponat']
+                b['ex'] = {'k': ex['model'], 'q': [[round(float(v), 2) for v in to_local(lo, la)] for la, lo in ex.get('kolej', [])]}
             if dsp.get('canopy'): b['cn'] = dsp['canopy']
             for blk in dsp.get('blocks', []):
                 o = p.minimum_rotated_rectangle; cs = list(o.exterior.coords)[:3]

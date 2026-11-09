@@ -148,6 +148,7 @@
   }
  },
   {"name": "Výstavní pavilon", "lat": 49.5987, "lon": 18.145053, "text": "Skleněný pavilon s vozem Tatra. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "pavilon", "wc": [150, 178, 192], "rc": [128, 124, 92], "r": "flat", "h": 4, "win": 5}},
+  {"name": "Depozitář Slovenské strely", "lat": 49.59446, "lon": 18.14752, "text": "Prosklený depozitář s motorovým vozem M 290.002 (25,1 m). Sklo podle CSG (repaired Slovenská strela is returning to Kopřivnice), rozměry a barvy podle Wikipedie (Motorový vůz M 290.0), výška haly z laseru ČÚZK, kolej z OSM.", "spec": {"model": "pavilon", "wc": [150, 178, 192], "r": "flat", "h": 10.7, "win": 5, "exponat": {"model": "strela", "kolej": [[49.594295, 18.147413], [49.594621, 18.147675]]}}},
   {"name": "Lašská brána", "lat": 49.598898, "lon": 18.14536, "text": "Portál z bílého betonu, výška 5 m, šířka 17 m. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "brana", "wc": [255, 253, 246], "rc": [255, 253, 246], "r": "flat", "h": 5, "win": 5}},
  {
   "name": "Tatrovanka",

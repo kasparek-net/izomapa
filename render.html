@@ -404,7 +404,7 @@ function roofDeco(b, X, eave, rc) {
         const len = Math.hypot(s_1 - s_0, t_1 - t_0), n = Math.round(len / 1.6);
         if (back(nx, ny)) pushBox(X, f, Math.min(s_0, s_1), Math.max(s_0, s_1) + (s_0 === s_1 ? 0.05 : 0), Math.min(t_0, t_1), Math.max(t_0, t_1) + (t_0 === t_1 ? 0.05 : 0), 0.15, H, GLASS, lit);
         for (let i = 0; i <= n; i++) { const q = i / n, m = [s_0 + (s_1 - s_0) * q, t_0 + (t_1 - t_0) * q]; pushBox(X, f, m[0] - 0.05, m[0] + 0.05, m[1] - 0.05, m[1] + 0.05, 0.15, H, FRAME, [0, 1, 0, 0]); 
-          if (!back(nx, ny) && i < n) {            // přední sklo: odlesk na části tabule, nadsvětlík a sokl
+          if (!back(nx, ny) && i < n && !b.ex) {   // přední sklo: odlesk na části tabule, nadsvětlík a sokl (s exponátem bez odlesku, ať je vidět)
             const a = [m[0] + (s_1 - s_0) / n * 0.1, m[1] + (t_1 - t_0) / n * 0.1], c = [m[0] + (s_1 - s_0) / n * (i % 3 ? 0.36 : 0.62), m[1] + (t_1 - t_0) / n * (i % 3 ? 0.36 : 0.62)];
             const pane = (p, q_, y0, y1, col) => pushBox(X, f, Math.min(p[0], q_[0]) - 0.02, Math.max(p[0], q_[0]) + 0.02, Math.min(p[1], q_[1]) - 0.02, Math.max(p[1], q_[1]) + 0.02, y0, y1, col, [0, 1, 0, 0]);
             pane(a, c, 0.15, H - 0.6, [0.66, 0.80, 0.88]);
@@ -414,6 +414,29 @@ function roofDeco(b, X, eave, rc) {
       };
       side(-L, -D, L, -D, sa, -ca); side(-L, D, L, D, -sa, ca); side(-L, -D, -L, D, -ca, -sa); side(L, -D, L, D, ca, sa);
       pushBox(X, f, -L - 0.3, L + 0.3, -D - 0.3, D + 0.3, H, H + 0.4, FRAME, [0, 1, 1, 0], rc);
+      if (b.ex && b.ex.k === 'strela' && b.ex.q.length === 2) {
+        // motorový vůz M 290.0 na koleji v hale: 25,1 × 2,85 m, skříň 3,665 m nad kolejí; višňově červená,
+        // vršek střechy starozlatý, podvozky šedé, na obou čelech stanoviště
+        const [[ax, ay], [bx, by]] = b.ex.q, ra = Math.atan2(by - ay, bx - ax), rl = Math.hypot(bx - ax, by - ay);
+        const inHall = (k) => { const x = ax + (bx - ax) * k, y = ay + (by - ay) * k, dx = x - (sm * ca - tm * sa), dy = y - (sm * sa + tm * ca);
+          return Math.abs(dx * ca + dy * sa) < L - 1 && Math.abs(-dx * sa + dy * ca) < D - 1; };
+        let k0 = 1, k1 = 0; for (let k = 0; k <= 1; k += 0.005) if (inHall(k)) { k0 = Math.min(k0, k); k1 = Math.max(k1, k); }
+        if (k1 > k0) {
+          const km = (k0 + k1) / 2, g = frameAt(ax + (bx - ax) * km, ay + (by - ay) * km, b.g, ra), hl = (k1 - k0) * rl / 2;
+          const RED = [0.66, 0.09, 0.12], GOLD = [0.74, 0.60, 0.30], GREY = [0.50, 0.52, 0.54], GL = [0.10, 0.13, 0.17], lit0 = [0, 1, 0, 0];
+          for (const t_ of [-0.72, 0.72]) pushBox(X, g, -hl, hl, t_ - 0.04, t_ + 0.04, 0.15, 0.3, [0.36, 0.36, 0.38], lit0);
+          for (const s_ of [-8.6, 8.6]) { pushBox(X, g, s_ - 1.6, s_ + 1.6, -1.1, 1.1, 0.3, 0.95, GREY, lit0); for (const w_ of [-1.1, 1.1]) pushBox(X, g, s_ + w_ - 0.45, s_ + w_ + 0.45, -0.8, 0.8, 0.3, 0.9, [0.12, 0.12, 0.13], lit0); }
+          pushBox(X, g, -10.2, 10.2, -1.425, 1.425, 0.75, 3.55, RED, lit0, RED);
+          pushBox(X, g, -10.0, 10.0, -1.05, 1.05, 3.55, 3.665, GOLD, lit0);
+          for (const sd of [-1, 1]) {                      // aerodynamická čela: skříň se k čelu zužuje a snižuje
+            const seg = [[10.2, 11.5, 1.3, 3.45, 0.8], [11.5, 12.25, 1.0, 3.15, 0.95], [12.25, 12.55, 0.6, 2.7, 1.1]];
+            for (const [s0_, s1_, w_, top, bot] of seg) pushBox(X, g, sd > 0 ? s0_ : -s1_, sd > 0 ? s1_ : -s0_, -w_, w_, bot, top, RED, lit0);
+            pushBox(X, g, sd > 0 ? 11.5 : -12.27, sd > 0 ? 12.27 : -11.5, -0.85, 0.85, 2.35, 2.95, GL, lit0);       // čelní okna
+          }
+          for (let s_ = -9.6; s_ < 9.4; s_ += 1.45) pushBox(X, g, s_, s_ + 1.05, -1.445, 1.445, 2.05, 2.85, GL, lit0);   // okna oddílu
+        }
+        continue;
+      }
       // Tatra 603 na třetině délky: černá karoserie, kabina se skly
       const cs = -L * 0.45, BODY = [0.07, 0.07, 0.08], cs_ = [[cs - 2.5, cs + 2.5, 0.42, 1.0, 0.9], [cs - 1.4, cs + 1.0, 1.0, 1.5, 0.72]];
       cs_.forEach(([a, c, y0, y1, w_], i) => pushBox(X, f, a, c, -w_, w_, 0.15 + y0, 0.15 + y1, i ? [0.30, 0.36, 0.42] : BODY, [0, 1, 0, 0], BODY));
