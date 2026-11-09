@@ -1249,7 +1249,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t) };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t), schoolDay: (n) => schoolDay(n), get SCHOOLS() { return SCHOOLS; }, schoolPaths: (q) => schoolPaths(q), kidPos: (p, s) => kidPos(p, s) };       // ladění v lokálním náhledu
   function figureHidden(x, y, h, p) {                      // postavu zakryje budova nebo koruna stromu
     if (occluded(p[0], p[1], depth(x, y, h))) return true;
     for (const q of treeShapes(x, y, h, [p[0] - 1, p[1] - 9, p[0] + 1, p[1]]))
@@ -1333,10 +1333,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const b = P(bu, bv); out.push([b[0], b[1], null]);
     return out;
   }
-  function drawFan(x, y, jacket, hat, step, sx, ox, oy, legs = '#2a2c31') {
+  function drawFan(x, y, jacket, hat, step, sx, ox, oy, legs = '#2a2c31', height = 1.8) {
     const h = gz(x, y), p = toImg(x, y, h);
     if (figureHidden(x, y, h, p)) return;
-    const top = toImg(x, y, h + 1.8), u = Math.max(1, Math.round((p[1] - top[1]) * sx / 8));
+    const top = toImg(x, y, h + height), u = Math.max(1, Math.round((p[1] - top[1]) * sx / 8));
     const X = Math.round(ox + p[0] * sx), Y = Math.round(oy + p[1] * sx);
     const R = (cx, cy, w, hh, c) => { ctx.fillStyle = c; ctx.fillRect(X + cx * u, Y - cy * u, w * u, hh * u); };
     if (!jacket) { R(0, 1, 1, 1, '#ffffff'); return; }    // míč
@@ -1364,6 +1364,79 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       ctx.strokeStyle = hraje ? '#f2c66d' : '#c4352b'; ctx.lineWidth = 1.5; ctx.strokeRect(X_ - tw / 2, Y_ - 10, tw, 20);
       ctx.fillStyle = '#f3efe2'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, X_, Y_ + 1);
       ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
+  }
+  // děti do školy: ve školní dny (mesto.json "skola": školní rok a prázdniny, státní svátky se dopočítají) ráno chodí
+  // po silnicích ke školám z overlay.json a odpoledne se rozcházejí; cesty jsou náhodné procházky grafem silnic od školy
+  const SKOLA = {{SKOLA}}, SCHOOLS = (OV.schools || []).filter((q) => q.a >= 2000);
+  const SVATKY = ['01-01', '05-01', '05-08', '07-05', '07-06', '09-28', '10-28', '11-17', '12-24', '12-25', '12-26'];
+  const isoDay = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  function easterSunday(y) {                               // velikonoční neděle (gregoriánský výpočet)
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return Date.UTC(y, month - 1, day);
+  }
+  function schoolDay(n) {                                  // n = pragueNow()
+    if (!SKOLA || n.wd > 4) return false;
+    const ds = String(n.d), iso = `${ds.slice(0, 4)}-${ds.slice(4, 6)}-${ds.slice(6)}`;
+    if (iso < SKOLA.rok[0] || iso > SKOLA.rok[1] || SVATKY.includes(iso.slice(5))) return false;
+    const e = easterSunday(+ds.slice(0, 4));
+    if (iso === isoDay(new Date(e - 2 * 86400000)) || iso === isoDay(new Date(e + 86400000))) return false;   // Velký pátek, Velikonoční pondělí
+    return !(SKOLA.volno || []).some(([a, b]) => iso >= a && iso <= b);
+  }
+  function schoolPaths(sc) {                               // pro každé dítě lomená čára od školy po silnicích ven
+    if (sc.paths || sc.tried === roads.length) return sc.paths;
+    sc.tried = roads.length;
+    let best = null, bd = 150 * 150;
+    for (let i = 0; i < roads.length; i++) {
+      const r = roads[i]; if (r.c === 'motorway' || r.c === 'trunk') continue;
+      for (let j = 0; j < r.w.length; j++) { const d = (r.w[j][0] - sc.xy[0]) ** 2 + (r.w[j][1] - sc.xy[1]) ** 2; if (d < bd) { bd = d; best = [i, j]; } }
+    }
+    if (!best) return null;
+    const n = Math.min(200, Math.round(sc.a / 80)), seed = sid(sc.name + sc.xy[0]);
+    sc.paths = [];
+    for (let k = 0; k < n; k++) {
+      const R = (q) => rnd(seed + k * 17 + q), want = 150 + R(1) ** 1.3 * 750;
+      const pts = [sc.xy, best[0] === null ? sc.xy : roads[best[0]].w[best[1]]];
+      let ri = best[0], dir = R(2) < 0.5 ? 1 : -1, j = best[1], L = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), step = 0, turned = 0;
+      while (L < want && step++ < 40) {
+        const w = roads[ri].w;
+        for (j += dir; j >= 0 && j < w.length && L < want; j += dir) { const a = pts[pts.length - 1]; L += Math.hypot(w[j][0] - a[0], w[j][1] - a[1]); pts.push(w[j]); }
+        if (L >= want) break;
+        const end = w[dir > 0 ? w.length - 1 : 0], opts = (ends.get(ek(end)) || []).filter(([i]) => i !== ri && roads[i].c !== 'motorway' && roads[i].c !== 'trunk');
+        if (!opts.length) {                                // slepá ulice (často příjezd ke škole): otočit a jít zpátky
+          if (turned++ > 1) break;
+          dir = -dir; j = dir > 0 ? 0 : w.length - 1; continue;
+        }
+        [ri, dir] = opts[Math.floor(R(3 + step) * opts.length)]; j = dir > 0 ? 0 : roads[ri].w.length - 1;
+      }
+      const cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]));
+      sc.paths.push({ pts, cum, L: cum[cum.length - 1], v: 1 + R(4) * 0.4, side: R(5) < 0.5 ? 1 : -1,
+                      am: (7 * 60 + 28 + R(6) ** 0.6 * 30) * 60, pm: ((sc.c === 'college' ? 12.5 : 11.75) + R(7) * (sc.c === 'college' ? 3.5 : 3.6)) * 3600,
+                      col: KIDC[k % KIDC.length], hat: KIDC[(k * 5 + 2) % KIDC.length] });
+    }
+    return sc.paths;
+  }
+  const KIDC = ['#d8352a', '#2f6fd1', '#f2c230', '#2aa36b', '#e0629a', '#f07a24', '#7b4fc9', '#3b4a63', '#5a5f66', '#28a0b4'];
+  function kidPos(p, s) {                                  // poloha dítěte v sekundách od půlnoci, nebo null
+    let d = null;
+    if (s > p.am - p.L / p.v && s < p.am) d = (p.am - s) * p.v;               // ráno ke škole (od konce cesty)
+    else if (s > p.pm && s < p.pm + p.L / p.v) d = (s - p.pm) * p.v;          // odpoledne domů
+    if (d === null) return null;
+    let i = 1; while (i < p.cum.length - 1 && p.cum[i] < d) i++;
+    const a = p.pts[i - 1], b = p.pts[i], t = Math.max(0, Math.min(1, (d - p.cum[i - 1]) / ((p.cum[i] - p.cum[i - 1]) || 1)));
+    const dx = b[0] - a[0], dy = b[1] - a[1], dl = Math.hypot(dx, dy) || 1, off = i > 1 ? 3.5 * p.side : 0;   // po chodníku
+    return [a[0] + dx * t - dy / dl * off, a[1] + dy * t + dx / dl * off, Math.floor(s * 3 + p.v * 10) % 2];
+  }
+  function drawSchoolKids(sx, ox, oy, vis) {
+    if (!SKOLA || sx <= 0.2) return;
+    const n = pragueNow(); if (!schoolDay(n)) return;
+    if (n.s < 6.5 * 3600 || n.s > 17 * 3600) return;
+    for (const sc of SCHOOLS) {
+      const [ix, iy] = toImg(sc.xy[0], sc.xy[1], gz(sc.xy[0], sc.xy[1]));
+      if (!vis(ix, iy, 900 / Math.max(sx, 0.2))) continue;
+      for (const p of schoolPaths(sc) || []) { const q = kidPos(p, n.s); if (q) drawFan(q[0], q[1], p.col, p.hat, q[2], sx, ox, oy, '#2a2c31', 1.35); }
     }
   }
   // jedoucí vozidla: stejný model jako zaparkovaná auta v renderu (karoserie, prosklení, střecha, 4 kola), stěny stínované
@@ -2354,6 +2427,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
     if (ZAP) drawZapasy(sx, ox, oy, vis);
+    drawSchoolKids(sx, ox, oy, vis);
     // vánoční strom
     if (snowy && sx > 0.15) for (const pt of xmasPts) if (vis(pt[0], pt[1], 100)) {
       const k = Math.max(1, Math.round(sx * 1.2)), X0 = Math.round(ox + (pt[0] + 30) * sx - 15 * k), Y0 = Math.round(oy + (pt[1] - 4) * sx - 48 * k);

@@ -71,6 +71,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
                         if M.get('zdrojovy_kod') else '',
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
+        'SKOLA': json.dumps(M.get('skola')),
         'ZAPASY': json.dumps(zapasy(M.get('zapasy')), ensure_ascii=False),
         'ZAPASY_ZDROJ': ''.join(f', rozpis zápasů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
                                 for z in (M.get('zapasy') or {}).get('zdroje', [])),

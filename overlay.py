@@ -266,6 +266,19 @@ for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
         nm = nm.replace(naz + '-', '')
     districts.append({'name': nm, 'xy': list(px(rp.x, rp.y, gz(rp.x, rp.y))[:2]), 'a': round(gg.area / 1e6, 2)})
 print('čtvrtí', len(districts))
+# školy (Overture land_use: school, college): děti k nim ráno chodí a odpoledne se rozcházejí (web/app.html)
+schools, _seen = [], set()
+for f in sorted(glob.glob('data*/land_use.parquet')):
+    if 'data_all' in f: continue
+    for r in pq.read_table(f, columns=['id', 'names', 'class', 'geometry']).to_pylist():
+        if r['class'] not in ('school', 'college') or r['id'] in _seen: continue
+        _seen.add(r['id'])
+        gg = shapely.ops.transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(r['geometry']))
+        rp = gg.representative_point()
+        if chunk_of(rp.x, rp.y) not in CKEY: continue
+        schools.append({'name': (r['names'] or {}).get('primary') or '', 'c': r['class'], 'xy': [round(rp.x, 1), round(rp.y, 1)],
+                        'a': round(gg.area)})
+print('škol', len(schools))
 # tramvaje: graf kolejí přes všechny čtverce, linky = nejkratší cesta mezi konečnými (TRAM_LINES), tam a zpět
 OFF = (0.0, 0.0)
 tnodes, tadj = {}, {}
@@ -304,7 +317,7 @@ for a_n, b_n, n_ in TRAM_LINES:
                   'stops': [list(px(TSTOP[n][0], TSTOP[n][1], 0)[:2]) + [n] for n in st]})
     print('tramvaj', a_n, '–', b_n, round(sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(on, on[1:]))), 'm', len(st), 'zastávek')
 json.dump({'w': W, 'h': H, 'cam': cam, 'districts': districts, 'needs': needs, 'xmas': nam, 'chunks': {CKEY[c]: CHUNKS[c] for c in chunks}, 'bus': bus_route, 'trams': trams, 'decks': decks,
-           'streets': streets, 'places': places},
+           'streets': streets, 'places': places, 'schools': schools},
           open('site/overlay.json', 'w'), separators=(',', ':'), ensure_ascii=False)
 json.dump(addr_index, open('site/search.json', 'w'), separators=(',', ':'), ensure_ascii=False)   # adresy pro hledání, načte se až při psaní
 print('čtverců', len(chunks), 'budov', sum(len(v['buildings']) for v in per_chunk.values()), 'adres', len(addr_index),
