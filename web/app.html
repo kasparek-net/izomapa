@@ -1304,8 +1304,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       else if (t > leave && t < leave + walk) f = 1 - (t - leave) / walk;
       if (f === null) continue;
       const p = alongPath(c, f), j = f === 1 ? 4 : 1.2;
-      out.push([p[0] + (r(5) - 0.5) * 2 * j, p[1] + (r(6) - 0.5) * 2 * j, r(7) < 0.25 ? (z.barvy || V.barvy || ['#c4352b'])[0] : ZAP_BUNDY[i % ZAP_BUNDY.length],
-                r(8) < 0.5 ? '#c4352b' : ZAP_BUNDY[(i * 3) % ZAP_BUNDY.length], f < 1 && f > 0 ? Math.floor(t / 300 + i) % 2 : 2]);
+      const kl = z.barvy || V.barvy || ['#c4352b', '#f0eee6'];       // klubové barvy: dres a šála/čepice části fanoušků
+      out.push([p[0] + (r(5) - 0.5) * 2 * j, p[1] + (r(6) - 0.5) * 2 * j, r(7) < 0.25 ? kl[0] : ZAP_BUNDY[i % ZAP_BUNDY.length],
+                r(8) < 0.5 ? kl[r(9) < 0.5 ? 0 : 1] : ZAP_BUNDY[(i * 3) % ZAP_BUNDY.length], f < 1 && f > 0 ? Math.floor(t / 300 + i) % 2 : 2]);
     }
     return out;
   }
