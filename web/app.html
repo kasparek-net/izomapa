@@ -1297,15 +1297,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const V = ZAPM[z.misto], out = [], n = z.divaku || V.divaku || 60, end = zapKonec(z), seed = sid(z.kdy + z.misto);
     for (let i = 0; i < n; i++) {
       const r = (k) => rnd(seed + i * 13 + k), c = V.cesty[i % V.cesty.length], L = alongPath(c, 1)[2], walk = L / (1.1 + r(1) * 0.5) * 1000;
-      const arrive = z.t - (4 + r(2) * 40) * 60000, leave = end + r(3) * 15 * 60000;
-      const stand = (2 + r(4) * 8) * 60000;               // postává před vchodem před zápasem i po něm
+      const arrive = z.t - (3 + r(2) ** 1.6 * 40) * 60000, leave = end + r(3) * 15 * 60000;
+      const stand = (3 + r(4) * 11) * 60000;               // postává před vchodem před zápasem i po něm
       let f = null;
       if (t > arrive - walk && t < arrive) f = (t - arrive + walk) / walk;
       else if (t >= arrive && t < Math.min(z.t - 60000, arrive + stand)) f = 1;
       else if (t > leave && t < leave + stand / 2) f = 1;
       else if (t >= leave + stand / 2 && t < leave + stand / 2 + walk) f = 1 - (t - leave - stand / 2) / walk;
       if (f === null) continue;
-      const p = alongPath(c, f), j = f === 1 ? 4 : 1.2;
+      const p = alongPath(c, f), j = f === 1 ? 9 : 1.2;
       const kl = z.barvy || V.barvy || ['#c4352b', '#f0eee6'];       // klubové barvy: dres a šála/čepice části fanoušků
       out.push([p[0] + (r(5) - 0.5) * 2 * j, p[1] + (r(6) - 0.5) * 2 * j, r(7) < 0.25 ? kl[0] : ZAP_BUNDY[i % ZAP_BUNDY.length],
                 r(8) < 0.5 ? kl[r(9) < 0.5 ? 0 : 1] : ZAP_BUNDY[(i * 3) % ZAP_BUNDY.length], f < 1 && f > 0 ? Math.floor(t / 300 + i) % 2 : 2]);
