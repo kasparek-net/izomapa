@@ -41,6 +41,16 @@ def zapasy(Z):
     return {'mista': Z['mista'], 'rozpis': sorted(rozpis, key=lambda z: z['t'])}
 
 
+def trhy(T):
+    """trhy z mesto.json: každý den akce [otevření, zavření] v ms od epochy (místní čas v Česku)"""
+    if not T: return None
+    tz = ZoneInfo('Europe/Prague')
+    ms = lambda d, h: int(datetime.fromisoformat(f'{d}T{h}').replace(tzinfo=tz).timestamp() * 1000)
+    akce = [{**a, 'dny': [[ms(d, a.get('od', '10:00')), ms(d, a.get('do', '18:00'))] for d in sorted(a['dny'])]}
+            for a in T.get('akce', []) if a.get('dny')]
+    return {'mista': T['mista'], 'akce': sorted(akce, key=lambda a: a['dny'][0][0])}
+
+
 SABLONA = open('web/app.html', encoding='utf-8').read()
 E = lambda t: html.escape(t or '', quote=True)
 
@@ -72,6 +82,9 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
         'SKOLA': json.dumps(M.get('skola')),
+        'TRHY': json.dumps(trhy(M.get('trhy')), ensure_ascii=False),
+        'TRHY_ZDROJ': ''.join(f', termíny trhů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
+                              for z in (M.get('trhy') or {}).get('zdroje', [])),
         'ZAPASY': json.dumps(zapasy(M.get('zapasy')), ensure_ascii=False),
         'ZAPASY_ZDROJ': ''.join(f', rozpis zápasů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
                                 for z in (M.get('zapasy') or {}).get('zdroje', [])),
