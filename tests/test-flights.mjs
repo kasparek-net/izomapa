@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+const store = new Map(); let calls = [];
+globalThis.caches = { default: { match: async (k) => store.get(k.url)?.clone(), put: async (k, v) => { store.set(k.url, v); } } };
+globalThis.fetch = async (u) => { calls.push(String(u)); return new Response('{"ac":[{"hex":"abc","lat":49.6,"lon":18.1}]}', { status: 200 }); };
+const { onRequest } = await import('../functions/api/flights.js');
+const ask = (q) => onRequest({ request: new Request('http://x/api/flights' + q) });
+let r = await ask('?lamin=49.2&lamax=50.0&lomin=17.6&lomax=18.6');
+assert.equal(r.status, 200); assert.equal((await r.json()).ac.length, 1);
+assert.deepEqual(calls, ['https://api.adsb.lol/v2/point/49.60/18.10/35']);
+r = await ask('?lamin=49.2&lamax=50.0&lomin=17.6&lomax=18.6'); assert.equal(r.status, 200); assert.equal(calls.length, 1, 'second ask is served from cache');
+r = await ask('?lamin=x'); assert.equal(r.status, 400); assert.equal(calls.length, 1);
+globalThis.fetch = async () => new Response('busy', { status: 503 }); store.clear();
+r = await ask('?lamin=49.2&lamax=50.0&lomin=17.6&lomax=18.6'); assert.equal(r.status, 502); assert.deepEqual(await r.json(), { ac: [] });
+console.log('OK: střed z obdélníku, cache, chybné parametry, výpadek zdroje');

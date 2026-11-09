@@ -70,7 +70,23 @@ async function adminSet(req, env) {
 
 export default {
   async fetch(req, env) {
-    const p = new URL(req.url).pathname;
+    const url = new URL(req.url), p = url.pathname;
+    if (p === '/api/flights') {
+      try {
+        const r = await fetch(`https://opensky-network.org/api/states/all${url.search}`);
+        const data = await r.text();
+        return new Response(data, {
+          status: r.status,
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'public, max-age=15',
+            'access-control-allow-origin': '*'
+          }
+        });
+      } catch (e) {
+        return json({ ok: false, err: 'upstream_failed' }, 502);
+      }
+    }
     if (p === '/api/report' && req.method === 'POST') return report(req, env);
     if (p.startsWith('/api/admin/') || p === '/admin' || p === '/admin.html') {
       if (!isAdmin(req, env)) return new Response('Přihlášení do administrace', { status: 401, headers: { 'www-authenticate': 'Basic realm="izomapa admin", charset="UTF-8"' } });
