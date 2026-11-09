@@ -61,7 +61,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
                         if M.get('zdrojovy_kod') else '',
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
-        'LETADLA_ZDROJ': ', letadla © <a href="https://opensky-network.org/" target="_blank" rel="noopener">OpenSky Network</a> / <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a>' if M.get('letadla', True) else '',
+        'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', True) else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                      if mhd.get('gtfs') and mhd.get('zdroj') else '',
     }

@@ -1703,7 +1703,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return (c.bmp[key] = [sh, bo]);
   }
 
-  // ---------- letadla (ADS-B / OpenSky Network, v úrovni mraků a nad nimi) ----------
+  // ---------- letadla (ADS-B z adsb.lol přes api/flights, v úrovni mraků a nad nimi) ----------
   const PLANESPR = new Map(), PLANESH = new Map();
   function planeSprite(cat, k) {
     const key = `${cat}|${k}`;
@@ -1844,8 +1844,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     drawn: [],
     hover: null,
     follow: null,
-    lastFetch: 0,
-    ambientTimer: 0
+    lastFetch: 0
   };
 
   function planeVisualH(p) {
@@ -1864,31 +1863,6 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     } else {
       $('follow').hidden = true;
     }
-  }
-
-  const AIRLINES = ['DLH', 'RYR', 'KLM', 'TRA', 'CSA', 'WZZ', 'AFR', 'BAW', 'AUA', 'LOT', 'EJU', 'TVL'];
-  const JET_MODELS = ['A320', 'B738', 'A321', 'B789', 'E190'];
-  function spawnAmbientPlane(now) {
-    const isJet = Math.random() < 0.82;
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 32000;
-    const startX = Math.cos(ang) * dist, startY = Math.sin(ang) * dist;
-    const targetX = -startX + (Math.random() - 0.5) * 16000;
-    const targetY = -startY + (Math.random() - 0.5) * 16000;
-    const courseRad = Math.atan2(targetX - startX, targetY - startY);
-    const track = ((courseRad * 180 / Math.PI) + 360) % 360;
-    const callsign = isJet ? AIRLINES[Math.floor(Math.random() * AIRLINES.length)] + (100 + Math.floor(Math.random() * 890)) : 'OK-' + String.fromCharCode(65 + Math.floor(Math.random() * 26)) + String.fromCharCode(65 + Math.floor(Math.random() * 26)) + String.fromCharCode(65 + Math.floor(Math.random() * 26));
-    const alt = isJet ? 8500 + Math.random() * 3200 : 900 + Math.random() * 1100;
-    const speed = isJet ? 210 + Math.random() * 45 : 45 + Math.random() * 22;
-    const model = isJet ? JET_MODELS[Math.floor(Math.random() * JET_MODELS.length)] : 'C172';
-    const id = 'amb_' + callsign + '_' + Math.floor(now);
-    PLANES.list.set(id, {
-      id, callsign, cat: isJet ? 'jet' : 'light', model,
-      alt, speed, track,
-      x: startX, y: startY,
-      lon: cam.lon0 + startX / cam.kx, lat: cam.lat0 + startY / cam.ky,
-      trail: [], simulated: true, lastSeen: now
-    });
   }
 
   function parseFlightData(d) {
@@ -1941,7 +1915,6 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         existing.lastSeen = now;
         existing.simulated = false;
       } else {
-        for (const [sid, sp] of PLANES.list) if (sp.simulated) PLANES.list.delete(sid);
         PLANES.list.set(f.id, {
           id: f.id, callsign: f.callsign, country: f.country,
           cat: f.cat, model: f.model,
@@ -1962,11 +1935,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const pad = 0.35;
     const lamin = (cam.lat0 - pad).toFixed(4), lamax = (cam.lat0 + pad).toFixed(4);
     const lomin = (cam.lon0 - pad * 1.5).toFixed(4), lomax = (cam.lon0 + pad * 1.5).toFixed(4);
-    const urls = [
-      `api/flights?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`,
-      `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`,
-      `https://api.adsb.lol/v2/point/${cam.lat0.toFixed(4)}/${cam.lon0.toFixed(4)}/35`
-    ];
+    const urls = [`api/flights?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`];
     for (const u of urls) {
       try {
         const r = await fetch(u, { signal: AbortSignal.timeout(4500) });
@@ -1985,13 +1954,6 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (now - PLANES.lastFetch > 20000) {
       PLANES.lastFetch = now;
       fetchFlights();
-    }
-    if (PLANES.list.size < 2) {
-      PLANES.ambientTimer += dt;
-      if (PLANES.ambientTimer > 45 || PLANES.list.size === 0) {
-        PLANES.ambientTimer = 0;
-        spawnAmbientPlane(now);
-      }
     }
     for (const [id, p] of PLANES.list) {
       const rad = p.track * Math.PI / 180;
