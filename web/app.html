@@ -1298,10 +1298,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (let i = 0; i < n; i++) {
       const r = (k) => rnd(seed + i * 13 + k), c = V.cesty[i % V.cesty.length], L = alongPath(c, 1)[2], walk = L / (1.1 + r(1) * 0.5) * 1000;
       const arrive = z.t - (4 + r(2) * 40) * 60000, leave = end + r(3) * 15 * 60000;
+      const stand = (2 + r(4) * 8) * 60000;               // postává před vchodem před zápasem i po něm
       let f = null;
       if (t > arrive - walk && t < arrive) f = (t - arrive + walk) / walk;
-      else if (t >= arrive && t < Math.min(z.t - 2 * 60000, arrive + (1 + r(4) * 5) * 60000)) f = 1;
-      else if (t > leave && t < leave + walk) f = 1 - (t - leave) / walk;
+      else if (t >= arrive && t < Math.min(z.t - 60000, arrive + stand)) f = 1;
+      else if (t > leave && t < leave + stand / 2) f = 1;
+      else if (t >= leave + stand / 2 && t < leave + stand / 2 + walk) f = 1 - (t - leave - stand / 2) / walk;
       if (f === null) continue;
       const p = alongPath(c, f), j = f === 1 ? 4 : 1.2;
       const kl = z.barvy || V.barvy || ['#c4352b', '#f0eee6'];       // klubové barvy: dres a šála/čepice části fanoušků
