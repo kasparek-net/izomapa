@@ -84,7 +84,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'SKOLA': json.dumps(M.get('skola')),
         'TRHY': json.dumps(trhy(M.get('trhy')), ensure_ascii=False),
         'TRHY_ZDROJ': ''.join(f', termíny trhů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
-                              for z in (M.get('trhy') or {}).get('zdroje', [])),
+                              for z in (M.get('trhy') or {}).get('zdroje', []) if any(a.get('dny') for a in M['trhy'].get('akce', []))),
         'ZAPASY': json.dumps(zapasy(M.get('zapasy')), ensure_ascii=False),
         'ZAPASY_ZDROJ': ''.join(f', rozpis zápasů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
                                 for z in (M.get('zapasy') or {}).get('zdroje', [])),

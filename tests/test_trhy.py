@@ -36,6 +36,8 @@ class TrhyTest(unittest.TestCase):
         html = postav(None)
         self.assertIn('const TRHY = null', html)
         self.assertNotIn('termíny trhů', html)
+        html = postav({'mista': {'n': {'rada': [[50, 15], [50.0002, 15.0005]]}}, 'akce': [], 'zdroje': [{'nazev': 'KD', 'url': 'https://example.org/'}]})
+        self.assertNotIn('termíny trhů', html)                       # zdroj jen s nějakým termínem
 
 
 if __name__ == '__main__':
