@@ -64,6 +64,9 @@ WATER = [(64, 124, 190), (92, 196, 230), (72, 132, 196), (186, 210, 228), (150, 
 
 # modrošedé střechy (plech, panely): jsou vzácné a median cut je posouval k převládající zeleni do tyrkysové
 ROOF_COOL = [(120, 135, 150), (102, 116, 131), (89, 107, 126), (70, 84, 100), (130, 136, 150)]
+# tmavá višňová (vůz ve stínu haly, červené karoserie): median cut ji jinak sloučí s hnědou
+DEEP_RED = [(120, 18, 26), (89, 13, 19)]
+EXTRA = ROOF_COOL + DEEP_RED
 
 
 # ruční povrchy (plaza, plaza2, deck) ve světle a stínu, léto a zima: vzácné barvy by median cut sloučil s béžovou.
@@ -73,9 +76,9 @@ SURFACES_WINTER = [(197, 201, 208), (134, 143, 166), (210, 214, 220), (143, 152,
 
 
 def palette_with_water(sample, colors):
-    q = sample.quantize(colors=colors - 1 - 3 * len(WATER + ROOF_COOL), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER + ROOF_COOL))]
-    for r, g, b in WATER + ROOF_COOL:
+    q = sample.quantize(colors=colors - 1 - 3 * len(WATER + EXTRA), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    p = q.getpalette()[:3 * (colors - 1 - 3 * len(WATER + EXTRA))]
+    for r, g, b in WATER + EXTRA:
         for k in (1.0, 0.8, 0.66):         # stupně osvětlení terénu ve stínu
             p += [int(r * k), int(g * k), int(b * k)]
     im = Image.new('P', (1, 1)); im.putpalette(p + [0] * (768 - len(p)))
@@ -101,7 +104,7 @@ def quant_alpha(rgba, colors, pal=None, keep=()):
 
 
 def build_alpha(variant, chunk, img, info):
-    colors = 64 if variant.startswith('lights') else 225 + 3 * len(ROOF_COOL)       # víc odstínů: zeleň stromů jinak bere sloty vzácným barvám střech a ploch
+    colors = 64 if variant.startswith('lights') else 225 + 3 * len(EXTRA)       # víc odstínů: zeleň stromů jinak bere sloty vzácným barvám střech a ploch
     sample = img.convert('RGB').resize((img.width // 3, img.height // 3), Image.Resampling.NEAREST)
     pal = palette_with_water(sample, colors) if not variant.startswith('lights') else sample.quantize(colors=colors - 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     keep = () if variant.startswith('lights') else SURFACES_WINTER if variant == 'winter' else SURFACES
