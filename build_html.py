@@ -1,7 +1,9 @@
 """Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap).
 Pokud existuje složka obce/*.json, vyrobí pro každou obec i site/index_<obec>.html a site/obce/<obec>/og.jpg."""
 import hashlib, html, json, os, re
+from datetime import datetime
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 from PIL import Image
 import geo
 from geo import MESTO
@@ -29,6 +31,14 @@ def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=1, latlon=None):
                 q = Image.open(f).convert('RGBA'); img.paste(q, (i * T - x0, j * T - y0), q)
     os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
     img.save(out, quality=85)
+
+
+def zapasy(Z):
+    """domácí zápasy z mesto.json: čas začátku (místní čas v Česku) -> ms od epochy pro prohlížeč"""
+    if not Z: return None
+    tz = ZoneInfo('Europe/Prague')
+    rozpis = [{**z, 't': int(datetime.fromisoformat(z['kdy']).replace(tzinfo=tz).timestamp() * 1000)} for z in Z.get('rozpis', [])]
+    return {'mista': Z['mista'], 'rozpis': sorted(rozpis, key=lambda z: z['t'])}
 
 
 SABLONA = open('web/app.html', encoding='utf-8').read()
@@ -61,6 +71,9 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
                         if M.get('zdrojovy_kod') else '',
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
+        'ZAPASY': json.dumps(zapasy(M.get('zapasy')), ensure_ascii=False),
+        'ZAPASY_ZDROJ': ''.join(f', rozpis zápasů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
+                                for z in (M.get('zapasy') or {}).get('zdroje', [])),
         'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', True) else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                      if mhd.get('gtfs') and mhd.get('zdroj') else '',

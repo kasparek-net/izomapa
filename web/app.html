@@ -336,7 +336,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     <li><b>Sdílet</b> <span class="ico-inline"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/><path d="M8 10H5v11h14V10h-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></span> zkopíruje odkaz přesně na to, co právě vidíte, včetně ročního období a denní doby.</li>
   </ul>
   <p class="muted">Vytvořeno nástrojem <a href="https://github.com/adamklatovsky/izomapa" target="_blank" rel="noopener">izomapa</a> od <a href="https://www.adamklatovsky.cz/" target="_blank" rel="noopener">Adama Klatovského</a> (původní mapa: <a href="https://izomapa.fun" target="_blank" rel="noopener">izometrický Liberec</a>).<br>
-  Mapová data © přispěvatelé <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL) a Overture Maps, terén Terrarium (AWS Open Data), výšky budov a stromů, ortofoto a ZABAGED{{RUIAN_ZDROJ}} © <a href="https://geoportal.cuzk.cz/" target="_blank" rel="noopener">ČÚZK</a> (CC BY 4.0){{MHD_ZDROJ}}{{VITR_ZDROJ}}{{LETADLA_ZDROJ}}{{DOPRAVA_ZDROJ}}{{MESTO_ZDROJ}}.</p>{{ZDROJOVY_KOD}}
+  Mapová data © přispěvatelé <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL) a Overture Maps, terén Terrarium (AWS Open Data), výšky budov a stromů, ortofoto a ZABAGED{{RUIAN_ZDROJ}} © <a href="https://geoportal.cuzk.cz/" target="_blank" rel="noopener">ČÚZK</a> (CC BY 4.0){{MHD_ZDROJ}}{{VITR_ZDROJ}}{{LETADLA_ZDROJ}}{{ZAPASY_ZDROJ}}{{DOPRAVA_ZDROJ}}{{MESTO_ZDROJ}}.</p>{{ZDROJOVY_KOD}}
 </dialog>
 <nav class="mbar" id="mbar" aria-label="Rychlé ovládání">
   <button class="px-btn" type="button" data-s="spring">Jaro</button>
@@ -1249,16 +1249,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), get planes() { return PLANES; } };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t) };       // ladění v lokálním náhledu
+  function figureHidden(x, y, h, p) {                      // postavu zakryje budova nebo koruna stromu
+    if (occluded(p[0], p[1], depth(x, y, h))) return true;
+    for (const q of treeShapes(x, y, h, [p[0] - 1, p[1] - 9, p[0] + 1, p[1]]))
+      if (q[0] === 1 ? ((p[0] - q[1][0]) / q[2]) ** 2 + ((p[1] - 4 - q[1][1]) / q[3]) ** 2 < 1 : p[1] - 4 > q[1][1] && p[1] - 4 < q[2][1] && Math.abs(p[0] - q[1][0]) < q[3] * (p[1] - 4 - q[1][1]) / (q[2][1] - q[1][1])) return true;
+    return false;
+  }
   function drawSkier(q, sx, ox, oy) {
     const L = q.r.len; let i = 1; while (i < L.length - 1 && L[i] < q.s) i++;
     const a = q.r.w[i - 1], b = q.r.w[i], t = Math.max(0, Math.min(1, (q.s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));
     const dx = b[0] - a[0], dy = b[1] - a[1], dl = Math.hypot(dx, dy) || 1, ph = q.s / q.wl * Math.PI * 2 + q.ph, off = Math.sin(ph) * q.amp;
     const x = a[0] + dx * t - dy / dl * off, y = a[1] + dy * t + dx / dl * off, h = gz(x, y);
     const p = toImg(x, y, h);
-    if (occluded(p[0], p[1], depth(x, y, h))) return;
-    for (const q of treeShapes(x, y, h, [p[0] - 1, p[1] - 9, p[0] + 1, p[1]]))
-      if (q[0] === 1 ? ((p[0] - q[1][0]) / q[2]) ** 2 + ((p[1] - 4 - q[1][1]) / q[3]) ** 2 < 1 : p[1] - 4 > q[1][1] && p[1] - 4 < q[2][1] && Math.abs(p[0] - q[1][0]) < q[3] * (p[1] - 4 - q[1][1]) / (q[2][1] - q[1][1])) return;
+    if (figureHidden(x, y, h, p)) return;
     const top = toImg(x, y, h + 1.8), u = Math.max(1, Math.round((p[1] - top[1]) * sx / 8));
     const X = Math.round(ox + p[0] * sx), Y = Math.round(oy + p[1] * sx), lean = Math.cos(ph) > 0 ? 1 : -1;
     const R = (cx, cy, w, hh, c) => { ctx.fillStyle = c; ctx.fillRect(X + cx * u, Y - cy * u, w * u, hh * u); };
@@ -1268,6 +1272,96 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     R(lean > 0 ? 0 : -1, 7, 2, 1, '#e8c6a4');          // obličej
     R(lean > 0 ? 0 : -1, 8, 2, 1, q.hat);              // čepice
     R(lean > 0 ? 2 : -3, 4, 1, 3, '#9aa0a8');          // hůlka
+  }
+  // domácí zápasy podle rozpisu v mesto.json ("zapasy"): fanoušci přicházejí ke vchodu a po zápase odcházejí,
+  // na fotbale běhají hráči. Všechno se počítá z hodin (bez stavu), takže sedí i po přeskočení času.
+  const ZAP = {{ZAPASY}}, ZAP_MIN = { hokej: [150, 0], fotbal: [105, 15] };    // délka zápasu a přestávky v minutách
+  const ZAPM = {};
+  if (ZAP) for (const [k, m] of Object.entries(ZAP.mista)) {
+    const w = (q) => [(q[1] - cam.lon0) * cam.kx, (q[0] - cam.lat0) * cam.ky];
+    ZAPM[k] = { ...m, cesty: (m.cesty || []).map((c) => c.map(w)), hr: m.hriste && m.hriste.map(w), stit: w(m.stitek || m.cesty[0][m.cesty[0].length - 1]) };
+  }
+  const ZAP_BUNDY = ['#3b4a63', '#5a5f66', '#6b4f3a', '#2f4f3a', '#8a2a2a', '#46464e', '#a0968a', '#343a46'];
+  const zapKonec = (z) => z.t + (ZAP_MIN[ZAPM[z.misto].sport] || [120, 0]).reduce((a, b) => a + b) * 60000;
+  const zapDnes = (t) => ZAP ? ZAP.rozpis.filter((z) => ZAPM[z.misto] && t > z.t - 3 * 3600000 && t < zapKonec(z) + 30 * 60000) : [];
+  function alongPath(c, f) {                               // bod na lomené čáře v podílu f délky
+    let L = 0; for (let i = 1; i < c.length; i++) L += Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]);
+    let d = f * L;
+    for (let i = 1; i < c.length; i++) {
+      const l = Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]);
+      if (d <= l || i === c.length - 1) { const t = Math.min(1, d / (l || 1)); return [c[i - 1][0] + (c[i][0] - c[i - 1][0]) * t, c[i - 1][1] + (c[i][1] - c[i - 1][1]) * t, L]; }
+      d -= l;
+    }
+  }
+  function zapFans(z, t) {                                 // fanoušci: [x, y, bunda, čepice, krok]
+    const V = ZAPM[z.misto], out = [], n = z.divaku || V.divaku || 60, end = zapKonec(z), seed = sid(z.kdy + z.misto);
+    for (let i = 0; i < n; i++) {
+      const r = (k) => rnd(seed + i * 13 + k), c = V.cesty[i % V.cesty.length], L = alongPath(c, 1)[2], walk = L / (1.1 + r(1) * 0.5) * 1000;
+      const arrive = z.t - (4 + r(2) * 40) * 60000, leave = end + r(3) * 15 * 60000;
+      let f = null;
+      if (t > arrive - walk && t < arrive) f = (t - arrive + walk) / walk;
+      else if (t >= arrive && t < Math.min(z.t - 2 * 60000, arrive + (1 + r(4) * 5) * 60000)) f = 1;
+      else if (t > leave && t < leave + walk) f = 1 - (t - leave) / walk;
+      if (f === null) continue;
+      const p = alongPath(c, f), j = f === 1 ? 4 : 1.2;
+      out.push([p[0] + (r(5) - 0.5) * 2 * j, p[1] + (r(6) - 0.5) * 2 * j, r(7) < 0.25 ? (z.barvy || V.barvy || ['#c4352b'])[0] : ZAP_BUNDY[i % ZAP_BUNDY.length],
+                r(8) < 0.5 ? '#c4352b' : ZAP_BUNDY[(i * 3) % ZAP_BUNDY.length], f < 1 && f > 0 ? Math.floor(t / 300 + i) % 2 : 2]);
+    }
+    return out;
+  }
+  function zapPlayers(z, t) {                              // fotbal: hráči kolem rozestavení, posouvají se za míčem
+    const V = ZAPM[z.misto]; if (!V.hr) return [];
+    const m = (t - z.t) / 60000, [len, pause] = ZAP_MIN.fotbal;
+    if (m < 0 || m > len + pause || (m > 45 && m < 45 + pause)) return [];
+    const s = (t - z.t) / 1000, h2 = m > 45 ? -1 : 1, A = V.hr[0], U = [V.hr[1][0] - A[0], V.hr[1][1] - A[1]], W_ = [V.hr[3][0] - A[0], V.hr[3][1] - A[1]];
+    const P = (u, v) => [A[0] + U[0] * u + W_[0] * v, A[1] + U[1] * u + W_[1] * v];
+    const bu = 0.5 + 0.3 * Math.sin(s * 0.05) + 0.12 * Math.sin(s * 0.23 + 1), bv = 0.5 + 0.28 * Math.sin(s * 0.041 + 2) + 0.1 * Math.sin(s * 0.19);
+    const F = [[0.04, 0.5], [0.17, 0.2], [0.15, 0.4], [0.15, 0.6], [0.17, 0.8], [0.33, 0.15], [0.3, 0.4], [0.3, 0.6], [0.33, 0.85], [0.44, 0.38], [0.45, 0.62]];
+    const [dc, hc] = [z.barvy || V.barvy || ['#c4352b', '#f0eee6'], z.barvy_hoste || ['#f0eee6', '#2a4a9a']], out = [];
+    F.forEach(([u, v], i) => {
+      for (const [side, col] of [[1, dc], [-1, hc]]) {
+        const uu = side * h2 > 0 ? u : 1 - u, k = i === 0 ? 0.08 : 0.35;
+        const pu = uu + (bu - 0.5) * k + 0.02 * Math.sin(s * 0.7 + i * 2 + side), pv = v + (bv - 0.5) * 0.3 + 0.03 * Math.sin(s * 0.5 + i + side);
+        const p = P(Math.min(0.99, Math.max(0.01, pu)), Math.min(0.98, Math.max(0.02, pv)));
+        out.push([p[0], p[1], col[0], '#3a2a20', Math.floor(s * 3 + i) % 2, col[1]]);
+      }
+    });
+    const rf = P(bu + 0.06, bv - 0.08); out.push([rf[0], rf[1], '#1d1f24', '#1d1f24', Math.floor(s * 3) % 2, '#1d1f24']);
+    const b = P(bu, bv); out.push([b[0], b[1], null]);
+    return out;
+  }
+  function drawFan(x, y, jacket, hat, step, sx, ox, oy, legs = '#2a2c31') {
+    const h = gz(x, y), p = toImg(x, y, h);
+    if (figureHidden(x, y, h, p)) return;
+    const top = toImg(x, y, h + 1.8), u = Math.max(1, Math.round((p[1] - top[1]) * sx / 8));
+    const X = Math.round(ox + p[0] * sx), Y = Math.round(oy + p[1] * sx);
+    const R = (cx, cy, w, hh, c) => { ctx.fillStyle = c; ctx.fillRect(X + cx * u, Y - cy * u, w * u, hh * u); };
+    if (!jacket) { R(0, 1, 1, 1, '#ffffff'); return; }    // míč
+    ctx.globalAlpha = 0.25; R(-1, 0, 3, 1, '#000'); ctx.globalAlpha = 1;
+    if (step === 2) R(-1, 3, 2, 3, legs); else { R(step ? -1 : 0, 3, 1, 3, legs); R(step ? 0 : -1, 2, 1, 2, legs); }
+    R(-1, 6, 3, 3, jacket);
+    R(-1, 7, 2, 1, '#e8c6a4');
+    R(-1, 8, 2, 1, hat);
+  }
+  function drawZapasy(sx, ox, oy, vis) {
+    const t = Date.now(), dnes = zapDnes(t);
+    for (const z of dnes) {
+      const V = ZAPM[z.misto];
+      if (sx > 0.2) {
+        for (const f of zapFans(z, t)) drawFan(f[0], f[1], f[2], f[3], f[4], sx, ox, oy);
+        for (const f of zapPlayers(z, t)) drawFan(f[0], f[1], f[2], f[3], f[4], sx, ox, oy, f[5]);
+      }
+      const [ix, iy] = toImg(V.stit[0], V.stit[1], gz(V.stit[0], V.stit[1]) + 22);
+      if (!vis(ix, iy, 200) || sx < 0.12) continue;
+      const hraje = t >= z.t && t < zapKonec(z), hm = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }).format(new Date(z.t));
+      const txt = `${V.sport === 'hokej' ? '🏒' : '⚽'} ${hraje ? 'hraje se' : t < z.t ? 'dnes ' + hm : 'po zápase'} · ${z.domaci} – ${z.hoste}`;
+      ctx.font = '700 12px "Atkinson Hyperlegible", system-ui, sans-serif';
+      const tw = Math.ceil(ctx.measureText(txt).width) + 12, X_ = Math.round(ox + ix * sx), Y_ = Math.round(oy + iy * sx);
+      ctx.fillStyle = 'rgba(22, 25, 31, 0.88)'; ctx.fillRect(X_ - tw / 2, Y_ - 10, tw, 20);
+      ctx.strokeStyle = hraje ? '#f2c66d' : '#c4352b'; ctx.lineWidth = 1.5; ctx.strokeRect(X_ - tw / 2, Y_ - 10, tw, 20);
+      ctx.fillStyle = '#f3efe2'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, X_, Y_ + 1);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
   }
   // jedoucí vozidla: stejný model jako zaparkovaná auta v renderu (karoserie, prosklení, střecha, 4 kola), stěny stínované
   // stejným sluncem (od jihovýchodu). Kreslí se jako render: do malého obrázku v rozlišení mapy (1 px = cam.mpp),
@@ -2256,6 +2350,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         drawSkier(q, sx, ox, oy);
       }
     }
+    if (ZAP) drawZapasy(sx, ox, oy, vis);
     // vánoční strom
     if (snowy && sx > 0.15) for (const pt of xmasPts) if (vis(pt[0], pt[1], 100)) {
       const k = Math.max(1, Math.round(sx * 1.2)), X0 = Math.round(ox + (pt[0] + 30) * sx - 15 * k), Y0 = Math.round(oy + (pt[1] - 4) * sx - 48 * k);
