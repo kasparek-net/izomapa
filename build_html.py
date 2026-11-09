@@ -59,7 +59,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'MHD': 'true' if mhd.get('gtfs') else 'false',
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
-        'LETADLA': 'true' if M.get('letadla', True) else 'false',
+        'LETADLA': 'true' if M.get('letadla', False) else 'false',
         'POHLED': json.dumps(pohled if isinstance(pohled, list) and len(pohled) >= 2 else None),
         'DOMU_CELEK': 'true' if M.get('domu_celek') else 'false',
         'STROM': json.dumps(strom if isinstance(strom, list) and len(strom) == 2 else None),
@@ -75,7 +75,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'ZAPASY': json.dumps(zapasy(M.get('zapasy')), ensure_ascii=False),
         'ZAPASY_ZDROJ': ''.join(f', rozpis zápasů © <a href="{E(z.get("url", ""))}" target="_blank" rel="noopener">{E(z["nazev"])}</a>'
                                 for z in (M.get('zapasy') or {}).get('zdroje', [])),
-        'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', True) else '',
+        'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', False) else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                      if mhd.get('gtfs') and mhd.get('zdroj') else '',
     }

@@ -340,7 +340,8 @@ for _, r in inf.iterrows():
 for q in UP['paved']: fill(Polygon([to_local(lo, la) for la, lo in q]), C['paved'], block=True)
 
 wat = load('water')
-_bld_stream_excl = shapely.unary_union([p.buffer(1.2) for g in load('building').geom for p in polys(g) if p.intersects(DRAWBOX)])
+POTOKY = bool(geo.MESTO.get('potoky'))           # potoky (waterway=stream) jen na přání: v datech často vedou pod zemí (zatrubněné)
+_bld_stream_excl = shapely.unary_union([p.buffer(1.2) for g in load('building').geom for p in polys(g) if p.intersects(DRAWBOX)]) if POTOKY else shapely.geometry.GeometryCollection()
 for _, r in wat.iterrows():
     g = r.geom
     if g.geom_type in ('Polygon', 'MultiPolygon'):
@@ -348,7 +349,7 @@ for _, r in wat.iterrows():
         else: fill(g, C['water'], block=True)
     elif r['class'] == 'river':
         line(g, C['stream'], 6, block=True)
-    elif r['class'] == 'stream':         # říčka Oleška a potoky (mimo půdorysy budov, kde bývají zatrubněné)
+    elif r['class'] == 'stream' and POTOKY:   # potoky (mimo půdorysy budov, kde bývají zatrubněné)
         g_vis = g.difference(_bld_stream_excl) if not _bld_stream_excl.is_empty else g
         if not g_vis.is_empty:
             line(g_vis, C['stream'], 4.8 if sname(r) else 2.8, block=True)
@@ -706,7 +707,7 @@ if len(bld) and UP['roofs']:                            # přístřešky nástup
         g = LineString([to_local(lo, la) for la, lo in q['line']]).buffer(q['w'] / 2, cap_style='flat', join_style='mitre')
         rows.append({**t0.to_dict(), 'id': f'up-roof-{i}', 'class': 'roof', 'subtype': None, 'names': None, 'height': q['h'], 'num_floors': float('nan'), 'roof_shape': None, 'geom': g, 'geometry': None})
     bld = pd.concat([bld, pd.DataFrame(rows)], ignore_index=True)
-if len(bld) and UP.get('custom_bld'):                   # ručně doplněné drobné stavby (např. Z-BOX Zásilkovna)
+if len(bld) and UP.get('custom_bld'):                   # ručně doplněné drobné stavby (výdejní box, kiosek, přístřešek)
     t0 = bld.iloc[0]; rows = []
     for q in UP['custom_bld']:
         g = Polygon([to_local(lo, la) for la, lo in q['poly']])
@@ -1282,7 +1283,6 @@ for _, r in bld.iterrows():
                       'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2),
                       **({'roof_geometry': {'eave': b['e'], 'height': b['rh'], 'parts': b['parts']}}
                          if not lm and rs in ('gabled', 'hipped') and b['parts'] else {})})
-# samostatné stavby dominant (zřícenina, rozhledna): jen věž na bodu dominanty
 # samostatné stavby dominant (zřícenina, rozhledna, VTE): jen věž na bodu dominanty
 for d in DOMS:
     sp = d['spec']
@@ -1761,11 +1761,35 @@ for x, y, *_r in props['lamp']:
     lm_img[ys0:ys1, xs0:xs1] += blob[ys0 - y0:ys1 - y0, xs0 - x0:xs1 - x0]
 Image.fromarray((np.clip(lm_img, 0, 1) * 255).astype(np.uint8)).save(f'{OUT}/lightmap.png')
 
+# stáda zvířat na pastvinách (assets/upresneni.json -> stada)
+herds_out = []
+for h in UP.get('stada', UP.get('herds', [])):
+    typ_raw = str(h.get('typ', h.get('type', 'cow'))).lower()
+    typ = 'horse' if any(k in typ_raw for k in ('kun', 'kone', 'horse')) else 'deer' if any(k in typ_raw for k in ('srn', 'deer')) else 'cow'
+    hx, hy = to_local(float(h['lon']), float(h['lat']))
+    hr = float(h.get('radius', 30.0))
+    hpt = Point(hx, hy)
+    if EXT_P.contains(hpt) or hpt.buffer(hr).intersects(EXT):
+        hz = float(ground(hx, hy))
+        if not free(hx, hy):
+            cand = [(hx + math.cos(a) * d, hy + math.sin(a) * d) for d in np.linspace(3, hr, 8) for a in np.linspace(0, math.tau, 12)]
+            good = [p for p in cand if free(*p)]
+            if good:
+                hx, hy = min(good, key=lambda p: math.hypot(p[0] - hx, p[1] - hy))
+                hz = float(ground(hx, hy))
+        herds_out.append({
+            'typ': typ, 'x': round(hx, 2), 'y': round(hy, 2), 'z': round(hz, 2),
+            'n': int(h.get('pocet', h.get('count', 8))),
+            'r': round(hr, 1),
+            'mladata': bool(h.get('mladata', True))
+        })
+
 TOP = max([b['e'] + b['rh'] for b in buildings] + [t[2] + t[3] for t in trees] + [float(H.max())])
 json.dump({'chunk': CHUNK, 'center': [CX, CY], 'half': HALF, 'step': STEP, 'n': N, 'hmin': HMIN, 'heights': [round(float(v), 2) for v in H.ravel()],
            'ms': MS, 'hext': [round(float(v), 2) for v in HX.ravel()], 'nb': NB, 'margin': geo.MARGIN, 'skirt': geo.skirt_edges(CHUNK),
            'floor': geo.FLOOR, 'top': round(TOP, 1),
            'buildings': buildings, 'trees': trees, 'props': props, 'cars': cars, 'buses': buses, 'portals': portals, 'lines': lines_out,
+           'herds': herds_out,
            'bridges': [{'p': [[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])], 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)]},
           open(f'{OUT}/scene.json', 'w'), separators=(',', ':'))
 
@@ -1972,7 +1996,7 @@ for _, r in wat.iterrows():
     if g.geom_type in ('Polygon', 'MultiPolygon'):
         for p in polys(g):
             if p.area > 15: water_out['ponds'].append(zline(p.exterior) + ([] if r['class'] != 'swimming_pool' else []))
-    elif r['class'] in ('river', 'stream'):
+    elif r['class'] == 'river' or (r['class'] == 'stream' and POTOKY):
         water_out['streams'] += [zline(l) for l in lines(g)]
 piste_out = []                                 # pro lyžaře v prohlížeči: vždy shora dolů
 for l in PISTE:

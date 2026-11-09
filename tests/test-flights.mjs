@@ -11,4 +11,6 @@ r = await ask('?lamin=49.2&lamax=50.0&lomin=17.6&lomax=18.6'); assert.equal(r.st
 r = await ask('?lamin=x'); assert.equal(r.status, 400); assert.equal(calls.length, 1);
 globalThis.fetch = async () => new Response('busy', { status: 503 }); store.clear();
 r = await ask('?lamin=49.2&lamax=50.0&lomin=17.6&lomax=18.6'); assert.equal(r.status, 502); assert.deepEqual(await r.json(), { ac: [] });
-console.log('OK: střed z obdélníku, cache, chybné parametry, výpadek zdroje');
+const worker = (await import('../hlaseni/worker.js')).default;
+r = await worker.fetch(new Request('http://x/api/flights?lamin=x'), {}); assert.equal(r.status, 400, 'worker routes /api/flights to the proxy');
+console.log('OK: střed z obdélníku, cache, chybné parametry, výpadek zdroje, worker');

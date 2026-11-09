@@ -11,7 +11,7 @@ export async function onRequest({ request }) {
   const cache = caches.default, key = new Request(src);
   let r = await cache.match(key);
   if (!r) {
-    const up = await fetch(src, { headers: { 'user-agent': 'izomapa (koprivnice.kasparek.net)' } });
+    const up = await fetch(src, { headers: { 'user-agent': 'izomapa' } });
     if (!up.ok) return new Response('{"ac":[]}', { status: 502, headers: { 'content-type': 'application/json' } });
     r = new Response(await up.text(), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=15' } });
     await cache.put(key, r.clone());

@@ -29,5 +29,6 @@
   "zdroj_url": null
  },
  "vanocni_strom": null,
- "letadla": true
+ "letadla": false,
+ "potoky": false
 }
