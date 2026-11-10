@@ -202,7 +202,27 @@ for chunk in chunks:
         hit_ = _lt.query(_pt, predicate='dwithin', distance=45)
         _ok = sorted({int(i) for i, k in zip(*hit_) if ln_[k].distance(_pt[i]) < max(9.0, 1.7 * T_[i][3])})
         vtrees = [[round(T_[i][0] + OFF[0], 2), round(T_[i][1] + OFF[1], 2), round(T_[i][2], 1), T_[i][3], T_[i][4], T_[i][5] if len(T_[i]) > 5 else 0] for i in _ok]   # 2 desetinná místa: prohlížeč podle nich vybere stejnou kresbu stromu jako renderer
-    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees}
+    # svíčky na hrobech (prohlížeč je rozsvítí večer; kolem Dušiček a na Štědrý den skoro na každém hrobě): bod na desce před náhrobkem,
+    # bez těch, které by na obrázku ležely v koruně stromu; [x, y obrázku, náhoda 0–1 pro podíl, barvu a mihotání]
+    svicky = []
+    G_ = sc_['props'].get('grave', [])
+    if G_:
+        TT = [t for t in sc_['trees'] if abs(t[0]) <= HALF + 40 and abs(t[1]) <= HALF + 40]
+        tr_ = shapely.STRtree(shapely.points([(t[0], t[1]) for t in TT])) if TT else None
+        for gi, (gx, gy, gz_, ga, gh, gc) in enumerate(G_):
+            if abs(gx) > HALF or abs(gy) > HALF: continue
+            u = ((gi * 2654435761 + int(abs(gx * 7 + gy * 13))) % 1000) / 1000
+            s_, t_ = (u - 0.5) * 0.5, -0.45
+            cx, cy = gx + math.cos(ga) * s_ - math.sin(ga) * t_, gy + math.sin(ga) * s_ + math.cos(ga) * t_
+            a_, b_, _ = px(cx, cy, gz_ + 0.25)
+            skryta = False
+            if tr_ is not None:
+                for k_ in tr_.query(shapely.Point(cx, cy).buffer(16)):
+                    t = TT[int(k_)]; h_ = t[3]; r_ = h_ * (0.2 if t[4] else 0.32)
+                    ta, tb, _ = px(t[0], t[1], t[2] + h_ * 0.62); ra, rb, _ = px(t[0] + r_, t[1], t[2] + h_ * 0.62)
+                    if (a_ - ta) ** 2 + (b_ - tb) ** 2 < (ra - ta) ** 2 + (rb - tb) ** 2: skryta = True; break
+            if not skryta: svicky.append([round(a_), round(b_), round(u, 3)])
+    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees, 'svicky': svicky}
 
 
 

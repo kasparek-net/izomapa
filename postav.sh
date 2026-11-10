@@ -16,11 +16,8 @@ if [ "$1" != render ]; then
   [ -f build/les_maska.png ] || python nastroje/les.py                                     # les podle ortofota
   [ -f assets/zabaged.json ] || { python nastroje/zabaged.py && python nastroje/pole.py; } # pole a louky
 fi
-for c in $CH; do python prep.py $(dir $c) $c > /dev/null && echo "scéna $c"; done
-for c in $CH; do ./render_chunk.sh $c; done
 rm -rf site/tiles && mkdir -p site/tiles && rm -f site/tiles.json
-python dzi.py
-for c in $CH; do [ "$c" = "0,0" ] || python dzi.py --chunk $c; done
+./render_par.sh                                               # scény, render a dlaždice: několik čtverců najednou podle paměti (./render_par.sh 1 = po jednom)
 for s in summer autumn winter spring; do node render.mjs mpp=0.2 dir=build season=$s alpha=1 stromy=site/stromy > /dev/null; done   # kresby stromů: auta se schovají přesně za ně
 python preview.py
 python overlay.py

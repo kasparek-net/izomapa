@@ -816,6 +816,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const v = MHD.drawn.find((q) => Math.hypot(q[0] - e.position.x, q[1] - e.position.y) < 18);
     if (v) { mhdFollow(v[2]); return; }
     const [ix, iy] = vpToImg(e.position);
+    const st = stopAt(ix, iy);
+    if (st) { showStop(st); return; }
     const b = hit(ix, iy);
     if (b) showBuilding(b); else showPoint(ix, iy);
   });
@@ -829,7 +831,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (!$('l-hover').checked || e.pointerType === 'touch') { state.hover = null; $('osd').style.cursor = ''; return; }
     const [ix, iy] = vpToImg(new OpenSeadragon.Point(mx, my));
     state.hover = hit(ix, iy);
-    $('osd').style.cursor = state.hover ? 'pointer' : '';
+    $('osd').style.cursor = state.hover || stopAt(ix, iy) ? 'pointer' : '';
   });
 
 
@@ -879,7 +881,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (!addrLoad) { loadAddr().then(() => e.target.dispatchEvent(new Event('input'))); }
     const pool = index.filter((r) => shown(r.k)), seenL = new Set();
     const starts = pool.filter((r) => r.n.startsWith(q)), inside = pool.filter((r) => !r.n.startsWith(q) && r.n.includes(q));
-    const order = { 'místo': 0, budova: 1, ulice: 2, adresa: 3 };
+    const order = { 'místo': 0, 'zastávka': 0.5, budova: 1, ulice: 2, adresa: 3 };
     res = [...starts, ...inside].filter((r) => !seenL.has(r.kind + r.label) && seenL.add(r.kind + r.label)).sort((a, b) => (a.n.startsWith(q) === b.n.startsWith(q) ? order[a.kind] - order[b.kind] : 0)).slice(0, 8);
     renderResults();
   });
@@ -1036,6 +1038,18 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const ek = (p) => Math.round(p[0]) + ',' + Math.round(p[1]);
   const TRUCKC = ['#c42a20|#ecebe6|box', '#eceeed|#d6a13a|tarp', '#eceeed|#3f5f8a|tarp', '#2f4f86|#e4e4de|box', '#eceeed|#9aa0a7|box'];
   const CARC = ['#ecebe6', '#b3b8bf', '#2a2c31', '#b8291f', '#33529e', '#62666d', '#3d6b4c', '#cdbd99'];
+  const VANC = ['#ecebe6', '#ecebe6', '#ecebe6', '#ecebe6', '#b3b8bf', '#2f3f6e', '#c23b2a', '#e8c547'];   // dodávky: hlavně bílé
+  const CABC = ['#ecebe6', '#ecebe6', '#c23b2a', '#2f5fa8', '#e3a52b', '#3c6e47', '#1d1f24', '#b3b8bf'];   // kabiny tahačů
+  const BOXC = ['#e9e8e2', '#e9e8e2', '#e9e8e2', '#c9ccd0', '#2f4f8a', '#a33a2c', '#4f6b4a', '#d9d2bf'];   // návěsy
+  // druhy vozidel: len/wid rozměr v m, code obrázek ve vehicleSprite (3 nákladní auto, 5 dodávka, 7 tahač, 9 popelářské auto, 10 traktor),
+  // vmax km/h, gap místo ve frontě před přejezdem (m). Kamion = tahač + návěs (TRAILER m) za ním po silnici.
+  const VTYP = {
+    car: { len: 4.2, wid: 1.76, code: false, gap: 8 }, van: { len: 5.4, wid: 2.0, code: 5, vmax: 110, gap: 9 },
+    truck: { len: 9, wid: 2.45, code: 3, vmax: 80, gap: 13 }, semi: { len: 6.1, wid: 2.5, code: 7, vmax: 80, gap: 25 },
+    garbage: { len: 9.2, wid: 2.5, code: 9, vmax: 35, gap: 13 }, tractor: { len: 4.3, wid: 2.3, code: 10, vmax: 30, gap: 8 },
+  };
+  const TRAILER = 13.6, TAH = 3.05 - 1.0 + 6.8;                 // střed návěsu za středem tahače (točnice 1 m před zadkem tahače)
+  const MINOR = new Set(['residential', 'living_street', 'unclassified', 'tertiary']);   // popeláři a traktory jezdí po vedlejších silnicích
   // silnice čtverce: napojit na graf (konce se potkají i přes šev) a přidat auta
   onChunk.push((k, d) => {
     const i0 = roads.length;
@@ -1064,6 +1078,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const i = n0 + j, r_ = pickMain(rnd(i)), c = { r: r_, dir: roads[r_].o || (rnd(i + 9) > 0.5 ? 1 : -1), s: rnd(i + 3) * roads[r_].L,   // po celé délce, jinak se na dlouhé silnici auta nalepí do hloučku
         f: 0.85 + rnd(i + 5) * 0.25, q: rnd(i + 7), col: CARC[i % CARC.length], truck: rnd(i + 11) * 100 < (roads[r_].t || 0) };
       if (c.truck) c.col = TRUCKC[i % TRUCKC.length];
+      const u_ = rnd(i + 13), rc = roads[r_].c;
+      c.t = c.truck ? (u_ < 0.55 && !MINOR.has(rc) ? 'semi' : 'truck') : u_ < 0.1 ? 'van' : u_ < 0.11 ? 'garbage' : u_ < 0.116 ? 'tractor' : 'car';
+      if (c.t === 'van') c.col = VANC[i % VANC.length];
+      else if (c.t === 'semi') { c.col = CABC[i % CABC.length]; c.col2 = BOXC[(i >> 3) % BOXC.length]; }
+      else if (c.t === 'garbage') c.col = '#ecebe6|#e8742a';
+      else if (c.t === 'tractor') c.col = rnd(i + 17) < 0.7 ? '#3f7a2e' : '#b52a1e';
+      c.T = VTYP[c.t]; c.pr = -1;
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
     }
@@ -1074,8 +1095,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const a = r.w[i - 1], b = r.w[i], pa = r.p[i - 1], pb = r.p[i];
     return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, ix: pa[0] + (pb[0] - pa[0]) * t, iy: pa[1] + (pb[1] - pa[1]) * t, d: pa[2] + (pb[2] - pa[2]) * t, dx: b[0] - a[0], dy: b[1] - a[1], z: a.length > 2 ? a[2] + (b[2] - a[2]) * t : undefined };
   }
-  function pickExit(all, truck) {
-    const big = truck ? all.filter(([i]) => roads[i].t) : all, opts = big.length ? big : all;   // nákladní auta drží sčítané silnice
+  function pickExit(all, c) {
+    const big = c.truck ? all.filter(([i]) => roads[i].t) : c.t === 'garbage' || c.t === 'tractor' ? all.filter(([i]) => MINOR.has(roads[i].c)) : all, opts = big.length ? big : all;   // nákladní auta drží sčítané silnice, popeláři a traktory vedlejší
     const sum = opts.reduce((a, [i]) => a + (roads[i].v || 0), 0);
     if (!sum) return opts[Math.floor(Math.random() * opts.length)];
     let x = Math.random() * sum;
@@ -1102,11 +1123,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return { threshold, allowed };
   }
   let tShare = 1, tShareT = 0, tShareCount = -1, tShareSlow = null, tAllowed = null;
-  const carActive = (c) => c.q <= tShare && (!tAllowed || tAllowed.has(c));
+  const carActive = (c) => c.q <= tShare && (!tAllowed || tAllowed.has(c)) && (c.t !== 'garbage' || state.night < 0.5);   // popeláři jen ve dne
   // rychlost podle limitu z dat, jinak odhad podle třídy silnice; c.f je povaha řidiče
   const CLASS_KMH = { motorway: 110, trunk: 90, primary: 50, secondary: 50, tertiary: 50, unclassified: 40, residential: 30, living_street: 20 };
   const roadSpeed = (r) => (r.x ? Math.min(r.l || 50, 50) : r.l || CLASS_KMH[r.c] || 40) / 3.6;   // r.x = nájezdová rampa
-  const carSpeed = (c, r) => (c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r)) * c.f;   // nákladní auta o něco pomaleji
+  const carSpeed = (c, r) => Math.min(c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r), (c.T.vmax || 999) / 3.6) * c.f;   // nákladní auta o něco pomaleji, popeláři a traktory pomalu
   // semafory: dvě osy křižovatky se střídají (40 s cyklus je odhad); auta na červenou stojí ve frontě po 8 m
   const sigGreen = (z) => { const t = (performance.now() / 1000 + z[1] * 7) % 40; return z[2] ? t >= 20 && t < 37 : t < 17; };
   const curbPt = (o, side, off) => {                       // bod u pravého okraje vozovky pro auta jedoucí po kusu (side 1) nebo proti (-1)
@@ -1133,26 +1154,33 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function stepCar(c, dt) {
     if (c.hold) { if (!isOpen(c.hold)) return; c.hold.q = null; c.hold = null; }
     const r = roads[c.r], next = c.s + carSpeed(c, r) * dt * c.dir;
-    if (r.zj.length && c.q <= tShare) for (const z of r.zj) {
+    if (r.zj.length && c.q <= tShare) for (const z of r.zj) {   // červená nebo zavřený přejezd: zastavit 6 m před, další ve frontě podle délky vozu
       if (isOpen(z)) continue;
-      const qi = c.dir > 0 ? 0 : 1, stop = z[0] - c.dir * (6 + ((z.q && z.q[qi]) || 0) * 8);
-      if (c.dir * (stop - c.s) >= 0 && c.dir * (next - stop) > 0) { c.s = stop; c.hold = z; (z.q = z.q || [0, 0])[qi]++; return; }
-      if (c.dir * (stop - c.s) < 0 && c.dir * (z[0] - c.dir * 6 - c.s) >= 0) { c.hold = z; (z.q = z.q || [0, 0])[qi]++; return; }   // fronta mezitím narostla za auto: zastavit na místě, ne projet
+      const qi = c.dir > 0 ? 0 : 1, stop = z[0] - c.dir * (6 + ((z.q && z.q[qi]) || 0));   // z.q = délka fronty v m
+      if (c.dir * (stop - c.s) >= 0 && c.dir * (next - stop) > 0) { c.s = stop; c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; return; }
+      if (c.dir * (stop - c.s) < 0 && c.dir * (z[0] - c.dir * 6 - c.s) >= 0) { c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; return; }   // fronta mezitím narostla za auto: zastavit na místě
     }
     c.s = next;
     if (c.s < 0 || c.s > r.L) {
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
+      c.pr = c.r; c.pdir = c.dir;                           // návěs kamionu ještě chvíli jede po předchozí silnici
       const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
-      if (opts.length) { const [i, dir] = pickExit(opts, c.truck); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
+      if (opts.length) { const [i, dir] = pickExit(opts, c); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
       else if (r.o && (ends.get(ek(endPt)) || []).some(([i]) => i !== c.r && roads[i].c !== 'service')) {   // data mají navazující kus opačně: radši pokračovat než zmizet
-        const [i, dir] = pickExit((ends.get(ek(endPt)) || []).filter(([i]) => i !== c.r && roads[i].c !== 'service'), c.truck); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L;
+        const [i, dir] = pickExit((ends.get(ek(endPt)) || []).filter(([i]) => i !== c.r && roads[i].c !== 'service'), c); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L;
       }
       else if (r.o) {                  // konec jednosměrky: otočit se nesmí, auto se objeví jinde
         let i = c.r; for (let k = 0; k < 20; k++) { i = Math.floor(Math.random() * roads.length); if (roads[i].c !== 'service') break; }
-        c.r = i; c.dir = roads[i].o || 1; c.s = c.dir > 0 ? 0 : roads[i].L;
+        c.r = i; c.dir = roads[i].o || 1; c.s = c.dir > 0 ? 0 : roads[i].L; c.pr = -1;
       }
-      else { c.dir *= -1; c.s = Math.max(0, Math.min(r.L, c.s)); }
+      else { c.dir *= -1; c.s = Math.max(0, Math.min(r.L, c.s)); c.pr = -1; }
     }
+  }
+  function trailerPos(c) {                                  // návěs kamionu TAH m za tahačem, po předchozí silnici, když tahač právě odbočil
+    const r = roads[c.r], done = c.dir > 0 ? c.s : r.L - c.s;
+    if (done >= TAH || c.pr < 0) { const o = along(r, Math.max(0, Math.min(r.L, c.s - TAH * c.dir))); o.dirSign = c.dir; o.lane = r.o ? 0 : 1.6; return o; }
+    const q = roads[c.pr], rem = Math.min(q.L, TAH - done);
+    const o = along(q, c.pdir > 0 ? q.L - rem : rem); o.dirSign = c.pdir; o.lane = q.o ? 0 : 1.6; return o;
   }
   const bus = (() => {
     if (!OV.bus) return null;
@@ -1175,7 +1203,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     m.shapes = m.shapes.map((w) => { const len = [0]; for (let i = 1; i < w.length; i++) len.push(len[i - 1] + Math.hypot(w[i][0] - w[i - 1][0], w[i][1] - w[i - 1][1])); return { w, len, L: len[len.length - 1] }; });
     m.dur = m.trips.map((t) => t[4][t[4].length - 2]);
     m.maxDur = Math.max(...m.dur);
+    m.maxWait = m.trips.reduce((x, t) => Math.max(x, t[7] || 0), 0);   // čekání na konečné před odjezdem (mhd.py)
     Object.assign(MHD, m, { on: true });
+    stopsReady();
   }).catch(() => {});
   const pragueNow = () => {                                // datum, den v týdnu (po = 0) a sekundy od půlnoci (čas v Česku)
     const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', weekday: 'short', hour12: false })
@@ -1199,7 +1229,16 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (const [svc, t] of [[today, n.s], [yest, n.s + 86400]]) {
       const T = MHD.trips; let lo = 0, hi = T.length;
       while (lo < hi) { const m = (lo + hi) >> 1; if (T[m][3] < t - MHD.maxDur) lo = m + 1; else hi = m; }
-      for (let i = lo; i < T.length && T[i][3] <= t; i++) if (svc.has(T[i][2]) && t - T[i][3] <= MHD.dur[i]) out.push([i, t - T[i][3]]);
+      for (let i = lo; i < T.length && T[i][3] <= t + (MHD.maxWait || 0); i++) {
+        if (!svc.has(T[i][2])) continue;
+        const el = t - T[i][3];
+        if (el <= MHD.dur[i] && el >= -(T[i][7] || 0)) out.push(el >= 0 ? [i, el] : [i, 0, -el]);   // [i, s od odjezdu, s do odjezdu když stojí na konečné]
+      }
+    }
+    const fronta = {};                                     // víc vozů na téže konečné: kdo odjíždí později, stojí za ním (a[3] = pořadí)
+    for (const a of out.filter((q) => q[2]).sort((p, q) => p[2] - q[2])) {
+      const t = MHD.trips[a[0]], k = `${MHD.routes[t[0]][1]}_${t[6][0]}`;
+      a[3] = fronta[k] = (fronta[k] ?? -1) + 1;
     }
     return out;
   }
@@ -1212,13 +1251,69 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const t = MHD.trips[i], [line, typ] = MHD.routes[t[0]], z = t[6]; let next = '';
     for (let k = 0; k < z.length; k += 2) if (z[k + 1] >= a[1]) { next = MHD.names[z[k]]; break; }
     const b = document.createElement('b'); b.textContent = `${typ === 0 ? 'Tramvaj' : typ === 2 ? 'Vlak' : 'Autobus'} ${line}`;
-    $('followTxt').replaceChildren(b, ` → ${MHD.names[t[5]]}`, next ? ` · další zastávka ${next}` : '');
+    const odj = a[2] ? ` · stojí na konečné, odjezd za ${Math.max(1, Math.round(a[2] / 60))} min` : next ? ` · další zastávka ${next}` : '';
+    $('followTxt').replaceChildren(b, ` → ${MHD.names[t[5]]}`, odj);
   }
   $('followStop').addEventListener('click', () => { MHD.follow = null; if (typeof PLANES !== 'undefined') PLANES.follow = null; $('follow').hidden = true; });
   viewer.addHandler('canvas-drag', () => {
     if (MHD.follow !== null) { MHD.follow = null; $('follow').hidden = true; }
     if (typeof PLANES !== 'undefined' && PLANES.follow !== null) { PLANES.follow = null; $('follow').hidden = true; }
   });
+  function odstavPos(trip, ceka, poradi) {                 // tramvaj na konečné, kde kolej za zastávkou slepě končí: z nástupiště dozadu na konec koleje, před odjezdem zpátky
+    const pole = MHD.odstav && MHD.odstav[trip[1]];
+    if (!pole) return null;
+    const od = pole[(poradi || 0) % pole.length];
+    if (!od.len) { od.len = [0]; for (let i = 1; i < od.length; i++) od.len.push(od.len[i - 1] + Math.hypot(od[i][0] - od[i - 1][0], od[i][1] - od[i - 1][1])); od.L = od.len[od.len.length - 1]; }
+    const f = Math.min(1, Math.min((trip[7] || 0) - ceka, ceka) / 30), s = Math.max(0, od.L * f - 8 - ((poradi || 0) >= pole.length ? 34 : 0));
+    const bod = (s_) => { let k = 1; while (k < od.len.length - 1 && od.len[k] < s_) k++; const a = od[k - 1], b = od[k], u = Math.max(0, Math.min(1, (s_ - od.len[k - 1]) / ((od.len[k] - od.len[k - 1]) || 1))); return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; };
+    const [x, y] = bod(s), [x2, y2] = bod(Math.min(od.L, s + 6)), h = gz(x, y), [ix, iy] = toImg(x, y, h);   // směr z delšího úseku, koleje jsou po krátkých kouscích
+    return { x, y, z: h, ix, iy, dx: x2 - x, dy: y2 - y, dirSign: 1 };
+  }
+  // zastávky (mhd.json "stops": [jméno, x, y, druh]): kliknutí ukáže nejbližší odjezdy podle jízdního řádu, hledání je najde
+  function stopsReady() {
+    if (!MHD.stops) return;
+    MHD.stopPts = MHD.stops.map(([n, x, y, kd]) => { const [ix, iy] = toImg(x, y, gz(x, y)); return { n, x, y, kd, ix, iy }; });
+    const seen = new Set();
+    for (const s of MHD.stopPts) {
+      if (seen.has(s.n)) continue; seen.add(s.n);
+      const nm = MHD.names[s.n];
+      index.push({ label: nm, kind: 'zastávka', k: `c${Math.round(s.x / (2 * cam.half))}_${Math.round(s.y / (2 * cam.half))}`, n: norm(nm), go: () => { goTo(s.ix, s.iy, 2); showStop(s); } });
+    }
+  }
+  function stopDepartures(nid) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
+    const p = pragueNow(), y = new Date(); y.setDate(y.getDate() - 1);
+    const zit = new Date(); zit.setDate(zit.getDate() + 1);
+    let today = mhdServices(p.d, p.wd, true);
+    if (!MHD.trips.some((t) => today.has(t[2]))) today = mhdServices(p.d, p.wd, false);
+    const yest = mhdServices(ymd(y), (p.wd + 6) % 7, false), tom = mhdServices(ymd(zit), (p.wd + 1) % 7, false), out = [];
+    for (const [svc, base] of [[today, 0], [yest, -86400], [tom, 86400]]) for (const t of MHD.trips) {
+      if (!svc.has(t[2]) || MHD.routes[t[0]][1] === 2) continue;
+      const z = t[6];
+      for (let k = 0; k < z.length - 2; k += 2) if (z[k] === nid) { const dt = base + t[3] + z[k + 1] - p.s; if (dt >= -20 && dt <= 3600) out.push([dt, t]); }
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+  function showStop(s) {
+    const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
+    const za = (dt) => (dt < 60 ? 'teď' : `za ${Math.round(dt / 60)} min`);
+    const groups = new Map();
+    for (const [dt, t] of stopDepartures(s.n)) {
+      const [line, typ] = MHD.routes[t[0]], key = `${typ === 0 ? 'Tramvaj' : 'Autobus'} ${line} → ${MHD.names[t[5]]}`;
+      if (!groups.has(key)) groups.set(key, []);
+      if (groups.get(key).length < 3) groups.get(key).push(dt);
+    }
+    const rows = [...groups.entries()].sort((a, b) => a[1][0] - b[1][0]).slice(0, 10).map(([k, v]) => [k, `${hm(v[0])} (${za(v[0])})` + v.slice(1).map((d) => ', ' + hm(d)).join('')]);
+    showCard({ title: `Zastávka ${MHD.names[s.n]}`, text: rows.length ? 'Odjezdy podle jízdního řádu, bez zpoždění.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
+      rows, lon: s.x / cam.kx + cam.lon0, lat: s.y / cam.ky + cam.lat0 });
+  }
+  const stopAt = (ix, iy) => {                              // zastávka pod kliknutím (do ~20 px na obrazovce, nejméně 6 m)
+    if (!MHD.stopPts) return null;
+    const scr = viewer.viewport.getContainerSize().x / (viewer.viewport.getBounds(true).width * W);
+    if (scr < 0.12) return null;
+    const r = Math.max(20 / scr, 30); let best = null, bd = r;
+    for (const s of MHD.stopPts) { const d = Math.hypot(s.ix - ix, s.iy - iy); if (d < bd) { bd = d; best = s; } }
+    return best;
+  };
   function mhdPos(trip, el, T = 0, off = 0) {                              // kde na trase je spoj el sekund po výjezdu
     const q = trip[4]; let i = 2; while (i < q.length - 2 && q[i] < el) i += 2;
     const f = Math.max(0, Math.min(1, (el - q[i - 2]) / ((q[i] - q[i - 2]) || 1)));
@@ -1532,7 +1627,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const SUNV = (() => { const v = [0.38, -0.68, 0.62], n = Math.hypot(...v); return v.map((q) => q / n); })();
   const RGB = {}, rgbOf = (hex) => RGB[hex] || (RGB[hex] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
   const lit = (rgb, d) => { const f = (0.62 + 0.42 * Math.max(0, d)) / 0.88; return `rgb(${rgb.map((q) => Math.min(255, Math.round(q * f))).join(',')})`; };
-  const VEH = new Map(), NDIR = 48;
+  const VEH = new Map(), NDIR = 48, NDIR_VLAK = 240;   // vlak: jemnější natočení, ať na sebe vozy navazují (48 směrů = schod na spoji)
+  const ndirOf = (isBus) => isBus === 4 ? NDIR_VLAK : NDIR;
   // vlaky: délky článků podle skutečných řad (Wikipedie), barvy podle jednotného schématu ČD; výška a čela jsou přibližné.
   // f / r = čelo vpředu / vzadu; deck 2 = patrový; loco = bez bočních oken. Výběr: "vlak" v mesto.json.
   const CD = { low: [18, 63, 115], body: [31, 106, 176], band: [232, 240, 246], roof: [120, 128, 136] };
@@ -1602,9 +1698,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     parts.sort((a, b) => depth(b) - depth(a) || a[2] - b[2]).forEach((p) => p[3]());
   }
   function vehicleSprite(col, k, isBus, len, wid, snowy) {
-    const key = `${col}|${k}|${isBus ? +isBus : 0}|${snowy ? 1 : 0}`;      // isBus: 1 autobus, 2 tramvaj, 3 nákladní auto
+    const key = `${col}|${k}|${isBus ? +isBus : 0}|${snowy ? 1 : 0}`;      // isBus: 1 autobus, 2 tramvaj, 3 nákladní auto, 4 vlak, 5–10 další vozidla (VTYP)
     if (VEH.has(key)) return VEH.get(key);
-    const a = k / NDIR * Math.PI * 2, fx_ = Math.cos(a), fy_ = Math.sin(a), sxv = -fy_, syv = fx_;
+    const a = k / ndirOf(isBus) * Math.PI * 2, fx_ = Math.cos(a), fy_ = Math.sin(a), sxv = -fy_, syv = fx_;
     const O = toImg(0, 0, 0), R = (s, t, h) => { const p = toImg(fx_ * s + sxv * t, fy_ * s + syv * t, h); return [p[0] - O[0], p[1] - O[1]]; };
     const l = len / 2, w = wid / 2, faces = [];
     const vis = (nx, ny) => nx + ny < 0;                                   // normála míří ke kameře (na jihozápad)
@@ -1616,9 +1712,62 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     };
     const c = rgbOf(col), DARK = [31, 31, 33], GLASS = [71, 87, 107], snow = snowy ? [238, 242, 248] : null;
     const near = vis(sxv, syv) ? 1 : -1;                                     // strana přivrácená ke kameře
-    const wheels = (side) => { if (isBus === 2 || isBus === 3 || isBus === 4) return; for (const s_ of isBus ? [-l + 2.6, l - 3.0] : [-1.35, 1.35]) box(s_ - (isBus ? 0.48 : 0.32), s_ + (isBus ? 0.48 : 0.32), side * (w - 0.06) - 0.1, side * (w - 0.06) + 0.1, 0, isBus ? 0.8 : 0.62, DARK); };
+    const wheels = (side) => { if (isBus >= 2) return; for (const s_ of isBus ? [-l + 2.6, l - 3.0] : [-1.35, 1.35]) box(s_ - (isBus ? 0.48 : 0.32), s_ + (isBus ? 0.48 : 0.32), side * (w - 0.06) - 0.1, side * (w - 0.06) + 0.1, 0, isBus ? 0.8 : 0.62, DARK); };
     wheels(-near);
-    if (isBus === 4) {
+    if (isBus >= 5) {
+      // 5 dodávka, 7 tahač, 8 návěs, 9 popelářské auto (kabina|nástavba), 10 traktor. Díly se kreslí po vrstvách (podvozek, karoserie, nástavby)
+      // a ve vrstvě odzadu dopředu podle toho, jestli čelo míří ke kameře; okna jsou plochy přilepené na stěnu dílu.
+      const [c1, c2] = String(col).split('|'), hx = (q, d) => (q && q[0] === '#' ? rgbOf(q) : d);
+      const A = hx(c1, [200, 200, 196]), B = hx(c2, A), GL = [58, 70, 88], DK = DARK, sn = (q) => snow || q;
+      const tone = (q, f) => q.map((v) => Math.min(255, Math.round(v * f)));
+      const fwd = vis(fx_, fy_), parts = [], axles = [];
+      const Pt = (s0, s1, t0, t1, z0, z1, rgb, top, layer = 1) => { const e = { k: layer * 1000 + (fwd ? 1 : -1) * (s0 + s1) / 2, f: [() => box(s0, s1, t0, t1, z0, z1, rgb, top)] }; parts.push(e); return e; };
+      const win = (e, sA, tA, sB, tB, z0, z1, rgb = GL) => e.f.push(() => {
+        const es = sB - sA, et = tB - tA, el = Math.hypot(es, et) || 1; let ns = et / el, nt = -es / el;
+        if (ns * (sA + sB) + nt * (tA + tB) < 0) { ns = -ns; nt = -nt; }
+        const nx = fx_ * ns + sxv * nt, ny = fy_ * ns + syv * nt;
+        if (vis(nx, ny)) faces.push([[R(sA, tA, z0), R(sB, tB, z0), R(sB, tB, z1), R(sA, tA, z1)], lit(rgb, sun(nx, ny, 0))]);
+      });
+      const cab = (s0, s1, z0, z1, zg, rgb) => {                            // kabina se sklem vpředu a okny po stranách
+        const e = Pt(s0, s1, -w, w, z0, z1, rgb, sn(rgb));
+        win(e, s1, -w * 0.86, s1, w * 0.86, zg, z1 - 0.3);
+        for (const sd of [-1, 1]) win(e, s1 - 0.25, sd * w, s0 + 0.35, sd * w, zg + 0.05, z1 - 0.32);
+        return e;
+      };
+      if (isBus === 5) {                                                    // dodávka
+        axles.push([l - 0.95, 0.36, w, 0.13], [-l + 1.0, 0.36, w, 0.13]);
+        Pt(-l, l, -w, w, 0.3, 1.05, A, A, 0);
+        const e = Pt(l - 1.2, l, -w * 0.97, w * 0.97, 1.05, 1.95, A, sn(A));
+        win(e, l, -w * 0.86, l, w * 0.86, 1.1, 1.88);
+        for (const sd of [-1, 1]) win(e, l - 0.15, sd * w * 0.97, l - 1.05, sd * w * 0.97, 1.15, 1.85);
+        Pt(-l, l - 1.2, -w, w, 1.05, 2.35, A, sn(A));
+      } else if (isBus === 9) {                                             // popelářské auto
+        axles.push([l - 1.3, 0.5, w, 0.15], [-l + 1.9, 0.5, w, 0.15], [-l + 3.2, 0.5, w, 0.15]);
+        Pt(-l + 0.2, l - 0.2, -w * 0.8, w * 0.8, 0.5, 1.05, DK, DK, 0);
+        cab(l - 2.2, l, 0.6, 2.75, 1.6, A);
+        Pt(-l + 0.55, l - 2.3, -w, w, 1.0, 3.35, B, sn(tone(B, 1.05))); Pt(-l, -l + 0.55, -w * 0.94, w * 0.94, 0.8, 3.0, tone(B, 0.8), sn(tone(B, 0.8)));
+      } else if (isBus === 7) {                                             // tahač návěsu
+        axles.push([l - 1.25, 0.5, w, 0.15], [-l + 1.25, 0.5, w, 0.15]);
+        Pt(-l, l - 0.3, -w * 0.82, w * 0.82, 0.55, 1.2, DK, DK, 0);
+        cab(l - 2.35, l, 0.65, 3.05, 1.7, A);
+        Pt(l - 2.35, l - 0.75, -w * 0.9, w * 0.9, 3.05, 3.85, A, sn(A), 2);
+      } else if (isBus === 8) {                                             // návěs: plachta nebo skříň
+        axles.push([-l + 1.3, 0.5, w, 0.15], [-l + 2.6, 0.5, w, 0.15], [-l + 3.9, 0.5, w, 0.15]);
+        Pt(-l, l, -w * 0.85, w * 0.85, 0.95, 1.3, DK, DK, 0);
+        Pt(-l, l, -w, w, 1.3, 4.0, A, sn(tone(A, 1.04)));
+      } else if (isBus === 10) {                                            // traktor
+        axles.push([l - 0.75, 0.42, w * 0.8, 0.14], [-l + 1.05, 0.8, w, 0.24]);
+        Pt(-0.3, l, -0.55, 0.55, 0.75, 1.55, A, sn(A));
+        Pt(-l + 0.25, -0.3, -w * 0.72, w * 0.72, 0.95, 1.45, A, A);
+        Pt(-l + 0.3, -0.35, -w * 0.7, w * 0.7, 1.45, 2.6, GL, GL, 2);
+        Pt(-l + 0.2, -0.25, -w * 0.78, w * 0.78, 2.6, 2.75, A, sn(A), 3);
+      }
+      const wh = (side) => { for (const [s_, r_, th, hw] of axles) box(s_ - r_ * 0.8, s_ + r_ * 0.8, side * (th - 0.08) - hw, side * (th - 0.08) + hw, 0, r_ * 1.7, DK); };
+      wh(-near);
+      parts.sort((a, b) => a.k - b.k);
+      for (const e of parts) for (const f of e.f) f();
+      wh(near);
+    } else if (isBus === 4) {
       const [, name, ci] = col.split('|'), M = TRAINS[name], car = M.cars[+ci], h = M.h, nf = car.f ? M.nose : 0, nr = car.r ? M.nose : 0, ROOF = snow || M.roof;
       for (const s_ of [-l + 3.4, l - 3.4]) box(s_ - 1.4, s_ + 1.4, -w * 0.82, w * 0.82, 0.12, 0.6, DARK);       // podvozky
       const fp = [[-l + nr, -w], [l - nf, -w], [l, -w * (nf ? 0.5 : 1)], [l, w * (nf ? 0.5 : 1)], [l - nf, w], [-l + nr, w], [-l, w * (nr ? 0.5 : 1)], [-l, -w * (nr ? 0.5 : 1)]];
@@ -1864,6 +2013,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     parts.sort((a, b) => (b[0].x + b[0].y) - (a[0].x + a[0].y));
     let any = false;
     for (const [o, c, i] of parts) if (drawVehicle(o, c.len, 2.82, `train|${name}|${i}`, sx, ox, oy, night, 4)) any = true;
+    at = T / 2; drawTrain.pts = [];                           // body po celé délce vlaku (po ~5 m): na vlak jde kliknout kdekoli
+    for (const c of cars) { for (let s = 0; s <= c.len; s += 5) drawTrain.pts.push(mhdPos(trip, el, T, at - s)); at -= c.len + 0.4; }
     return any;
   }
   // světla vozidel v noci: sesbírat za celý snímek a nakreslit třemi cestami (kužely, přední, zadní) místo stovek fill()
@@ -1880,20 +2031,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     NL.beams.length = NL.head.length = NL.tail.length = 0;
   }
-  function drawVehicle(o, len, wid, col, sx, ox, oy, night, isBus) {
+  function drawVehicle(o, len, wid, col, sx, ox, oy, night, isBus, lights = 3) {   // lights: 1 přední, 2 zadní
     const L = Math.hypot(o.dx, o.dy) || 1, fx_ = o.dx / L * (o.dirSign || 1), fy_ = o.dy / L * (o.dirSign || 1);
     const sxv = -fy_, syv = fx_;
     const lane = o.lane ?? 1.6, cxw = o.x - sxv * lane, cyw = o.y - syv * lane;
     const h0 = o.z ?? gz(cxw, cyw);                                            // výška silnice (na mostovce mostovka), jinak terén
     const base = toImg(cxw, cyw, h0);
-    const k = ((Math.round(Math.atan2(fy_, fx_) / (Math.PI * 2) * NDIR) % NDIR) + NDIR) % NDIR;
+    const nd = ndirOf(isBus), k = ((Math.round(Math.atan2(fy_, fx_) / (Math.PI * 2) * nd) % nd) + nd) % nd;
     const spr = vehicleSprite(col, k, isBus, len, wid, state.season === 'winter');
     drawBehindTrees(spr.c, base[0] + spr.x0, base[1] + spr.y0, spr.c.width, spr.c.height, cxw, cyw, h0, sx, ox, oy);
     if (night > 0.3 && !o.noLights && sx >= LIGHTS_SX) {                                    // světla jen při přiblížení; kreslí se najednou (flushLights)
       const P = (s, t, h) => { const p = toImg(cxw + fx_ * s + sxv * t, cyw + fy_ * s + syv * t, h0 + h); return [ox + p[0] * sx, oy + p[1] * sx]; };
       const l = len / 2, w = wid / 2;
-      NL.beams.push([P(l, -w, 0.6), P(l + 14, -w - 4, 0.1), P(l + 14, w + 4, 0.1), P(l, w, 0.6)]);
-      for (const t of [-w * 0.7, w * 0.7]) { NL.head.push(P(l, t, 0.7)); NL.tail.push(P(-l, t, 0.7)); }
+      if (lights & 1) NL.beams.push([P(l, -w, 0.6), P(l + 14, -w - 4, 0.1), P(l + 14, w + 4, 0.1), P(l, w, 0.6)]);
+      for (const t of [-w * 0.7, w * 0.7]) { if (lights & 1) NL.head.push(P(l, t, 0.7)); if (lights & 2) NL.tail.push(P(-l, t, 0.7)); }
     }
     return true;
   }
@@ -1919,6 +2070,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     return pts;
   })();
+  // svíčky na hrobech (overlay/<čtverec>.json "svicky": [x, y obrázku, náhoda]), kreslí se večer
+  const svicky = [], SVB = 512, svGrid = new Map();             // mřížka po 512 px obrázku: každý snímek jen buňky ve výřezu
+  onChunk.push((k, d) => {
+    for (const [x, y, u] of d.svicky || []) {
+      const q = [x, y, u, k], key = Math.floor(x / SVB) + ',' + Math.floor(y / SVB);
+      svicky.push(q); if (!svGrid.has(key)) svGrid.set(key, []); svGrid.get(key).push(q);
+    }
+  });
   // vodní třpytky: body na potocích a uvnitř rybníků
   const sparkles = [];
   onChunk.push((wk, d) => {
@@ -2397,7 +2556,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     perf(now - last);
     if (eco && (skip = !skip)) { requestAnimationFrame(frame); return; }      // úsporně: každý druhý snímek
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = SLOW ? Math.min(1.5, window.devicePixelRatio || 1) : (window.devicePixelRatio || 1);   // mobil: efekty v 1,5× místo 3×, 4× méně pixelů (pixel art, plátno se zvětší bez rozmazání)
     const cw = fx.clientWidth, ch = fx.clientHeight;
     if (fx.width !== Math.round(cw * dpr) || fx.height !== Math.round(ch * dpr)) { fx.width = Math.round(cw * dpr); fx.height = Math.round(ch * dpr); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch); ctx.imageSmoothingEnabled = false;
@@ -2455,7 +2614,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (sx > 0.12) for (const c of cars) {
         if (!carActive(c) || !shown(roads[c.r].k)) continue;
         const o = along(roads[c.r], c.s); o.dirSign = c.dir; o.lane = roads[c.r].o ? 0 : 1.6;
-        if (vis(o.ix, o.iy)) drawVehicle(o, c.truck ? 9 : 4.2, c.truck ? 2.45 : 1.76, c.col, sx, ox, oy, night, c.truck ? 3 : false);
+        if (!vis(o.ix, o.iy)) continue;
+        if (c.t !== 'semi') { drawVehicle(o, c.T.len, c.T.wid, c.col, sx, ox, oy, night, c.T.code); continue; }
+        const q = trailerPos(c), nav = () => drawVehicle(q, TRAILER, 2.55, c.col2, sx, ox, oy, night, 8, 2);   // kamion: vzdálenější díl dřív
+        if (q.d > o.d) nav();
+        drawVehicle(o, c.T.len, c.T.wid, c.col, sx, ox, oy, night, 7, 1);
+        if (q.d <= o.d) nav();
       }
       if (MHD.on) {
         const ns = Math.floor(now / 1000);
@@ -2463,13 +2627,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         MHD.drawn = [];
         if (MHD.follow !== null) {
           const a = MHD.act.find((q) => q[0] === MHD.follow);
-          if (a) { const o = mhdPos(MHD.trips[a[0]], a[1] + (now / 1000 - ns) - (busWait.get(a[0]) || 0)); viewer.viewport.panTo(new OpenSeadragon.Point(o.ix / W, o.iy / W), true); }
+          if (a) { const o = mhdPos(MHD.trips[a[0]], a[2] ? 0 : a[1] + (now / 1000 - ns) - (busWait.get(a[0]) || 0)); viewer.viewport.panTo(new OpenSeadragon.Point(o.ix / W, o.iy / W), true); }
         }
-        if (sx > 0.12) for (const [i, el] of MHD.act) {
-          const trip = MHD.trips[i], [line, typ] = MHD.routes[trip[0]], o = mhdPos(trip, el + (now / 1000 - ns) - (typ === 2 ? 0 : busDelay(i, trip, el + (now / 1000 - ns), dt)));
+        if (sx > 0.12) for (const [i, el, ceka, poradi] of MHD.act) {
+          const trip = MHD.trips[i], [line, typ] = MHD.routes[trip[0]];
+          let o = mhdPos(trip, ceka ? 0 : el + (now / 1000 - ns) - (typ === 2 ? 0 : busDelay(i, trip, el + (now / 1000 - ns), dt)));   // na konečné stojí
+          const ods = ceka && typ === 0 ? odstavPos(trip, ceka, poradi) : null;
+          if (ods) o = ods;
+          else if (poradi) {                                     // další vůz ve frontě na konečné: o délku vozu (s mezerou) za předchozím
+            const L_ = Math.hypot(o.dx, o.dy) || 1, d_ = poradi * (typ === 0 ? 36 : 16), x_ = o.x - o.dx / L_ * d_, y_ = o.y - o.dy / L_ * d_, z_ = gz(x_, y_), [ix_, iy_] = toImg(x_, y_, z_);
+            o = { ...o, x: x_, y: y_, z: z_, ix: ix_, iy: iy_ };
+          }
           if (!vis(o.ix, o.iy, 120) || !cam.grounds.some((q) => Math.abs(o.x - q.cx) <= cam.half && Math.abs(o.y - q.cy) <= cam.half)) continue;   // mimo čtverce mapy
           const shown_ = typ === 0 ? drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2) : typ === 2 ? drawTrain(trip, el + (now / 1000 - ns), line, sx, ox, oy, night) : drawVehicle(o, 12, 2.5, '#e9e6dc', sx, ox, oy, night, true);
-          if (shown_) MHD.drawn.push([Math.round(ox + o.ix * sx), Math.round(oy + o.iy * sx) - Math.round(8 * sx), i]);
+          if (shown_) for (const q of typ === 2 ? drawTrain.pts : [o]) MHD.drawn.push([Math.round(ox + q.ix * sx), Math.round(oy + q.iy * sx) - Math.round(8 * sx), i]);
           if (shown_ && (sx > 0.55 || i === MHD.follow)) {     // číslo linky nad vozidlem
             const h = gz(o.x, o.y), [tx, ty] = toImg(o.x, o.y, h + 6), X_ = Math.round(ox + tx * sx), Y_ = Math.round(oy + ty * sx);
             ctx.font = '700 13px "Atkinson Hyperlegible", system-ui, sans-serif'; const tw = Math.ceil(ctx.measureText(line).width) + 10;
@@ -2516,6 +2687,24 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         ctx.fillStyle = ['#ff4a3a', '#ffd23a', '#4ab0ff', '#ffffff'][ph];
         ctx.globalAlpha = on; ctx.fillRect(X0 + Math.round(lx * k), Y0 + Math.round(ly * k), k, k); ctx.globalAlpha = 1;
       });
+    }
+    // svíčky na hřbitovech: večer; kolem Dušiček (30. 10.–10. 11.) skoro na každém hrobě, na Štědrý den na většině, jinak jen tu a tam.
+    // Hřbitovní lampy jsou červené, žluté a bílé; plamen se mihotá, při přiblížení kolem něj malá záře
+    if (night > 0.3 && sx > 0.1 && svicky.length) {
+      const dn = new Date(), md = (dn.getMonth() + 1) * 100 + dn.getDate();
+      const podil = md >= 1030 && md <= 1110 ? 0.85 : md >= 1224 && md <= 1226 ? 0.6 : 0.1, on = Math.min(1, (night - 0.3) * 2.5);
+      const q = Math.max(1, Math.round(sx * 0.8)), zare = sx > 0.45 && !SLOW;
+      const lod = sx < 0.3 ? 3 : sx < 0.5 ? 2 : 1;               // zdálky stačí každá druhá až třetí (hustota vypadá stejně)
+      const gx0 = Math.floor(-ox / sx / SVB), gy0 = Math.floor(-oy / sx / SVB), gx1 = Math.floor((cw - ox) / sx / SVB), gy1 = Math.floor((ch - oy) / sx / SVB);
+      for (let gx = gx0; gx <= gx1; gx++) for (let gy = gy0; gy <= gy1; gy++) for (const [cx, cy, u, ck] of svGrid.get(gx + ',' + gy) || []) {
+        if (u > podil || (lod > 1 && Math.floor(u * 997) % lod) || !shown(ck)) continue;
+        const fl = 0.72 + 0.28 * Math.sin(t * (6 + u * 9) + u * 50) * Math.sin(t * 2.7 + u * 31);
+        ctx.fillStyle = u < podil * 0.5 ? '#ff4b2e' : u < podil * 0.8 ? '#ffc04a' : '#fff0c8';
+        const X = Math.round(ox + cx * sx), Y = Math.round(oy + cy * sx);
+        if (zare) { ctx.globalAlpha = 0.22 * fl * on; ctx.fillRect(X - q * 2, Y - q * 2, q * 4, q * 4); }
+        ctx.globalAlpha = fl * on; ctx.fillRect(X - (q >> 1), Y - (q >> 1), q, q);
+      }
+      ctx.globalAlpha = 1;
     }
     // kouř z komínů
     if ($('l-smoke').checked && sx > 0.3) {

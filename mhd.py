@@ -12,7 +12,7 @@ Místo adresy může být v mhd.gtfs "build/gtfs.zip" z nastroje/gtfs_cz.py, pak
 """
 import csv, io, json, os, subprocess, sys, time, zipfile
 import shapely
-from nastroje.gtfs_casy import dopln_mezicasy
+from nastroje.gtfs_casy import cekani_na_konecne, dopln_mezicasy
 from geo import CHUNKS, HALF, MESTO, chunk_center, to_local
 
 URL = (MESTO.get('mhd') or {}).get('gtfs')
@@ -92,6 +92,14 @@ def nid(n):
     if n not in NI: NI[n] = len(names); names.append(n)
     return NI[n]
 out = []
+# vlaky z celostátního jízdního řádu (nastroje/vlaky_vyber.py a nastroje/vlaky.py), hodí se, když GTFS vlaky nemá; druh vozidla určuje volba "vlak"
+if MESTO.get('vlak') and os.path.exists('build/vlaky/vlaky_mhd.json'):
+    _v = json.load(open('build/vlaky/vlaky_mhd.json', encoding='utf-8'))
+    _r, _s = len(routes), len(shapes)
+    routes += _v['routes']; shapes += _v['shapes']; services.update(_v['services'])
+    for t in _v['trips']:
+        z_ = t[6]; out.append([t[0] + _r, t[1] + _s, t[2], t[3], t[4], nid(t[5]), [q for i in range(0, len(z_), 2) for q in (nid(z_[i]), z_[i + 1])]])
+    print('vlaků z celostátního jízdního řádu', len(_v['trips']))
 for t in trips:
     if routes[RI[t['route_id']]][1] != 2 and len(routes[RI[t['route_id']]][0]) > 4: continue   # poptávková doprava apod. bez pravidelné trasy; vlaky mají dlouhá čísla
     s = sorted(st.get(t['trip_id'], []))
@@ -107,7 +115,57 @@ for t in trips:
         if d > a: seq += [d - t0, round(dist * k)]              # pobyt v zastávce
         zs += [nid(nm), a - t0]
     out.append([RI[t['route_id']], SI[t['shape_id']], t['service_id'], t0, seq, nid(t['trip_headsign'] or s[-1][4]), zs])
+# čekání na konečné (q[7] = s do odjezdu, kdy vůz už stojí na první zastávce): GTFS čekání nezná, spoj začíná až odjezdem
+print('spojů s čekáním na konečné', cekani_na_konecne(out, lambda q: routes[q[0]][1]))
 out.sort(key=lambda q: q[3])
-json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names,
+# zastávky na mapě (prohlížeč z nich po kliknutí ukáže odjezdy, hledání je najde): [jméno, x, y, druh 0 tramvaj / 3 autobus]
+_obsl = {}
+for q in out:
+    if routes[q[0]][1] == 2: continue
+    for i in range(0, len(q[6]), 2): _obsl.setdefault(q[6][i], set()).add(routes[q[0]][1])
+stops = []
+for sid, (x, y) in SXY.items():
+    n_ = NI.get(SN.get(sid))
+    if n_ is None or n_ not in _obsl or not AREA.contains(shapely.Point(x, y)): continue
+    if any(q[0] == n_ and abs(q[1] - x) < 6 and abs(q[2] - y) < 6 for q in stops): continue   # stejné místo vícekrát (nástupiště, stanice)
+    stops.append([n_, round(x, 1), round(y, 1), 0 if 0 in _obsl[n_] else 3])
+print('zastávek na mapě', len(stops))
+# odstav na konečné: kolej za zastávkou končí slepě (do 160 m), tramvaj čeká vzadu na konci koleje, ne na nástupišti
+# {tvar: [[[x, y], …] od zastávky po konec koleje, …]}, nejvýš dvě koleje, ať se vozy můžou vystřídat
+import heapq as _hq, math as _m
+_gk = lambda p: (round(p[0] / 2) * 2, round(p[1] / 2) * 2)
+_g = {}
+for _c in CHUNKS:
+    _f = 'build/info_src.json' if tuple(_c) == (0, 0) else f'build/c{_c[0]}_{_c[1]}/info_src.json'
+    if not os.path.exists(_f): continue
+    _cx, _cy = chunk_center(_c)
+    for _t in json.load(open(_f, encoding='utf-8')).get('trams') or []:
+        _p = [(_q[0] + _cx, _q[1] + _cy) for _q in _t]
+        for _a, _b in zip(_p, _p[1:]):
+            _d = _m.dist(_a, _b)
+            if _d: _g.setdefault(_gk(_a), {})[_gk(_b)] = _d; _g.setdefault(_gk(_b), {})[_gk(_a)] = _d
+odstav = {}
+for _sh in sorted({q[1] for q in out if routes[q[0]][1] == 0 and len(q) > 7 and q[7]}) if _g else []:
+    _s0, _s1 = shapes[_sh][0], shapes[_sh][1]
+    _st = min(_g, key=lambda k: (k[0] - _s0[0]) ** 2 + (k[1] - _s0[1]) ** 2)
+    if _m.dist(_st, _s0) > 6: continue
+    _dist, _prev, _h = {_st: 0.0}, {}, [(0.0, _st)]
+    while _h:
+        _d, _u = _hq.heappop(_h)
+        if _d > _dist[_u] or _d > 160: continue
+        for _v, _w in _g[_u].items():
+            if _d + _w < _dist.get(_v, 1e18): _dist[_v] = _d + _w; _prev[_v] = _u; _hq.heappush(_h, (_d + _w, _v))
+    _vyber = []
+    for _e in sorted((k for k in _dist if len(_g[k]) == 1 and 20 <= _dist[k] <= 160), key=lambda k: -_dist[k]):
+        if any(_m.dist(_e, _o[-1]) < 6 for _o in _vyber): continue
+        _pts = [_e]
+        while _pts[-1] != _st: _pts.append(_prev[_pts[-1]])
+        _pts.reverse()
+        _n = _pts[min(3, len(_pts) - 1)]
+        if (_n[0] - _pts[0][0]) * (_s1[0] - _s0[0]) + (_n[1] - _pts[0][1]) * (_s1[1] - _s0[1]) < 0: _vyber.append(_pts)   # jen kolej za zastávkou, ne dopředu po trase
+        if len(_vyber) == 2: break
+    if _vyber: odstav[str(_sh)] = [[[round(float(_a), 1), round(float(_b), 1)] for _a, _b in _o] for _o in _vyber]
+print('tvarů s odstavem na konečné', len(odstav))
+json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names, 'odstav': odstav, 'stops': stops,
            'feed': next(iter(T('feed_info')), {}).get('feed_version', '') if 'feed_info.txt' in zf.namelist() else time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(Z)))}, open('site/mhd.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 print('linek', len(routes), 'tras', len(shapes), 'spojů', len(out), 'kB', os.path.getsize('site/mhd.json') // 1000)

@@ -221,27 +221,32 @@ const C255 = (rgb) => rgb.map((v) => v / 255);
 // ---------- materiály budov ----------
 const wallMat = mat(/* glsl */`
   varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
+  float gWin;                                                   // pořadí okna ve zdi (pro rozsvícení celého okna najednou)
   float win(float u, float len, float sp, float w){
     float n = floor((len - 0.6) / sp);
     if (n < 1.0) return 0.0;
     float off = (len - n * sp) * 0.5;
     float q = (u - off) / sp;
     if (q < 0.0 || q >= n) return 0.0;
-    return abs(fract(q) - 0.5) < w / (2.0 * sp) ? 1.0 : 0.0;
+    if (abs(fract(q) - 0.5) < w / (2.0 * sp)) { gWin = floor(q) + sp * 17.0; return 1.0; }
+    return 0.0;
   }
   void main(){
     vec3 n = fn(normalize(vN));
     vec3 col = vC;
     float u = vA.x, v = vA.y, len = vA.z, st = vA.w;
+    gWin = -1.0;
     bool w = false; bool door = false;
     float cell = 0.0;
     if (v > 0.0) {
       if (st > 14.5) {                // velká hala: skoro plná zeď, jen pár malých okének
         float a = floor(u / 6.4), r = floor(v / 5.2);
         w = fract(u / 6.4) > 0.72 && fract(v / 5.2) > 0.55 && fract(v / 5.2) < 0.78 && hash(vec2(a, r) + len) > 0.5;
+        gWin = a; cell = r;
       } else if (st > 13.5) {                // sklo a kámen (moderní stavby): pásy skla s příčkami
         w = fract(u / 1.6) > 0.12 && fract(v / 3.6) > 0.1;
         if (w && fract(u / 9.6) < 0.25) { w = false; }
+        gWin = floor(u / 1.6); cell = floor(v / 3.6);
       } else if (st > 12.5) {         // zámek: bílá omítka, červené šambrány a nárožní pásy
         float f = fract(v / 3.6) * 3.6;
         cell = floor(v / 3.6);
@@ -286,7 +291,7 @@ const wallMat = mat(/* glsl */`
       } else {                        // art deco: pilastry, římsy, ozdobná atika
         float f = fract(v / 3.3) * 3.3;
         cell = floor(v / 3.3);
-        float pu = mod(u, 3.2);
+        float pu = mod(u, 3.2); gWin = floor(u / 3.2);
         if (pu < 0.5) col *= 1.06;
         if (pu < 0.08 || abs(pu - 0.5) < 0.06) col *= 0.82;
         if (f < 0.22) col *= 0.86;
@@ -294,8 +299,12 @@ const wallMat = mat(/* glsl */`
         if (v < 3.4) { w = pu > 0.9 && pu < 2.8 && v > 0.4 && v < 3.0; if (v < 0.4) col = vec3(0.55, 0.53, 0.50); }
       }
     }
-    if (st > 4.5 && st < 5.5) w = abs(u - len * 0.5) < 0.55 && v > -1.3 && v < -0.25;   // vikýř: okno pod horní hranou
-    float hh = hash(floor((vW.xz + uOff) / 3.0) + vec2(cell * 7.0, floor(u / 2.4)));   // světové souřadnice = stejně přes šev
+    if (st > 4.5 && st < 5.5) { w = abs(u - len * 0.5) < 0.55 && v > -1.3 && v < -0.25; gWin = 0.0; }   // vikýř: okno pod horní hranou
+    // rozsvícení po celých oknech: zeď pozná podle jejího začátku ve světě (stejně přes šev), okno podle pořadí ve zdi
+    vec2 wd = normalize(vec2(-vN.z, vN.x) + 1e-6);
+    float sg = dot(dFdx(vW.xz), wd) * dFdx(u) + dot(dFdy(vW.xz), wd) * dFdy(u) < 0.0 ? -1.0 : 1.0;
+    vec2 ws = floor((vW.xz - wd * sg * u + uOff) * 0.5 + 0.25);
+    float hh = hash(ws * 0.618 + vec2(cell * 7.0, gWin >= 0.0 ? gWin : floor(u / 2.4)));
     if (uLights > 0.5) {
       vec3 e = vec3(0.0);
       if (w) {

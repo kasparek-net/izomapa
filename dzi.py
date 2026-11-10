@@ -138,19 +138,33 @@ if __name__ == '__main__':
     from geo import CHUNKS
     os.makedirs('site', exist_ok=True)
     path = 'site/tiles.json'
-    out = json.load(open(path)) if os.path.exists(path) else {}
     args = sys.argv[1:]
     chunk = None
     if args[:1] == ['--chunk']:
         chunk = tuple(int(v) for v in args[1].split(',')); args = args[2:]
     variants = args or ['autumn', 'winter', 'spring', 'summer', 'lights'] + [v for v in ('lights_prace', 'lights_noc') if os.path.exists(f'build/tiles_{v}/info.json')]
-    if chunk:
-        name = f'c{chunk[0]}_{chunk[1]}'
-        ch = out.setdefault('chunks', {}).setdefault(name, {'chunk': list(chunk), 'status': CHUNKS[chunk]})
-        ch['status'] = CHUNKS[chunk]
-        for v in variants: ch[v] = build(v, chunk)
-    else:
-        info = json.load(open('build/tiles_autumn/info.json'))
-        out['base'] = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'status': CHUNKS[(0, 0)]}
-        for v in variants: out[v] = build(v)
-    json.dump(out, open(path, 'w'))
+    built = {v: build(v, chunk) if chunk else build(v) for v in variants}
+    # souběžný render (render_par.sh): tiles.json se načte a zapíše až pod zámkem, ať si čtverce nepřepíšou záznamy.
+    # Zámek je soubor vytvořený s O_EXCL (funguje i na Windows); po pádu jiného běhu se starý zámek po 2 minutách smaže.
+    import time
+    os.makedirs('build', exist_ok=True); lock = 'build/tiles_json.lock'; t0 = time.time()
+    while True:
+        try: fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY); break
+        except FileExistsError:
+            if time.time() - t0 > 120:
+                try: os.remove(lock)
+                except FileNotFoundError: pass
+            time.sleep(0.2)
+    try:
+        out = json.load(open(path)) if os.path.exists(path) else {}
+        if chunk:
+            name = f'c{chunk[0]}_{chunk[1]}'
+            ch = out.setdefault('chunks', {}).setdefault(name, {'chunk': list(chunk), 'status': CHUNKS[chunk]})
+            ch['status'] = CHUNKS[chunk]; ch.update(built)
+        else:
+            info = json.load(open('build/tiles_autumn/info.json'))
+            out['base'] = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'status': CHUNKS[(0, 0)]}
+            out.update(built)
+        json.dump(out, open(path + '.tmp', 'w')); os.replace(path + '.tmp', path)
+    finally:
+        os.close(fd); os.remove(lock)
