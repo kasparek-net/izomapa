@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory() as root:
         os.makedirs(os.path.dirname(f'{root}/{rel}'), exist_ok=True)
         open(f'{root}/{rel}', 'wb').write(WEBP)
     assert k.check(root)[0] == []
+    json.dump({'trips': [[0]], 'stops': []}, open(f'{root}/mhd.json', 'w'))
+    assert 'no stops' in ' '.join(k.check(root)[0])
+    json.dump({'trips': [[0]], 'stops': [[0, 1, 2, 3]]}, open(f'{root}/mhd.json', 'w'))
+    assert k.check(root)[0] == []
     os.remove(f'{root}/{paths[0]}')
     open(f'{root}/{paths[1]}', 'wb').write(b'x' * 20)
     found = ' '.join(k.check(root)[0])

@@ -72,6 +72,10 @@ def check(root):
         key = chunk if isinstance(chunk, str) else chunk.get('key', '') if isinstance(chunk, dict) else ''
         if key and not os.path.exists(f'{root}/overlay/{key}.json'):
             problems.append(f'overlay/{key}.json missing')
+    if os.path.exists(f'{root}/mhd.json'):
+        mhd = json.load(open(f'{root}/mhd.json', encoding='utf-8'))
+        if mhd.get('trips') and not mhd.get('stops'):
+            problems.append('mhd.json has trips but no stops, so stop departures and stop search are missing (stops.txt without coordinates?)')
     extra = []
     for folder, _, files in os.walk(f'{root}/tiles'):
         for file in files:
