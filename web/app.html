@@ -1326,7 +1326,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const t = MHD.trips[i], [line, typ] = MHD.routes[t[0]], z = t[6]; let next = '';
     for (let k = 0; k < z.length; k += 2) if (z[k + 1] >= a[1]) { next = MHD.names[z[k]]; break; }
     const b = document.createElement('b'); b.textContent = `${typ === 0 ? 'Tramvaj' : typ === 2 ? 'Vlak' : 'Autobus'} ${line}`;
-    const odj = a[2] ? ` · stojí na konečné, odjezd za ${Math.max(1, Math.round(a[2] / 60))} min` : next ? ` · další zastávka ${next}` : '';
+    const odj = a[2] ? ` · stojí na konečné, odjezd za ${Math.max(1, Math.round(a[2] / 60))}\u00a0min` : next ? ` · další zastávka ${next}` : '';
     $('followTxt').replaceChildren(b, ` → ${MHD.names[t[5]]}`, odj);
   }
   $('followStop').addEventListener('click', () => { MHD.follow = null; if (typeof PLANES !== 'undefined') PLANES.follow = null; $('follow').hidden = true; });
@@ -1370,7 +1370,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
   function showStop(s) {
     const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
-    const za = (dt) => (dt < 60 ? 'teď' : `za ${Math.round(dt / 60)} min`);
+    const za = (dt) => (dt < 60 ? 'teď' : `za ${Math.round(dt / 60)}\u00a0min`);
     const groups = new Map();
     for (const [dt, t] of stopDepartures(s.n)) {
       const [line, typ] = MHD.routes[t[0]], key = `${typ === 0 ? 'Tramvaj' : 'Autobus'} ${line} → ${MHD.names[t[5]]}`;
@@ -2355,7 +2355,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (MHD.follow !== null) MHD.follow = null;
       $('follow').hidden = false;
       const b = document.createElement('b'); b.textContent = `✈️ Let ${p.callsign}`;
-      $('followTxt').replaceChildren(b, ` · ${p.model || (p.cat === 'jet' ? 'Dopravní letadlo' : 'Sportovní letadlo')} · Výška: ${Math.round(p.alt)} m (${Math.round(p.alt * 3.2808)} ft) · Rychlost: ${Math.round(p.speed * 3.6)} km/h`);
+      $('followTxt').replaceChildren(b, ` · ${p.model || (p.cat === 'jet' ? 'Dopravní letadlo' : 'Sportovní letadlo')} · Výška: ${Math.round(p.alt)}\u00a0m (${Math.round(p.alt * 3.2808)}\u00a0ft) · Rychlost: ${Math.round(p.speed * 3.6)}\u00a0km/h`);
       closeCard();
     } else {
       $('follow').hidden = true;
@@ -2573,7 +2573,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const isFollowed = PLANES.follow === id;
       if (isHovered || isFollowed || sx > 0.42) {
         ctx.font = '700 12px "Atkinson Hyperlegible", system-ui, sans-serif';
-        const txt = `✈️ ${p.callsign}${p.model ? ' · ' + p.model : ''} · ${Math.round(p.alt)} m`;
+        const txt = `✈️ ${p.callsign}${p.model ? ' · ' + p.model : ''} · ${Math.round(p.alt)}\u00a0m`;
         const tw = Math.ceil(ctx.measureText(txt).width) + 12;
         const tagX = X_pl, tagY = Y_pl - Math.round(sH / 2) - 14;
         ctx.fillStyle = 'rgba(22, 25, 31, 0.88)';
