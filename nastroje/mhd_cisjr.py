@@ -309,7 +309,7 @@ def main():
         return osm[kind].get(k) or osm[kind].get(k.split(',', 1)[-1])
 
     snaps, legs, shapes = {}, {}, {}
-    trips, times, routes, services, seen, unmatched = [], [], {}, {}, set(), Counter()
+    trips, times, routes, services, seen, unmatched, xy = [], [], {}, {}, set(), Counter(), {}
     def leg(kind, a, b):
         if (kind, a, b) not in legs:
             sa, sb = [snaps.setdefault((kind, k), nets[kind].snap(*pos(kind, k), SNAP[kind])) for k in (a, b)]
@@ -347,6 +347,7 @@ def main():
             for k, (nm, a, d) in enumerate(part):
                 if k: dist += leg(kind, part[k - 1][0], nm)[1]
                 times.append((tid, a, d, stop_key(nm), k + 1, round(dist, 1), stop_label(nm)))
+                xy.setdefault(stop_key(nm), pos(kind, nm))
 
     versions = defaultdict(list)
     for fn in z.namelist():
@@ -394,7 +395,9 @@ def main():
         o.writestr('routes.txt', table([(k, v[0], v[1]) for k, v in routes.items()], ['route_id', 'route_short_name', 'route_type']))
         o.writestr('trips.txt', table(trips, ['route_id', 'service_id', 'trip_id', 'trip_headsign', 'shape_id']))
         o.writestr('shapes.txt', table(shape_rows, ['shape_id', 'shape_pt_lat', 'shape_pt_lon', 'shape_pt_sequence', 'shape_dist_traveled']))
-        o.writestr('stops.txt', table(sorted({(r[3], r[6]) for r in times}), ['stop_id', 'stop_name']))
+        ids = sorted({(r[3], r[6]) for r in times})       # poloha zastávky z OSM (prohlížeč podle ní ukáže odjezdy)
+        lon, lat = to_lonlat([xy[k][0] for k, _ in ids], [xy[k][1] for k, _ in ids])
+        o.writestr('stops.txt', table([(k, n, f'{float(la):.7f}', f'{float(lo):.7f}') for (k, n), la, lo in zip(ids, lat, lon)], ['stop_id', 'stop_name', 'stop_lat', 'stop_lon']))
         o.writestr('stop_times.txt', table([(a, hms(b), hms(c), d, e, f) for a, b, c, d, e, f, _ in times], ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'shape_dist_traveled']))
         o.writestr('calendar.txt', table(cal_rows, ['service_id', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'start_date', 'end_date']))
         o.writestr('calendar_dates.txt', table(date_rows, ['service_id', 'date', 'exception_type']))
