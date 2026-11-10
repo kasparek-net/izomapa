@@ -20,7 +20,12 @@
   --body: "Atkinson Hyperlegible", system-ui, sans-serif;
   color-scheme: dark;
 }
-html, body { height: 100%; }
+html, body { height: 100%; overscroll-behavior: none; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+#map { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+button, a, label, summary, input, select { touch-action: manipulation; }
+/* iOS po klepnutí do pole s písmem pod 16 px přiblíží stránku a nevrátí ji */
+.search input, .card .report textarea, .card .report select { font-size: max(16px, 1em) !important; }
 body { background: var(--night); color: var(--ink); font-family: var(--body); overflow: hidden; }
 #map { position: fixed; inset: 0; background: var(--night); }
 #osd { width: 100%; height: 100%; }
@@ -134,7 +139,7 @@ dialog.help .muted { color: var(--muted); margin-top: 14px; }
 .coffee { display: block; font-size: .82rem; color: var(--muted); text-decoration: none; padding: 2px 0; }
 .coffee:hover, .coffee:focus-visible { color: var(--ink); text-decoration: underline; }
 .support-links img { width: 132px; height: 132px; image-rendering: pixelated; background: #fff; padding: 4px; }
-.follow { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
+.follow { position: fixed; left: 50%; width: max-content; max-width: calc(100vw - 32px); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
   background: var(--panel); border: 2px solid var(--edge); box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); font-size: .9rem; max-width: calc(100vw - 32px); }
 .follow b { font-family: var(--display); font-weight: 500; }
 .follow .px-btn { width: 32px; height: 32px; padding: 0; flex: none; }
@@ -145,7 +150,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 #vdFoundMsg.ok { color: var(--grass); } #vdFoundMsg.err { color: #ff9a6a; }
 .here-pin { width: 26px; height: 26px; border: 3px solid #ff9a3c; border-radius: 50%; box-shadow: 0 0 0 3px rgba(20, 26, 40, .7); animation: herepulse 1.2s ease-in-out infinite; pointer-events: none; }
 @keyframes herepulse { 50% { transform: scale(1.5); opacity: .55; } }
-.toast { position: fixed; z-index: 6; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%);
+.toast { position: fixed; z-index: 6; left: 50%; width: max-content; max-width: calc(100vw - 32px); overflow-wrap: anywhere; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%);
   background: var(--panel); border: 2px solid var(--edge); padding: 8px 14px; font-size: .86rem; box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); }
 .realtime { display: flex; gap: 8px; align-items: center; font-size: .82rem; color: var(--muted); margin-top: 6px; cursor: pointer; }
 .realtime input { accent-color: var(--grass); }
@@ -188,7 +193,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   .panel { padding: 10px 12px; gap: 12px; max-height: calc(100% - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .panel.closed .sub { display: none; }
   h1 { font-size: 1.2rem; }
-  .controls, .minimap, .fold { display: none; }
+  .minimap, .fold { display: none; }
+  .controls { right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); flex-direction: column; gap: 6px; }
+  .controls #zin, .controls #share { display: none; }
+  .controls .px-btn { width: 44px; height: 44px; opacity: .92; }
+  details summary, .realtime, .layers label { min-height: 44px; display: flex; align-items: center; }
+  .results button, .places button { min-height: 44px; }
+  dialog.help .close { width: 44px; height: 44px; }
   .folded .panel { transform: none; }
   .mbar {
     display: grid; grid-template-columns: repeat(4, 1fr) 1fr 0.8fr; gap: 6px;
@@ -231,7 +242,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 
   <div class="search">
     <label class="label" for="q">Hledat</label>
-    <input id="q" type="search" placeholder="Ulice, adresa nebo místo" autocomplete="off">
+    <input id="q" type="search" placeholder="Ulice, adresa nebo místo" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
     <ul class="results" id="results"></ul>
   </div>
 
@@ -347,7 +358,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   <button class="px-btn" type="button" id="mShare" aria-label="Sdílet tento pohled"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/><path d="M8 10H5v11h14V10h-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
 </nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js" integrity="sha384-4BsIv4BUV37POdA1NZ6UcVAsFk96MQXmFLog7pWs+JP+a8k2XjilfManEVdWDxTe" crossorigin="anonymous"></script>
 <script>
 (async () => {
 
@@ -371,6 +382,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const W = OV.w, Hh = OV.h;
   const $ = (id) => document.getElementById(id);
   const isMobile = () => matchMedia('(max-width: 640px)').matches;
+  let uiDepth = 0, uiPop = false, uiBackAt = 0;
   const state = { season: 'summer', night: 0, weather: 'clear', sel: null, hover: null, wip: false };
   const hashTokens = (location.hash || '').slice(1).split('@')[0].split('-');
   const SEASON_TOKEN = { jaro: 'spring', leto: 'summer', podzim: 'autumn', zima: 'winter' };
@@ -404,7 +416,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     maxZoomPixelRatio: 6, minZoomImageRatio: 0.6, visibilityRatio: 0.4, animationTime: 0.6,
     // mobil a pomalé připojení: hrubší dlaždice, aby se mapa ukázala hned (při přiblížení se doostří)
     ...(SLOW ? { minPixelRatio: 1.2, immediateRender: true, imageLoaderLimit: 4 } : { minPixelRatio: 0.6 }),
-    gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true }, gestureSettingsTouch: { pinchRotate: false },
+    gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true }, gestureSettingsTouch: { pinchRotate: false }, gestureSettingsPen: { clickToZoom: false, dblClickToZoom: true },
   });
   // verze dlaždic v adrese: dlaždice se cachují na rok, nové nasazení změní verzi (tiles.json se ověřuje vždy)
   const VER = TILES.ver ? `?v=${TILES.ver}` : '';
@@ -444,6 +456,21 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     warmItem = await add({ tileSource: { type: 'image', url: solid(255, 160, 90) }, x: -60, y: -60, width: 200, opacity: 0, compositeOperation: 'source-atop' });
     darkItem = await add({ tileSource: { type: 'image', url: solid(14, 20, 52) }, x: -60, y: -60, width: 200, opacity: 0, compositeOperation: 'source-atop' });
     for (const l of LAYERS) if (l.src('lights')) l.light = await add({ tileSource: l.src(lightNow = wantStage()) || l.src('lights'), x: l.x, y: l.y, width: l.w, opacity: 0, compositeOperation: 'lighter', preload: false });
+    // Levnější noc se stejným obrazem. OpenSeadragon (4.1.0) kreslí každou vrstvu s prolnutím přes pomocné plátno:
+    // smazat, nakreslit, přenést = tři průchody přes celou obrazovku na tón a na každou vrstvu světel.
+    // Tón je jednobarevný, stačí jeden obdélník přímo do hlavního plátna; pořadí vrstev zůstává.
+    // (Světla zůstávají původní cestou: přímé přičítání dělalo na švech dlaždic světlé linky.)
+    try {
+      const mainCtx = () => viewer.drawer && viewer.drawer.context;
+      if (!mainCtx() || !darkItem._drawTiles || !viewer.drawer.drawTile) throw new Error('jiná verze OpenSeadragonu');
+      for (const [it, col] of [[warmItem, 'rgb(255,160,90)'], [darkItem, 'rgb(14,20,52)']]) it.draw = function () {
+        this._needsDraw = false;
+        if (!this.opacity) return;
+        const c = mainCtx(); c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalCompositeOperation = 'source-atop'; c.globalAlpha = this.opacity; c.fillStyle = col; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+        c.restore();
+      };
+    } catch (e) { console.warn('noc: zůstává původní skládání', e.message); }
     for (const n of OV.needs || []) {
       const el = document.createElement('div'); el.className = 'pin need'; el.textContent = '📷 ' + n.name; el.title = n.text; n.el = el;
       viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(n.xy[0] / W, n.xy[1] / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
@@ -454,6 +481,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     ready = true; applyVisibility(); applyTime(); loadMini(); tickReal();
     viewer.viewport.fitBounds(homeBounds(), true);
+    { const b = homeBounds(), side = Math.max(b.width, b.height) * 1.04, tx = b.x - (side - b.width) / 2, ty = b.y - (side - b.height) / 2;   // čtverec kolem mapy místo 200 × 200: omezení oddálení a posunu platí k mapě
+      for (const it of [warmItem, darkItem]) if (it) { it.setPosition(new OpenSeadragon.Point(tx, ty), true); it.setWidth(side, true); } }
     // odkaz na místo: #zima-noc@50.76984,15.05836,2 (zeměpisná šířka, délka, přiblížení = šířka výřezu v km)
     // ...,1 = značka přesně na místě (odkaz z administrace hlášení); jen jedna značka a jeden čekající výběr, i po dalších odkazech
     let herePin = null, hereAt = null;
@@ -475,6 +504,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     goToLink(true, true);
     // odkaz vložený do už otevřené mapy: stránka se nenačte znovu, takže je potřeba přejít sem (replaceState níže tuto událost nespouští)
     addEventListener('hashchange', () => {
+      if (Date.now() - uiBackAt < 1500) return;                  // návrat po zavření okna (Zpět) mapu nepřesouvá
       const tok = location.hash.slice(1).split('@')[0].split('-');
       for (const q of tok) if (SEASON_TOKEN[q]) setSeason(SEASON_TOKEN[q]);
       // sdílený odkaz má vždy roční období, noc nebo soumrak jen když platí; odkaz jen s polohou denní dobu nemění
@@ -510,6 +540,18 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
   const goHome = (imm = false) => goView(HOME_VIEW && !HOME_ALL ? HOME_VIEW : null, imm);
   viewer.addOnceHandler('open', () => {});
+  viewer.addHandler('canvas-scroll', (e) => {
+    const o = e.originalEvent;
+    if (!o || o.deltaMode !== 0 || (!o.ctrlKey && Math.abs(o.deltaY) >= 50)) return;      // zub kolečka myši (velký skok): výchozí chování
+    e.preventDefaultAction = true;                         // trackpad: OpenSeadragon bere jen směr a jeden švih proletěl celý rozsah
+    viewer.viewport.zoomBy(Math.exp(-o.deltaY * (o.ctrlKey ? 0.01 : 0.004)), viewer.viewport.pointFromPixel(e.position, true));
+    viewer.viewport.applyConstraints();
+  });
+  if ('ongesturestart' in window && !('ontouchstart' in window)) {   // Safari na Macu neposílá štípnutí jako kolečko
+    let gs = 1;
+    $('osd').addEventListener('gesturestart', (e) => { e.preventDefault(); gs = 1; });
+    $('osd').addEventListener('gesturechange', (e) => { e.preventDefault(); viewer.viewport.zoomBy(e.scale / gs); viewer.viewport.applyConstraints(); gs = e.scale; });
+  }
   initLayers();
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // stupně nočních světel: vždy se kreslí jen jedna vrstva, výměna je párkrát za noc (noční režim je nejnáročnější)
@@ -655,12 +697,24 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return g[r][c] * (1 - tx) * (1 - ty) + g[r][c + 1] * tx * (1 - ty) + g[r + 1][c] * (1 - tx) * ty + g[r + 1][c + 1] * tx * ty;
   };
   // výška mostovky pod bodem (jen když vozidlo jede podél mostu, ne pod ním): overlay.json decks
+  // Úseky mostovek v mřížce 32 m (jen buňky, kam úsek s tolerancí zasahuje), v původním pořadí: výsledek je stejný
+  // jako při průchodu všech úseků, ale vozidlo mimo most projde jen pár kandidátů místo tisíců.
+  const DZG = new Map(), DZC = 32, dzk = (i, j) => i * 100003 + j;
+  for (const d of OV.decks || []) for (let i = 0; i < d.p.length - 1; i++) {
+    const a = d.p[i], b = d.p[i + 1], ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey) || 1;
+    const pad = d.w / 2 + 1.5 + 0.05 * el + 0.5, sg = { a, b, ex, ey, el, lim: d.w / 2 + 1.5 };
+    const i0 = Math.floor((Math.min(a[0], b[0]) - pad) / DZC), i1 = Math.floor((Math.max(a[0], b[0]) + pad) / DZC);
+    const j0 = Math.floor((Math.min(a[1], b[1]) - pad) / DZC), j1 = Math.floor((Math.max(a[1], b[1]) + pad) / DZC);
+    for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) { const k = dzk(ci, cj); let l = DZG.get(k); if (!l) DZG.set(k, l = []); l.push(sg); }
+  }
   const deckZ = (x, y, dx, dy) => {
+    const l = DZG.get(dzk(Math.floor(x / DZC), Math.floor(y / DZC)));
+    if (!l) return null;
     const dl = Math.hypot(dx, dy) || 1;
-    for (const d of OV.decks || []) for (let i = 0; i < d.p.length - 1; i++) {
-      const a = d.p[i], b = d.p[i + 1], ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey) || 1;
+    for (const s of l) {
+      const a = s.a, b = s.b, ex = s.ex, ey = s.ey, el = s.el;
       const t = ((x - a[0]) * ex + (y - a[1]) * ey) / (el * el);
-      if (t < -0.05 || t > 1.05 || Math.abs((x - a[0]) * ey - (y - a[1]) * ex) / el > d.w / 2 + 1.5) continue;
+      if (t < -0.05 || t > 1.05 || Math.abs((x - a[0]) * ey - (y - a[1]) * ex) / el > s.lim) continue;
       if (Math.abs((dx * ex + dy * ey) / (dl * el)) < 0.85) continue;
       return a[2] + (b[2] - a[2]) * Math.max(0, Math.min(1, t));
     }
@@ -696,7 +750,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       Object.assign(CH[k], d);
       for (const b of d.buildings) b.k = k;
       addBuildings(d.buildings);
-      chimneys.push(...d.chimneys);
+      for (const [cx, cy, cid] of d.chimneys) { const id = sid(cid); chimneys.push([cx, cy, cid.split(':')[0], id, rnd(id), rnd(id + 0.5)]); }   // klíč čtverce a náhoda jednou, ne každý snímek
       for (const f of onChunk) f(k, d);
       return CH[k];
     }).catch(() => null) };
@@ -797,6 +851,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
   const closeCard = () => { $('card').hidden = true; state.sel = null; };
   $('cardClose').addEventListener('click', closeCard);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('card').hidden && !document.querySelector('dialog[open]') && !e.target.matches('input, textarea')) closeCard(); });
   // mobil: kartu jde stáhnout prstem dolů
   { let y0 = null;
     const card = $('card');
@@ -897,6 +952,18 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   zbtn('zout', () => viewer.viewport.zoomBy(1 / 1.6));
   if (HOME_VIEW && !HOME_ALL) $('home').title = 'Výchozí pohled';
   zbtn('home', () => goHome());
+  // Tlačítko Zpět (a gesto zpět na Androidu) zavře otevřené okno místo odchodu z webu: otevření okna přidá záznam do historie
+  for (const d of document.querySelectorAll('dialog')) {
+    const sm = d.showModal.bind(d);
+    d.showModal = () => { if (d.open) return; sm(); uiDepth++; try { history.pushState({ ui: uiDepth }, ''); } catch {} };
+    d.addEventListener('close', () => { if (uiPop || !uiDepth) return; uiDepth--; uiBackAt = Date.now(); history.back(); });
+  }
+  addEventListener('popstate', () => {
+    if (!uiDepth) return;
+    uiDepth--; uiBackAt = Date.now(); uiPop = true;
+    const ds = [...document.querySelectorAll('dialog[open]')]; if (ds.length) ds[ds.length - 1].close();
+    uiPop = false;
+  });
   $('help').addEventListener('click', (e) => { e.stopPropagation(); $('helpDlg').showModal(); });
   $('helpClose').addEventListener('click', () => $('helpDlg').close());
   $('helpDlg').addEventListener('click', (e) => { if (e.target === $('helpDlg')) $('helpDlg').close(); });
@@ -909,7 +976,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     try {
       if (navigator.share && isMobile()) { await navigator.share({ title: document.title, url }); return; }
       await navigator.clipboard.writeText(url); toast('Odkaz na tento pohled je zkopírovaný');
-    } catch { toast(url); }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;                  // člověk sdílení zavřel: nic nehlásit
+      try {                                                      // vestavěné prohlížeče bez schránky: starý způsob kopírování
+        const ta = document.createElement('textarea'); ta.value = url; ta.style.cssText = 'position:fixed;opacity:0'; document.body.append(ta); ta.select();
+        const ok = document.execCommand('copy'); ta.remove();
+        toast(ok ? 'Odkaz na tento pohled je zkopírovaný' : url);
+      } catch { toast(url); }
+    }
   }
   zbtn('share', share); zbtn('mShare', share);
   function setMenu(open) { $('panel').classList.toggle('closed', !open); $('menu').setAttribute('aria-expanded', String(open)); $('menu').textContent = open ? 'Skrýt' : 'Menu'; }
@@ -961,6 +1035,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 
   // ---------- animovaná vrstva ----------
   const fx = $('fx'), ctx = fx.getContext('2d');
+  viewer.canvas.insertBefore(fx, viewer.canvas.lastChild);           // mezi dlaždice a popisky: vozidla nepřekryjí názvy míst
   const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   const DISTRICTS = (OV.districts || []).slice().sort((p, q) => q.a - p.a);
   const DISPLAY_FONT = getComputedStyle(document.documentElement).getPropertyValue('--display').trim() || 'monospace';
@@ -1318,10 +1393,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const q = trip[4]; let i = 2; while (i < q.length - 2 && q[i] < el) i += 2;
     const f = Math.max(0, Math.min(1, (el - q[i - 2]) / ((q[i] - q[i - 2]) || 1)));
     const sh = MHD.shapes[trip[1]], L = sh.len, s0 = Math.min(sh.L, q[i - 1] + (q[i + 1] - q[i - 1]) * f), s = Math.max(0, Math.min(sh.L, Math.max(T / 2, Math.min(sh.L - T / 2, s0)) + off));   // T: délka vlaku, off: článek od středu
-    let k = 1; while (k < L.length - 1 && L[k] < s) k++;
-    const a = sh.w[k - 1], b = sh.w[k], u = Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));
-    const x = a[0] + (b[0] - a[0]) * u, y = a[1] + (b[1] - a[1]) * u, h = deckZ(x, y, b[0] - a[0], b[1] - a[1]) ?? gz(x, y), [ix, iy] = toImg(x, y, h);
-    return { x, y, z: h, ix, iy, dx: b[0] - a[0], dy: b[1] - a[1], dirSign: 1 };   // z: autobus, tramvaj a vlak na mostě ve výšce mostovky
+    const at = (s) => {
+      let k = 1; while (k < L.length - 1 && L[k] < s) k++;
+      const a = sh.w[k - 1], b = sh.w[k], u = Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    };
+    // směr z bodů 4 m před a za vozidlem: trasy z GTFS mívají u zastávek krátké zalomené úseky, podle kterých by se vůz stočil napříč
+    const [x, y] = at(s), p0 = at(Math.max(0, s - 4)), p1 = at(Math.min(sh.L, s + 4)), dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+    const h = deckZ(x, y, dx, dy) ?? gz(x, y), [ix, iy] = toImg(x, y, h);
+    return { x, y, z: h, ix, iy, dx, dy, dirSign: 1 };   // z: autobus, tramvaj a vlak na mostě ve výšce mostovky
   }
   function stepShuttle(b, dt, stopWait, endWait) {
     if (b.wait > 0) { b.wait -= dt; return; }
@@ -2532,7 +2612,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (let y = 0; y < 28; y++) for (let x = 0; x < 48; x++) { const v = (Math.sin(x * 0.35) + Math.sin(y * 0.6 + x * 0.12) + Math.sin((x + y) * 0.21)) / 3; g.fillStyle = `rgba(226,232,240,${(0.18 + 0.2 * Math.max(0, v)).toFixed(3)})`; g.fillRect(x, y, 1, 1); }
     return c; })();
 
-  let last = performance.now(), skip = false;
+  let last = performance.now(), skip = false, miniKey = '', scaleTxt = '';
   // úsporný režim: když prohlížeč pár sekund nestíhá (víc než čtvrtina snímků přes 34 ms), přepne na hrubší dlaždice,
   // méně souběžných stahování a animace na 30 fps. Platí do zavření karty.
   let eco = false, perfN = 0, perfSlow = 0, perfW = 0, perfT0 = performance.now() + 8000;   // prvních 8 s se načítá, neměřit
@@ -2552,10 +2632,18 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     perfN++; if (ms > 34) perfSlow++;
     if (now - perfW > 3000) { if (perfN > 20 && perfSlow / perfN > 0.25) setEco(); perfN = perfSlow = 0; }   // okno 3 s
   }
+  // vrstva s vozidly se kreslí ve stejné chvíli jako dlaždice (událost update-viewport), jinak by při posouvání mapy
+  // o snímek zaostávala; když se mapa nehýbe, kreslí ji vlastní smyčka
+  let osdT = -1e9, rafLast = performance.now();
   function frame(now) {
-    perf(now - last);
-    if (eco && (skip = !skip)) { requestAnimationFrame(frame); return; }      // úsporně: každý druhý snímek
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    perf(now - rafLast); rafLast = now;
+    if (performance.now() - osdT > 24) draw(now, false);
+    requestAnimationFrame(frame);
+  }
+  viewer.addHandler('update-viewport', () => { osdT = performance.now(); draw(osdT, true); });
+  function draw(now, moving) {
+    if (!moving && eco && (skip = !skip)) return;      // úsporně: každý druhý snímek (při posunu mapy každý)
+    const dt = Math.min(0.1, Math.max(0, now - last) / 1000); last = now;
     const dpr = SLOW ? Math.min(1.5, window.devicePixelRatio || 1) : (window.devicePixelRatio || 1);   // mobil: efekty v 1,5× místo 3×, 4× méně pixelů (pixel art, plátno se zvětší bez rozmazání)
     const cw = fx.clientWidth, ch = fx.clientHeight;
     if (fx.width !== Math.round(cw * dpr) || fx.height !== Math.round(ch * dpr)) { fx.width = Math.round(cw * dpr); fx.height = Math.round(ch * dpr); }
@@ -2713,12 +2801,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const q = Math.max(1, Math.round(sx * 2));
       const wind = realWind ? realWind.strength : state.weather === 'rain' ? 1.8 : 1;
       const driftX = realWind ? realWind.dx : 1, driftY = realWind ? realWind.dy : 0;
-      for (const [cx, cy, cid] of chimneys) {
-        const ck = cid.split(':')[0], id = sid(cid);
-        if (!shown(ck)) continue;
-        if (rnd(id) > prob || !vis(cx, cy, 200)) continue;
+      if (prob > 0) for (const [cx, cy, ck, id, r0, r1] of chimneys) {
+        if (r0 > prob || !vis(cx, cy, 200) || !shown(ck)) continue;
         for (let k = 0; k < 9; k++) {
-          const a = (t * 0.18 + k / 9 + rnd(id + 0.5)) % 1;
+          const a = (t * 0.18 + k / 9 + r1) % 1;
           const drift = a * a * 40 * wind;
           const px = cx + drift * driftX + Math.sin(a * 5 + id) * 2.5, py = cy + drift * driftY - a * 75 / Math.max(1, wind) - 3;
           const size = Math.max(q, Math.round((3 + a * 8) * sx));
@@ -2795,10 +2881,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       ctx.fillStyle = `rgba(176,170,152,${Math.min(1, (realPm - 25) / 50) * (night > 0.5 ? 0.12 : 0.24)})`;
       ctx.fillRect(0, 0, cw, ch);
     }
-    drawMini();
-    const m = cam.mpp / sx;
-    $('scale').textContent = m < 1 ? `1\u00a0px = ${Math.round(m * 100)}\u00a0cm` : `1\u00a0px = ${Math.round(m)}\u00a0m`;
-    requestAnimationFrame(frame);
+    if (mini.offsetParent) {                               // na mobilu je minimapa skrytá; jinak kreslit jen při změně
+      const b = viewer.viewport.getBounds(true), mk = [b.x.toFixed(4), b.y.toFixed(4), b.width.toFixed(4), state.season, state.night > 0.35 ? state.night.toFixed(2) : 0, state.wip, Object.keys(miniImgs).length, cw].join('|');
+      if (mk !== miniKey) { miniKey = mk; drawMini(); }
+      const m = cam.mpp / sx, st = m < 1 ? `1\u00a0px = ${Math.round(m * 100)}\u00a0cm` : `1\u00a0px = ${Math.round(m)}\u00a0m`;
+      if (st !== scaleTxt) { scaleTxt = st; $('scale').textContent = st; }
+    }
   }
   requestAnimationFrame(frame);
 })();

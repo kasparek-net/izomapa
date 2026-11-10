@@ -13,8 +13,13 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
 const server = http.createServer((req, res) => {
-  const p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-  if (!p.startsWith(ROOT + path.sep)) { res.writeHead(403); res.end(); return; }   // jen soubory projektu
+  const deny = (c) => { res.writeHead(c); res.end(); };
+  // jen požadavky na tuhle adresu (cizí stránka v prohlížeči se sem přes jinou doménu nedostane)
+  if (req.headers.host !== `127.0.0.1:${server.address().port}`) return deny(403);
+  let rel; try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return deny(400); }
+  const p = path.join(ROOT, rel);
+  // jen soubory projektu, žádné skryté (.dev.vars, .git) a jen typy, které render potřebuje
+  if (rel.includes('\0') || !p.startsWith(ROOT + path.sep) || rel.split('/').some((s) => s.startsWith('.')) || !(path.extname(p) in MIME)) return deny(403);
   fs.readFile(p, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
@@ -71,6 +76,8 @@ if (args.stromy) {                             // jen kresby stromů pro prohlí
   delete t.url; fs.writeFileSync(path.join(ROOT, args.stromy, `${args.season}.json`), JSON.stringify(t));
   await browser.close(); server.close(); process.exit(0);
 }
+const MARK = path.join(outDir, 'rozpracovano');             // značka nedokončeného renderu (dzi.py podle ní odmítne směs starých a nových dlaždic)
+fs.writeFileSync(MARK, '');
 const only = args.only ? args.only.split(',').map(Number) : null;
 const list = args.tiles ? new Set(args.tiles.split(';')) : null;
 for (let j = 0; j < info.rows; j++) for (let i = 0; i < info.cols; i++) {
@@ -81,5 +88,6 @@ for (let j = 0; j < info.rows; j++) for (let i = 0; i < info.cols; i++) {
   fs.writeFileSync(path.join(outDir, `${i}_${j}.png`), Buffer.from(url.split(',')[1], 'base64'));
   console.log(`dlaždice ${i},${j}`, (Date.now() - t) / 1000, 's');
 }
+fs.rmSync(MARK, { force: true });
 await browser.close();
 server.close();

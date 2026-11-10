@@ -41,3 +41,17 @@ assets/zelen_mesta.json
 assets/prejezdy.json
 assets/potrubi.json
 assets/mobiliar_mesta.json
+
+# soukromé podklady a tajemství (nikdy do veřejného repa)
+podklady-soukrome/
+Fotky k nahrání/
+Satelitni snimky/
+output/
+.env*
+.dev.vars
+*.sql
+*.sqlite
+.vercel/
+hlaseni/wrangler.jsonc
+wrangler.toml
+!hlaseni/migrations/*.sql

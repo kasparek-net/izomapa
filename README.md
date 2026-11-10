@@ -47,7 +47,7 @@ Bez AI to jde taky:
 
 ```sh
 ./setup.sh                          # první spuštění: Python prostředí, Node, Chromium
-python novy_mesto.py "Chrastava"    # najde hranici obce a zapíše mesto.json
+.venv/bin/python novy_mesto.py "Chrastava"   # najde hranici obce a zapíše mesto.json (na Windows .venv\Scripts\python)
 ./postav.sh                         # stáhne data a postaví celé město do složky site/
 npm run nahled                      # náhled na http://localhost:8000
 ```
