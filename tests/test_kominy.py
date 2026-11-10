@@ -5,10 +5,12 @@ import sys
 import types
 import unittest
 
-sys.modules.setdefault('geo', types.ModuleType('geo'))
+_stub = 'geo' not in sys.modules           # kominy.py imports geo, which needs mesto.json; the stub must not leak into other tests
+if _stub: sys.modules['geo'] = types.ModuleType('geo')
 spec = importlib.util.spec_from_file_location('kominy', Path(__file__).resolve().parents[1] / 'nastroje/kominy.py')
 kominy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kominy)
+if _stub: del sys.modules['geo']
 
 class KominyTest(unittest.TestCase):
     def node(self, kind, lat=50.0):
