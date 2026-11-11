@@ -318,5 +318,9 @@
     194
    ]
   }
+ ],
+ "sousedi": [
+  {"nazev": "Ženklava", "url": "https://izomapa.zenklava.cz", "lat": 49.573923, "lon": 18.12148, "cil": [49.573923, 18.092909],
+   "text": "Sousední izometrická mapa. Ženklava leží 4 km na jihozápad."}
  ]
 }
