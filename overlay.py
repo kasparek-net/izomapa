@@ -178,7 +178,8 @@ for chunk in chunks:
         p = r['p']
         if len(p) < 2: continue
         roads.append({'c': r['c'], 'k': K, 'p': [list(px(x, y, z)) for x, y, z in p], 'w': [[x + OFF[0], y + OFF[1], round(z, 1)] for x, y, z in p],   # z: auto na mostovce jede ve výšce mostovky
-                       **({'o': r['o']} if r.get('o') else {}), **({'l': r['l']} if r.get('l') else {}), **({'z': r['z']} if r.get('z') else {}), **({'j': [[q[0], q[1] + OFF[0], q[2] + OFF[1]] for q in r['j']]} if r.get('j') else {}), **({'v': r['v']} if r.get('v') else {}), **({'t': r['t']} if r.get('t') else {}), **({'x': 1} if r.get('x') else {})})
+                       **({'o': r['o']} if r.get('o') else {}), **({'l': r['l']} if r.get('l') else {}), **({'z': r['z']} if r.get('z') else {}), **({'j': [[q[0], q[1] + OFF[0], q[2] + OFF[1]] for q in r['j']]} if r.get('j') else {}), **({'v': r['v']} if r.get('v') else {}), **({'t': r['t']} if r.get('t') else {}), **({'x': 1} if r.get('x') else {}),
+                       **({'rb': [r['rb'][0] + OFF[0], r['rb'][1] + OFF[1], r['rb'][2]]} if r.get('rb') else {}), **({'y': [[q[0], q[1] + OFF[0], q[2] + OFF[1], q[3]] for q in r['y']]} if r.get('y') else {})})
 
     gs = np.array(src['ground_small'])[::2, ::2]     # 41 × 41 stačí na dopravu a klikání
     grounds.append({'cx': OFF[0], 'cy': OFF[1], 'g': [[round(v, 1) for v in row] for row in gs.tolist()]})
@@ -233,6 +234,18 @@ OBCE = [json.load(open(f'obce/{f}', encoding='utf-8')) for f in sorted(os.listdi
 PLACES = [(m['nazev'], m['lat'], m['lon'], m['text'], m.get('obec')) for m in json.load(open('mista.json', encoding='utf-8'))] if os.path.exists('mista.json') else []
 for o in OBCE:
     PLACES += [(m['nazev'], m['lat'], m['lon'], m['text'], m.get('obec') or o.get('nazev')) for m in o.get('mista', [])]
+
+# sousední mapy: assets/upresneni.json nebo mesto.json (pole "sousedi" / "neighbors"), případně obce/*.json
+UP = json.load(open('assets/upresneni.json', encoding='utf-8')) if os.path.exists('assets/upresneni.json') else {}
+SOUS_RAW = UP.get('sousedi') or UP.get('neighbors') or MESTO.get('sousedi') or MESTO.get('neighbors') or []
+if not isinstance(SOUS_RAW, list): SOUS_RAW = []
+if os.path.exists('assets/sousedi.json'):
+    SOUS_RAW = json.load(open('assets/sousedi.json', encoding='utf-8')) + list(SOUS_RAW)
+elif os.path.exists('sousedi.json'):
+    SOUS_RAW = json.load(open('sousedi.json', encoding='utf-8')) + list(SOUS_RAW)
+for o in OBCE:
+    for s in (o.get('sousedi') or o.get('neighbors') or []):
+        SOUS_RAW.append({**s, 'obec': s.get('obec') or o.get('nazev')})
 def gz(x, y):
     for gr in grounds:
         lx, ly = x - gr['cx'], y - gr['cy']
@@ -252,6 +265,44 @@ for name, lat, lon, text, obec in PLACES:
     if c not in CKEY: continue
     OFF = (0.0, 0.0)
     places.append({'name': name, 'text': text, 'lon': lon, 'lat': lat, 'k': CKEY[c], 'xy': list(px(float(x), float(y), gz(x, y))[:2]), **({'obec': obec} if obec else {})})
+
+neighbors = []
+for s in SOUS_RAW:
+    if not isinstance(s, dict): continue
+    name = s.get('nazev') or s.get('name')
+    url = s.get('url') or s.get('href')
+    if not name or not url: continue
+    if 'lat' in s and 'lon' in s:
+        lat, lon = float(s['lat']), float(s['lon'])
+    elif 'poloha' in s and len(s['poloha']) >= 2:
+        lat, lon = float(s['poloha'][0]), float(s['poloha'][1])
+    elif 'pos' in s and len(s['pos']) >= 2:
+        lat, lon = float(s['pos'][0]), float(s['pos'][1])
+    else:
+        continue
+    text = s.get('text') or s.get('popis') or ''
+    target = s.get('target', '_self')
+    obec = s.get('obec')
+
+    x, y = to_local(lon, lat)
+    c = chunk_of(float(x), float(y))
+    k = CKEY.get(c)
+    if not k and chunks:
+        c_near = min(chunks, key=lambda ch: (ch[0] * 2 * HALF - x) ** 2 + (ch[1] * 2 * HALF - y) ** 2)
+        k = CKEY[c_near]
+    if not k: continue
+
+    OFF = (0.0, 0.0)
+    z = gz(x, y) or float(MESTO.get('href', 0))
+    ix, iy, _ = px(float(x), float(y), z)
+    item = {'name': name, 'url': url, 'lat': lat, 'lon': lon, 'k': k, 'xy': [ix, iy], 'target': target}
+    if text: item['text'] = text
+    if obec: item['obec'] = obec
+    if 'target_lat' in s and 'target_lon' in s:
+        item['target_lat'] = float(s['target_lat']); item['target_lon'] = float(s['target_lon'])
+    elif 'cil' in s and len(s['cil']) >= 2:
+        item['target_lat'] = float(s['cil'][0]); item['target_lon'] = float(s['cil'][1])
+    neighbors.append(item)
 
 cam = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'X': list(map(float, CAM_X)), 'Y': list(map(float, CAM_Y)),
        'half': HALF, 'grounds': grounds}
@@ -324,8 +375,8 @@ for a_n, b_n, n_ in TRAM_LINES:
                   'stops': [list(px(TSTOP[n][0], TSTOP[n][1], 0)[:2]) + [n] for n in st]})
     print('tramvaj', a_n, '–', b_n, round(sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(on, on[1:]))), 'm', len(st), 'zastávek')
 json.dump({'w': W, 'h': H, 'cam': cam, 'districts': districts, 'needs': needs, 'xmas': nam, 'chunks': {CKEY[c]: CHUNKS[c] for c in chunks}, 'bus': bus_route, 'trams': trams, 'decks': decks,
-           'streets': streets, 'places': places},
+           'streets': streets, 'places': places, 'neighbors': neighbors},
           open('site/overlay.json', 'w'), separators=(',', ':'), ensure_ascii=False)
 json.dump(addr_index, open('site/search.json', 'w'), separators=(',', ':'), ensure_ascii=False)   # adresy pro hledání, načte se až při psaní
 print('čtverců', len(chunks), 'budov', sum(len(v['buildings']) for v in per_chunk.values()), 'adres', len(addr_index),
-      'ulic', len(streets), 'míst', len(places), 'kB', os.path.getsize('site/overlay.json') // 1000)
+      'ulic', len(streets), 'míst', len(places), 'sousedů', len(neighbors), 'kB', os.path.getsize('site/overlay.json') // 1000)

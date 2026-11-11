@@ -2035,6 +2035,9 @@ for g_ in graph:
     if not g_.get('z'): g_.pop('z', None)
     g_.pop('_deck', None)
 print('železničních přejezdů', sum(len(g_.get('j', [])) for g_ in graph))
+sys.path.insert(0, 'nastroje'); import kruhace as _kr
+_kr.oznac(graph, _ring_lines)   # kruhový objezd: kusy okruhu ('rb') a vjezdy, které dávají přednost ('y')
+print('vjezdů na kruhový objezd', sum(len(g_.get('y', [])) for g_ in graph))
 stops = [{'name': sname(r), 'x': r.geom.x, 'y': r.geom.y} for _, r in inf.iterrows()
          if r['class'] == 'bus_stop' and AREA.contains(r.geom) and sname(r)]
 def zline(l):

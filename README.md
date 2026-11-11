@@ -10,12 +10,12 @@ vypadá a co umí (roční období, noc, počasí, jezdící MHD, klikací budov
 
 [![Izometrický Liberec na izomapa.fun – klikněte pro živou mapu](priklady/liberec.webp)](https://izomapa.fun)
 
-Liberec si dál vyvíjím a starám se o něj sám, proto si dál vyvíjím a starám se o něj sám, proto
+Liberec si dál vyvíjím a starám se o něj sám, proto
 tu nejsou jeho ručně vyladěné stavby, příběhy míst ani hra Najdi Vildu. Prosím, nedělejte další Liberec. Postavte si
 svoje město. Tenhle repozitář je přesně na to.
 
 Autor: [Adam Klatovský](https://www.adamklatovsky.cz/). Je to zdarma. Když vám to ušetří práci,
-[kupte mi kafe ☕](https://donate.stripe.com/3cI6oA0PE7u65Y9cim8g000). Jak to vzniklo, popisuju v článku
+[kupte mi kafe ☕](https://donate.stripe.com/7sY7sE41Qg0C0DP5TY8g001). Jak to vzniklo, popisuju v článku
 [Jak jsem s AI postavil izometrický Liberec](https://www.adamklatovsky.cz/blog/jak-jsem-s-ai-postavil-izometricky-liberec).
 
 ![Izometrická Chrastava, postavená tímhle repem bez ručních úprav](priklady/chrastava.webp)
@@ -118,7 +118,8 @@ Prohlížeč má zdroje dat v patičce nápovědy, nechte je tam.
 **Nikdy neobkreslujte z Google Maps, Apple Maps ani Mapy.cz.** Jejich podmínky to zakazují. Prohlížet si je jako
 vodítko je v pořádku. Tvary a barvy berte z ortofota ČÚZK a z vlastních fotek.
 
-Kód je pod licencí **AGPL-3.0** (soubor `LICENSE`). Kdo ho upraví a pustí jako web, musí zveřejnit i svoje úpravy.
+Kód je © 2026 Adam Klatovský pod licencí **AGPL-3.0** (soubor `LICENSE`). Kdo ho upraví a pustí jako web, musí zveřejnit
+i svoje úpravy a zachovat informaci o autorovi.
 
 ## Co potřebujete
 
@@ -196,10 +197,25 @@ Turnstile přes `TURNSTILE_SECRET`, ale formulář v mapě zatím token neposíl
 
 Repozitář dávám k dispozici, jak je. Podporu neposkytuju, na issues a pull requesty se podívám, až budu mít čas.
 
-Když vám repo ušetřilo práci, můžete mi [koupit kafe ☕](https://donate.stripe.com/3cI6oA0PE7u65Y9cim8g000).
+Když vám repo ušetřilo práci, můžete mi [koupit kafe ☕](https://donate.stripe.com/7sY7sE41Qg0C0DP5TY8g001).
 Až bude vaše mapa venku, pošlete mi ji do [katalogu map](https://izomapa.fun/mesta/) (tlačítko „Přidat město“),
 rád ji tam zveřejním.
-Budu rád, když v mapě necháte nenápadný odkaz „Vytvořeno nástrojem izomapa“ (je v O projektu a v nápovědě).
+
+## Prosba: nechte v mapě kredit
+
+Izomapu ladím každý den. Desítky hodin práce na liberecké mapě (zrychlení, rendery, nové vychytávky) průběžně
+převádím sem, aby je měl každý zdarma. Rád to dávám dál a jediné, o co prosím, je trochu uznání:
+
+- **Nechte v mapě odkaz „Vytvořeno nástrojem izomapa od Adama Klatovského“** (je v O projektu a v nápovědě).
+  Je nenápadný a vaší mapě nijak nepřekáží.
+- **Když mapu sdílíte na sociálních sítích,** označte prosím izomapu: Instagram
+  [@izomapa.fun](https://www.instagram.com/izomapa.fun/), Facebook [izomapa](https://www.facebook.com/izomapa).
+- **Když u sebe něco vylepšíte** (rychlost, render, nová funkce, oprava), pošlete to prosím zpátky jako
+  [pull request](https://github.com/adamklatovsky/izomapa/pulls). Já sem dávám svoje vylepšení z Liberce, je fér,
+  když se to vrátí a pomůže i ostatním. Stačí obecná část, bez dat a úprav vašeho města.
+- Nevydávejte prosím izomapu za vlastní výtvor. Mapa vašeho města je vaše práce, nástroj pod ní je moje.
+
+Nic z toho není podmínka, je to prosba. Kdo ji dodrží, dělá mi radost a dává smysl tomu, že to dál dávám zdarma.
 
 Prosím, nepojmenovávejte svoje projekty „Izomapa“ a nepoužívejte domény izomapa.fun a izomapa.cz. Pojmenujte je po svém městě.
 

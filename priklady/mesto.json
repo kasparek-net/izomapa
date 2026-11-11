@@ -30,5 +30,6 @@
  },
  "vanocni_strom": null,
  "letadla": false,
- "potoky": false
+ "potoky": false,
+ "sousedi": []
 }
