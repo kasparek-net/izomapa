@@ -134,6 +134,8 @@ dialog.help ul { margin: 0; padding-left: 18px; } dialog.help li { margin: 3px 0
 dialog.help p { margin: 4px 0; } dialog.help a { color: var(--ink); }
 dialog.help .close { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; }
 dialog.help .muted { color: var(--muted); margin-top: 14px; }
+dialog.plocha { max-width: 440px; } dialog.plocha h3 { margin-top: 0; } dialog.plocha ol { margin: 4px 0 8px; padding-left: 20px; } dialog.plocha li { margin: 3px 0; }
+.app-btn[hidden], .pl-os[hidden] { display: none; }
 .support-links { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 6px; }
 .support-links a.px-btn { text-decoration: none; display: inline-block; }
 .coffee { display: block; font-size: .82rem; color: var(--muted); text-decoration: none; padding: 2px 0; }
@@ -337,6 +339,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 <dialog class="help" id="helpDlg" aria-labelledby="helpTitle">
   <button class="px-btn close" id="helpClose" type="button" aria-label="Zavřít">×</button>
   <h2 id="helpTitle">O&nbsp;mapě</h2>
+  <p><button class="px-btn app-btn" id="plochaBtn" type="button">📱 Přidat na plochu</button></p>
   <p>{{POPIS}}</p>
   <h3>Ovládání</h3>
   <ul>
@@ -348,6 +351,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   </ul>
   <p class="muted">Vytvořeno nástrojem <a href="https://github.com/adamklatovsky/izomapa" target="_blank" rel="noopener">izomapa</a> od <a href="https://www.adamklatovsky.cz/" target="_blank" rel="noopener">Adama Klatovského</a> (původní mapa: <a href="https://izomapa.fun" target="_blank" rel="noopener">izometrický Liberec</a>).<br>
   Mapová data © přispěvatelé <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL) a&nbsp;Overture Maps, terén Terrarium (AWS Open Data), výšky budov a&nbsp;stromů, ortofoto a&nbsp;ZABAGED{{RUIAN_ZDROJ}} © <a href="https://geoportal.cuzk.cz/" target="_blank" rel="noopener">ČÚZK</a> (CC BY 4.0){{MHD_ZDROJ}}{{VITR_ZDROJ}}{{LETADLA_ZDROJ}}{{ZAPASY_ZDROJ}}{{TRHY_ZDROJ}}{{DOPRAVA_ZDROJ}}{{MESTO_ZDROJ}}.</p>{{ZDROJOVY_KOD}}
+</dialog>
+<dialog class="help plocha" id="plochaDlg" aria-labelledby="plochaTitle">
+  <button class="px-btn close" id="plochaClose" type="button" aria-label="Zavřít">×</button>
+  <h3 id="plochaTitle">Mapa jako aplikace</h3>
+  <p>Ikona na ploše otevře mapu rovnou přes celou obrazovku, bez lišty prohlížeče.</p>
+  <p class="pl-os" id="plInstall" hidden><button class="px-btn" id="plochaGo" type="button">Přidat na plochu</button></p>
+  <div class="pl-os" data-os="ios"><h4>iPhone a iPad (Safari)</h4><ol><li>Dole klepněte na <b>Sdílet</b> (čtvereček se šipkou nahoru).</li><li>Vyberte <b>Přidat na plochu</b>.</li><li>Potvrďte <b>Přidat</b>.</li></ol></div>
+  <div class="pl-os" data-os="android"><h4>Android (Chrome)</h4><ol><li>Vpravo nahoře klepněte na <b>⋮</b>.</li><li>Vyberte <b>Přidat na plochu</b> nebo <b>Instalovat aplikaci</b>.</li><li>Potvrďte <b>Instalovat</b>.</li></ol></div>
+  <div class="pl-os" data-os="pc"><h4>Počítač (Chrome, Edge)</h4><ol><li>V adresním řádku vpravo klikněte na ikonu <b>Instalovat</b> (monitor se šipkou).</li><li>Nebo v menu <b>⋮</b> zvolte <b>Uložit a sdílet → Instalovat stránku jako aplikaci</b>.</li></ol><p>V Safari na Macu: <b>Soubor → Přidat do Docku</b>.</p></div>
 </dialog>
 <nav class="mbar" id="mbar" aria-label="Rychlé ovládání">
   <button class="px-btn" type="button" data-s="spring">Jaro</button>
@@ -382,7 +394,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const W = OV.w, Hh = OV.h;
   const $ = (id) => document.getElementById(id);
   const isMobile = () => matchMedia('(max-width: 640px)').matches;
-  let uiDepth = 0, uiPop = false, uiBackAt = 0;
+  let uiDepth = 0, uiPop = false, uiBackAt = 0, uiSelf = 0;
   const state = { season: 'summer', night: 0, weather: 'clear', sel: null, hover: null, wip: false };
   const hashTokens = (location.hash || '').slice(1).split('@')[0].split('-');
   const SEASON_TOKEN = { jaro: 'spring', leto: 'summer', podzim: 'autumn', zima: 'winter' };
@@ -956,9 +968,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   for (const d of document.querySelectorAll('dialog')) {
     const sm = d.showModal.bind(d);
     d.showModal = () => { if (d.open) return; sm(); uiDepth++; try { history.pushState({ ui: uiDepth }, ''); } catch {} };
-    d.addEventListener('close', () => { if (uiPop || !uiDepth) return; uiDepth--; uiBackAt = Date.now(); history.back(); });
+    d.addEventListener('close', () => { if (uiPop || !uiDepth) return; uiDepth--; uiBackAt = Date.now(); uiSelf++; history.back(); });
   }
   addEventListener('popstate', () => {
+    if (uiSelf) { uiSelf--; return; }                     // krok zpět po zavření okna tlačítkem: nezavírat další (vnořené) okno
     if (!uiDepth) return;
     uiDepth--; uiBackAt = Date.now(); uiPop = true;
     const ds = [...document.querySelectorAll('dialog[open]')]; if (ds.length) ds[ds.length - 1].close();
@@ -967,6 +980,22 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   $('help').addEventListener('click', (e) => { e.stopPropagation(); $('helpDlg').showModal(); });
   $('helpClose').addEventListener('click', () => $('helpDlg').close());
   $('helpDlg').addEventListener('click', (e) => { if (e.target === $('helpDlg')) $('helpDlg').close(); });
+  // přidání na plochu: návod podle zařízení; Chrome na Androidu a počítači nabídne rovnou svoje okno instalace
+  {
+    const ua = navigator.userAgent, os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : 'pc';
+    let prompt = null;
+    if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) $('plochaBtn').hidden = true;   // už běží jako aplikace
+    addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); prompt = e; });
+    addEventListener('appinstalled', () => { prompt = null; $('plochaBtn').hidden = true; $('plochaDlg').close(); });
+    $('plochaBtn').addEventListener('click', () => {
+      $('plInstall').hidden = !prompt;
+      document.querySelectorAll('#plochaDlg [data-os]').forEach((el) => { el.hidden = el.dataset.os !== os; });
+      $('plochaDlg').showModal();                       // nad nápovědou; po zavření se vrátí do ní
+    });
+    $('plochaGo').addEventListener('click', async () => { if (!prompt) return; prompt.prompt(); await prompt.userChoice.catch(() => {}); prompt = null; $('plInstall').hidden = true; });
+    $('plochaClose').addEventListener('click', () => $('plochaDlg').close());
+    $('plochaDlg').addEventListener('click', (e) => { if (e.target === $('plochaDlg')) $('plochaDlg').close(); });
+  }
   // sdílení: odkaz obsahuje polohu, přiblížení, roční období a denní dobu (#zima-noc@50.77,15.06,0.8)
   async function share() {
     const tok = [{ spring: 'jaro', summer: 'leto', autumn: 'podzim', winter: 'zima' }[state.season]];

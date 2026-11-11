@@ -52,6 +52,31 @@ def trhy(T):
 
 
 SABLONA = open('web/app.html', encoding='utf-8').read()
+
+
+def ikony_a_manifest(M):
+    """ikona (izometrická kostka), ikony pro přidání na plochu a manifest: mapu jde přidat na plochu jako aplikaci"""
+    from PIL import ImageDraw
+    os.makedirs('site', exist_ok=True)
+    tvar = [('#6fa84a', [(36, 15), (61, 27.5), (36, 40), (11, 27.5)]), ('#8a6242', [(11, 27.5), (36, 40), (36, 63), (11, 50.5)]),
+            ('#684832', [(36, 40), (61, 27.5), (61, 50.5), (36, 63)])]
+    def ikona(size, maskable, out):
+        S = size * 4; im = Image.new('RGBA', (S, S), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+        if maskable: d.rectangle([0, 0, S, S], fill='#1b2333'); k = S / 72 * 0.72; o = S * 0.14   # maskable: obsah v bezpečné zóně
+        else: d.rounded_rectangle([0, 0, S - 1, S - 1], radius=S * 10 / 72, fill='#1b2333'); k = S / 72; o = 0
+        for barva, body in tvar: d.polygon([(o + x * k, o + y * k) for x, y in body], fill=barva)
+        im.resize((size, size), Image.LANCZOS).save(out, optimize=True)
+    if not os.path.exists('site/favicon.svg'):            # vlastní ikony města se nepřepisují
+        open('site/favicon.svg', 'w').write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><rect width="72" height="72" rx="10" fill="#1b2333"/>'
+                                            + ''.join(f'<path d="M{"L".join(f"{x} {y}" for x, y in b)}z" fill="{c}"/>' for c, b in tvar) + '</svg>')
+    for size, maskable, out in [(180, False, 'apple-touch-icon.png'), (192, False, 'icon-192.png'), (512, False, 'icon-512.png'),
+                                (192, True, 'icon-maskable-192.png'), (512, True, 'icon-maskable-512.png')]:
+        if not os.path.exists(f'site/{out}'): ikona(size, maskable, f'site/{out}')
+    json.dump({'name': M['titulek'], 'short_name': M['nazev'], 'description': M['popis'], 'lang': 'cs', 'start_url': './', 'scope': './',
+               'display': 'standalone', 'orientation': 'any', 'background_color': '#1b2333', 'theme_color': '#1b2333',
+               'icons': [{'src': f'icon-{s}.png', 'sizes': f'{s}x{s}', 'type': 'image/png'} for s in (192, 512)]
+                        + [{'src': f'icon-maskable-{s}.png', 'sizes': f'{s}x{s}', 'type': 'image/png', 'purpose': 'maskable'} for s in (192, 512)]},
+              open('site/manifest.webmanifest', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 E = lambda t: html.escape(t or '', quote=True)
 
 
@@ -119,6 +144,11 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b2333">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="{E(M['nazev'])}">
 <meta property="og:title" content="{E(M['titulek'])}">
 <meta property="og:description" content="{E(M['popis'])}">
 <meta property="og:type" content="website">
@@ -133,6 +163,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
     print(html_out, len(page))
 
 
+ikony_a_manifest(MESTO)
 postav_stranku(MESTO)
 SITE_URL = (MESTO.get('url') or '').rstrip('/')
 open('site/robots.txt', 'w').write('User-agent: *\nAllow: /\n' + (f'Sitemap: {SITE_URL}/sitemap.xml\n' if SITE_URL else ''))
