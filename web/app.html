@@ -1076,6 +1076,21 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   };
   // silniční graf
   const roads = [], ends = new Map(), cars = [], sigs = [];
+  // vjezd na kruhový objezd: auto dá přednost autům na okruhu (25 m před vjezdem nebo právě v něm)
+  function yieldZ(r, y) {
+    const e = y[0] < 1 ? r.w[0] : r.w[r.w.length - 1], z = [y[0]];
+    z.rb = { k: y[1].toFixed(0) + ',' + y[2].toFixed(0), cx: y[1], cy: y[2], R: y[3], an: Math.atan2(e[1] - y[2], e[0] - y[1]) };
+    return z;
+  }
+  function ringFree(g) {
+    for (const c of cars) {
+      if (c.q > tShare || roads[c.r].rbk !== g.k) continue;
+      const o = along(roads[c.r], c.s), rx = o.x - g.cx, ry = o.y - g.cy, turn = Math.sign((rx * o.dy - ry * o.dx) * c.dir) || 1;   // směr jízdy po okruhu
+      let d = ((g.an - Math.atan2(ry, rx)) * turn) % (2 * Math.PI); if (d < 0) d += 2 * Math.PI;
+      if (d * g.R < 25 || (2 * Math.PI - d) * g.R < 5) return false;
+    }
+    return true;
+  }
   // železniční přejezdy (z[0] metry od začátku kusu, z[1..2] svět): zavřeno ~25 s před příjezdem vlaku, dokud neprojede poslední vůz
   const XC = new Map(), xings = [];
   function addXing(r, z) {
@@ -1159,7 +1174,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const i0 = roads.length;
     for (const r of d.roads) {
       const len = [0]; for (let i = 1; i < r.w.length; i++) len.push(len[i - 1] + Math.hypot(r.w[i][0] - r.w[i - 1][0], r.w[i][1] - r.w[i - 1][1]));
-      if (len[len.length - 1] > 1) { roads.push({ ...r, k, len, L: len[len.length - 1] }); const rr = roads[roads.length - 1]; for (const z of r.z || []) sigs.push([rr, z]); for (const z of r.j || []) addXing(rr, z); rr.zj = [...(r.z || []), ...(r.j || [])]; }   // i krátké kousky (kruhový objezd u vjezdů), jinak v okruhu zůstanou mezery a auta tam stojí
+      if (len[len.length - 1] > 1) { roads.push({ ...r, k, len, L: len[len.length - 1] }); const rr = roads[roads.length - 1]; for (const z of r.z || []) sigs.push([rr, z]); for (const z of r.j || []) addXing(rr, z); rr.zj = [...(r.z || []), ...(r.j || []), ...(r.y || []).map((y) => yieldZ(rr, y))]; if (r.rb) rr.rbk = r.rb[0].toFixed(0) + ',' + r.rb[1].toFixed(0); }   // i krátké kousky (kruhový objezd u vjezdů), jinak v okruhu zůstanou mezery a auta tam stojí
     }
     for (let i = i0; i < roads.length; i++) { const r = roads[i]; for (const [end, dir] of [[r.w[0], 1], [r.w[r.w.length - 1], -1]]) { const q = ek(end); if (!ends.has(q)) ends.set(q, []); ends.get(q).push([i, dir]); } }
     // konce, které se v datech minou o pár metrů (rozdělená vozovka, mostovka), propojit, ať auto nemusí otáčet ani mizet
@@ -1254,7 +1269,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     ctx.fillStyle = lamp[1]; ctx.fillRect(lamp[0] - q * 0.6, y - h + q * 0.05, q * 1.2, q * 1.1);
   }
-  const isOpen = (z) => z.xc ? !z.xc.closed : sigGreen(z);   // semafor nebo přejezd
+  const isOpen = (z) => z.xc ? !z.xc.closed : z.rb ? ringFree(z.rb) : sigGreen(z);   // přejezd, vjezd na kruhový objezd, nebo semafor
   function stepCar(c, dt) {
     if (c.hold) { if (!isOpen(c.hold)) return; c.hold.q = null; c.hold = null; }
     const r = roads[c.r], next = c.s + carSpeed(c, r) * dt * c.dir;

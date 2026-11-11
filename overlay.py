@@ -178,7 +178,8 @@ for chunk in chunks:
         p = r['p']
         if len(p) < 2: continue
         roads.append({'c': r['c'], 'k': K, 'p': [list(px(x, y, z)) for x, y, z in p], 'w': [[x + OFF[0], y + OFF[1], round(z, 1)] for x, y, z in p],   # z: auto na mostovce jede ve výšce mostovky
-                       **({'o': r['o']} if r.get('o') else {}), **({'l': r['l']} if r.get('l') else {}), **({'z': r['z']} if r.get('z') else {}), **({'j': [[q[0], q[1] + OFF[0], q[2] + OFF[1]] for q in r['j']]} if r.get('j') else {}), **({'v': r['v']} if r.get('v') else {}), **({'t': r['t']} if r.get('t') else {}), **({'x': 1} if r.get('x') else {})})
+                       **({'o': r['o']} if r.get('o') else {}), **({'l': r['l']} if r.get('l') else {}), **({'z': r['z']} if r.get('z') else {}), **({'j': [[q[0], q[1] + OFF[0], q[2] + OFF[1]] for q in r['j']]} if r.get('j') else {}), **({'v': r['v']} if r.get('v') else {}), **({'t': r['t']} if r.get('t') else {}), **({'x': 1} if r.get('x') else {}),
+                       **({'rb': [r['rb'][0] + OFF[0], r['rb'][1] + OFF[1], r['rb'][2]]} if r.get('rb') else {}), **({'y': [[q[0], q[1] + OFF[0], q[2] + OFF[1], q[3]] for q in r['y']]} if r.get('y') else {})})
 
     gs = np.array(src['ground_small'])[::2, ::2]     # 41 × 41 stačí na dopravu a klikání
     grounds.append({'cx': OFF[0], 'cy': OFF[1], 'g': [[round(v, 1) for v in row] for row in gs.tolist()]})
