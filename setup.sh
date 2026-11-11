@@ -7,7 +7,7 @@ PY=python3; $PY -c '' 2>/dev/null || PY=python      # Windows: python3 je jen od
 $PY -m venv .venv
 if [ -f .venv/bin/activate ]; then . .venv/bin/activate; else . .venv/Scripts/activate; fi   # Windows: Scripts
 python -m pip install -q --upgrade pip
-pip install -q shapely pyproj numpy pillow pyarrow pandas "laspy[lazrs]"
+pip install -q shapely pyproj numpy pillow pyarrow pandas scipy "laspy[lazrs]"
 npm install
 npx playwright install chromium
 echo "Hotovo. Další krok: python novy_mesto.py \"Název obce\"  a pak  ./postav.sh"

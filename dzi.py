@@ -3,17 +3,19 @@
 python dzi.py [varianty...]            čtverec (0, 0) -> site/tiles/<varianta>/...
 python dzi.py --chunk 0,-1 [varianty]  další čtverec (průhledné pozadí) -> site/tiles/c0_-1/<varianta>/...
 """
-import json, math, os, shutil, sys
+import json, math, os, shutil, sys, time
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 TS = 2048           # velké dlaždice = málo souborů (artefakt má limit počtu souborů)
 FMT = 'webp'        # bezztrátové WebP (o ~14 % menší než paletové PNG); 'png' pro starý formát
+WORKERS = int(os.environ.get('IZO_DZI_VLAKNA', min(8, os.cpu_count() or 4)))   # souběžné kódování dlaždic
 
 
 def save(im, path):
-    if FMT == 'webp': im.convert('RGBA' if im.mode in ('P', 'RGBA', 'LA') else 'RGB').save(path[:-4] + '.webp', 'WEBP', lossless=True, quality=90, method=4, exact=False)
+    if FMT == 'webp': im.convert('RGBA' if im.mode in ('P', 'RGBA', 'LA') else 'RGB').save(path[:-4] + '.webp', 'WEBP', lossless=True, quality=50, method=4, exact=False)   # u bezztrátového WebP je quality jen úsilí komprese: pixely stejné, poloviční čas, soubory o ~1 % větší
     else: im.save(path, optimize=True)
 OUT = 'site/tiles'
 
@@ -21,6 +23,8 @@ OUT = 'site/tiles'
 def build(variant, chunk=None):
     src = f'build/tiles_{variant}' if not chunk else f'build/c{chunk[0]}_{chunk[1]}/tiles_{variant}'
     info = json.load(open(f'{src}/info.json'))
+    # render.mjs si na začátku odloží značku a po poslední dlaždici ji smaže: když zůstala, render spadl uprostřed
+    if os.path.exists(f'{src}/rozpracovano'): sys.exit(f'{src}: render neskončil (zůstala značka „rozpracovano“), dlaždice by byly směs starých a nových. Spusť render znovu.')
     T = info['tile']
     alpha = True        # všechny čtverce jsou průhledné vrstvy (skládají se podle hloubky, žádný není podklad)
     img = Image.new('RGBA' if alpha else 'RGB', (info['width'], info['height']), (0, 0, 0, 0) if alpha else (0, 0, 0))
@@ -94,7 +98,8 @@ def quant_alpha(rgba, colors, pal=None, keep=()):
     q.paste(colors - 1, mask=a.point(lambda v: 255 - v))
     if keep:
         idx, px, op = np.array(q), np.array(rgb), np.array(a) > 0
-        for i, c in enumerate(keep): idx[(px == c).all(axis=2) & op] = colors + i
+        key = (px[..., 0].astype(np.uint32) << 16) | (px[..., 1].astype(np.uint32) << 8) | px[..., 2]   # barva jako jedno číslo: 14× rychlejší než porovnání po složkách
+        for i, c in enumerate(keep): idx[(key == ((c[0] << 16) | (c[1] << 8) | c[2])) & op] = colors + i
         q = Image.fromarray(idx, 'P'); q.putpalette(p + [0] * (768 - len(p)))
     q.info['transparency'] = colors - 1
     return q
@@ -117,13 +122,14 @@ def build_alpha(variant, chunk, img, info):
         im = img if s == 1 else img.resize((w, h), Image.Resampling.BOX)
         d = f'{d0}/{lvl}'
         os.makedirs(d, exist_ok=True)
-        for c in range(math.ceil(w / TS)):
-            for r in range(math.ceil(h / TS)):
-                t = im.crop((c * TS, r * TS, min(w, (c + 1) * TS), min(h, (r + 1) * TS)))
-                # zmenšené úrovně bez vlastní palety: kvantizace zmenšeniny měnila vzácné barvy (bazény, voda) na šedou
-                # bez palety i v plném rozlišení: vzácné barvy (malé vodní plochy) se v paletě čtverce měnily na šedou
-                save(quant_alpha(t, colors, pal, keep), f'{d}/{c}_{r}.png')      # stejná paleta (s vodou) pro všechny úrovně
-                n += 1
+        # zmenšené úrovně bez vlastní palety: kvantizace zmenšeniny měnila vzácné barvy (bazény, voda) na šedou
+        # bez palety i v plném rozlišení: vzácné barvy (malé vodní plochy) se v paletě čtverce měnily na šedou
+        def one(cr, im=im, d=d, w=w, h=h):                                        # stejná paleta (s vodou) pro všechny úrovně
+            c, r = cr
+            save(quant_alpha(im.crop((c * TS, r * TS, min(w, (c + 1) * TS), min(h, (r + 1) * TS))), colors, pal, keep), f'{d}/{c}_{r}.png')
+        jobs = [(c, r) for c in range(math.ceil(w / TS)) for r in range(math.ceil(h / TS))]
+        with ThreadPoolExecutor(WORKERS) as ex: list(ex.map(one, jobs))           # Pillow při kódování pouští GIL; výstup je bajt po bajtu stejný
+        n += len(jobs)
     size = sum(os.path.getsize(os.path.join(a, f)) for a, _, fs in os.walk(d0) for f in fs)
     print(name or 'c0_0', variant, W, 'x', H, 'souborů', n, 'MB', round(size / 1e6, 1))
     return {'Image': {'xmlns': 'http://schemas.microsoft.com/deepzoom/2008', 'Url': f'tiles/{name}/{variant}/' if name else f'tiles/{variant}/', 'Format': FMT,
@@ -135,19 +141,33 @@ if __name__ == '__main__':
     from geo import CHUNKS
     os.makedirs('site', exist_ok=True)
     path = 'site/tiles.json'
-    out = json.load(open(path)) if os.path.exists(path) else {}
     args = sys.argv[1:]
     chunk = None
     if args[:1] == ['--chunk']:
         chunk = tuple(int(v) for v in args[1].split(',')); args = args[2:]
     variants = args or ['autumn', 'winter', 'spring', 'summer', 'lights'] + [v for v in ('lights_prace', 'lights_noc') if os.path.exists(f'build/tiles_{v}/info.json')]
-    if chunk:
-        name = f'c{chunk[0]}_{chunk[1]}'
-        ch = out.setdefault('chunks', {}).setdefault(name, {'chunk': list(chunk), 'status': CHUNKS[chunk]})
-        ch['status'] = CHUNKS[chunk]
-        for v in variants: ch[v] = build(v, chunk)
-    else:
-        info = json.load(open('build/tiles_autumn/info.json'))
-        out['base'] = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'status': CHUNKS[(0, 0)]}
-        for v in variants: out[v] = build(v)
-    json.dump(out, open(path, 'w'))
+    built = {v: build(v, chunk) if chunk else build(v) for v in variants}
+    # souběžný render (render_par.sh): tiles.json se načte a zapíše až pod zámkem, ať si čtverce nepřepíšou záznamy.
+    # Zámek je soubor vytvořený s O_EXCL (funguje i na Windows); po pádu jiného běhu se starý zámek po 2 minutách smaže.
+    os.makedirs('build', exist_ok=True); lock = 'build/tiles_json.lock'; t0 = time.time()
+    while True:
+        try: fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY); break
+        except FileExistsError:
+            if time.time() - t0 > 120:
+                try: os.remove(lock)
+                except FileNotFoundError: pass
+            time.sleep(0.2)
+    try:
+        out = json.load(open(path)) if os.path.exists(path) else {}
+        if chunk:
+            name = f'c{chunk[0]}_{chunk[1]}'
+            ch = out.setdefault('chunks', {}).setdefault(name, {'chunk': list(chunk), 'status': CHUNKS[chunk]})
+            ch['status'] = CHUNKS[chunk]; ch.update(built)
+        else:
+            info = json.load(open('build/tiles_autumn/info.json'))
+            out['base'] = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'status': CHUNKS[(0, 0)]}
+            out.update(built)
+        out['ver'] = time.strftime('%Y%m%d%H%M')              # verze dlaždic pro cache prohlížeče: mění se jen tady, když vzniknou nové dlaždice
+        json.dump(out, open(path + '.tmp', 'w')); os.replace(path + '.tmp', path)
+    finally:
+        os.close(fd); os.remove(lock)

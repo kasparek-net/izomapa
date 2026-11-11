@@ -340,7 +340,8 @@ for _, r in inf.iterrows():
 for q in UP['paved']: fill(Polygon([to_local(lo, la) for la, lo in q]), C['paved'], block=True)
 
 wat = load('water')
-_bld_stream_excl = shapely.unary_union([p.buffer(1.2) for g in load('building').geom for p in polys(g) if p.intersects(DRAWBOX)])
+POTOKY = bool(geo.MESTO.get('potoky'))           # potoky (waterway=stream) jen na přání: v datech často vedou pod zemí (zatrubněné)
+_bld_stream_excl = shapely.unary_union([p.buffer(1.2) for g in load('building').geom for p in polys(g) if p.intersects(DRAWBOX)]) if POTOKY else shapely.geometry.GeometryCollection()
 for _, r in wat.iterrows():
     g = r.geom
     if g.geom_type in ('Polygon', 'MultiPolygon'):
@@ -348,7 +349,7 @@ for _, r in wat.iterrows():
         else: fill(g, C['water'], block=True)
     elif r['class'] == 'river':
         line(g, C['stream'], 6, block=True)
-    elif r['class'] == 'stream':         # říčka Oleška a potoky (mimo půdorysy budov, kde bývají zatrubněné)
+    elif r['class'] == 'stream' and POTOKY:   # potoky (mimo půdorysy budov, kde bývají zatrubněné)
         g_vis = g.difference(_bld_stream_excl) if not _bld_stream_excl.is_empty else g
         if not g_vis.is_empty:
             line(g_vis, C['stream'], 4.8 if sname(r) else 2.8, block=True)
@@ -358,9 +359,13 @@ seg = load('segment')
 _uc = lambda r: r['class'] == 'motorway' and any('is_under_construction' in list(f.get('values')) for f in (r.road_flags if r.road_flags is not None else []))
 seg = seg[[not _uc(r) for _, r in seg.iterrows()]].reset_index(drop=True)
 TUNNEL_MIN = 60.0     # kratší „tunel“ je podjezd pod silnicí nebo tratí: kreslí se jako cesta, nad ní vede most
+def seg_flags(r):
+    """příznaky úseku: silnice je mají v road_flags, tratě v rail_flags"""
+    v = r.get('rail_flags') if r.subtype == 'rail' else r.road_flags
+    return list(v) if isinstance(v, (list, np.ndarray)) else []
 def tunnel_parts(r):
     """části segmentu mimo tunel (0..1); dlouhé tunely se nekreslí, silnice je pod zemí"""
-    fl = r.road_flags if r.road_flags is not None else []
+    fl = seg_flags(r)
     tn = [f.get('between') for f in fl if 'is_tunnel' in list(f.get('values'))]
     tn = [t for t in tn if (1.0 if t is None else float(t[1]) - float(t[0])) * r.geom.length >= TUNNEL_MIN]
     if not tn: return None
@@ -387,7 +392,7 @@ seg = pd.DataFrame(_rows).reset_index(drop=True)
 # mosty a lávky: úsek označený is_bridge se nekreslí do terénu, ale postaví se jako mostovka (scene.bridges)
 BRIDGE_MIN = UP.get('bridge_min', 8.0)      # kratší „most“ (propustek nad potokem) zůstane obyčejnou cestou
 def bridge_parts(r):
-    fl = r.road_flags if isinstance(r.road_flags, (list, np.ndarray)) else []
+    fl = seg_flags(r)
     br = [f.get('between') for f in fl if 'is_bridge' in list(f.get('values'))]
     if not br: return None
     rng = sorted((0.0, 1.0) if t is None else (float(t[0]), float(t[1])) for t in br)
@@ -619,6 +624,18 @@ for l, w, c, n in drive_lines:
         cd.line(P([(q.x, q.y), (q.x + rx * (w / 2 - 0.3), q.y + ry * (w / 2 - 0.3))]), fill=C['marking'], width=max(1, round(0.45 / TEX_RES)))
 all_lines = [(l, w, c, n) for _, g, c, w, n in roads if c != 'rail' for l in lines(g)]
 
+def deck_runs(pts):
+    """mostovka jen nad terénem mapy: nájezd, který pokračuje cestou za okraj mapy, by visel do prázdna (hráz u okraje) -> souvislé kusy uvnitř EXT"""
+    out, cur = [], []
+    for q in pts:
+        if EXT_P.contains(Point(q[0], q[1])): cur.append(q)
+        else:
+            if len(cur) > 1: out.append(cur)
+            cur = []
+    if len(cur) > 1: out.append(cur)
+    return out
+
+
 def deck_line(D):
     lz, d, z = D[0], D[1], D[2]
     return [[round(x, 1), round(y, 1), round(float(h), 2)] for (x, y), h in zip(np.array(lz.coords)[:, :2], z)]
@@ -651,11 +668,46 @@ for _, r in inf.iterrows():
         cd.polygon(P(corners), fill=C['marking'])
         k += 1.0
 
-# parkovací stání + zaparkovaná auta
+# parkovací stání + zaparkovaná auta: kolmo k uličkám, z obou stran (plocha bez uliček v datech podle obdélníku)
 cars = []
+_aisles = [l for _, g, c, _w, _n in roads if c == 'service' for l in lines(g)]
+_aisle_tree = shapely.STRtree(_aisles) if _aisles else None
+_stani = {}                                     # středy stání v mřížce 3 m: sousední uličky a plochy se nepřekryjí
+def _stani_volne(x, y):
+    kx, ky = int(x // 3), int(y // 3)
+    for a_ in range(kx - 1, kx + 2):
+        for b_ in range(ky - 1, ky + 2):
+            for q_ in _stani.get((a_, b_), []):
+                if (q_[0] - x) ** 2 + (q_[1] - y) ** 2 < 4.0: return False
+    _stani.setdefault((kx, ky), []).append((x, y))
+    return True
 for pid, p in parkings:
     if p.area < 120: continue
     crng = random.Random(f'{pid}{wkey(p.centroid.x, p.centroid.y)}')
+    _ais = []
+    if _aisle_tree is not None:
+        _p05 = p.buffer(0.5)
+        for i_ in sorted(int(v) for v in _aisle_tree.query(p)):
+            _ais += [l_ for l_ in lines(_aisles[i_].intersection(_p05)) if l_.length >= 6]
+    if _ais:
+        _pp = shapely.prepared.prep(p.buffer(-0.3))
+        _ais_tree = shapely.STRtree(_ais)
+        for a_l in _ais:
+            _s = 1.25
+            while _s < a_l.length - 1.25:
+                _q0, _q1, _q = a_l.interpolate(_s - 1.0), a_l.interpolate(_s + 1.0), a_l.interpolate(_s)
+                _tl = math.hypot(_q1.x - _q0.x, _q1.y - _q0.y) or 1.0
+                _tx, _ty = (_q1.x - _q0.x) / _tl, (_q1.y - _q0.y) / _tl
+                for _sg in (1, -1):
+                    _nx, _ny = -_ty * _sg, _tx * _sg
+                    _pa, _pb, _pc = [Point(_q.x + _nx * d_, _q.y + _ny * d_) for d_ in (3.0, 8.0, 5.5)]
+                    if not (_pp.contains(_pa) and _pp.contains(_pb) and _pp.contains(_pc)): continue
+                    if len(_ais_tree.query(_pc, predicate='dwithin', distance=4.6)) or not _stani_volne(_pc.x, _pc.y): continue   # blíž k jiné uličce než ke své
+                    cd.line(P([(_pa.x - _tx * 1.25, _pa.y - _ty * 1.25), (_pb.x - _tx * 1.25, _pb.y - _ty * 1.25)]), fill=C['marking'], width=1)
+                    cd.line(P([(_pa.x + _tx * 1.25, _pa.y + _ty * 1.25), (_pb.x + _tx * 1.25, _pb.y + _ty * 1.25)]), fill=C['marking'], width=1)
+                    if crng.random() < 0.58: cars.append([_pc.x, _pc.y, math.atan2(_ny, _nx), crng.randrange(8)])
+                _s += 2.5
+        continue
     o = p.minimum_rotated_rectangle
     oc = [np.array(c) for c in list(o.exterior.coords)[:4]]
     e1, e2 = oc[1] - oc[0], oc[3] - oc[0]
@@ -706,7 +758,7 @@ if len(bld) and UP['roofs']:                            # přístřešky nástup
         g = LineString([to_local(lo, la) for la, lo in q['line']]).buffer(q['w'] / 2, cap_style='flat', join_style='mitre')
         rows.append({**t0.to_dict(), 'id': f'up-roof-{i}', 'class': 'roof', 'subtype': None, 'names': None, 'height': q['h'], 'num_floors': float('nan'), 'roof_shape': None, 'geom': g, 'geometry': None})
     bld = pd.concat([bld, pd.DataFrame(rows)], ignore_index=True)
-if len(bld) and UP.get('custom_bld'):                   # ručně doplněné drobné stavby (např. Z-BOX Zásilkovna)
+if len(bld) and UP.get('custom_bld'):                   # ručně doplněné drobné stavby (výdejní box, kiosek, přístřešek)
     t0 = bld.iloc[0]; rows = []
     for q in UP['custom_bld']:
         g = Polygon([to_local(lo, la) for la, lo in q['poly']])
@@ -1281,7 +1333,6 @@ for _, r in bld.iterrows():
                       'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2),
                       **({'roof_geometry': {'eave': b['e'], 'height': b['rh'], 'parts': b['parts']}}
                          if not lm and rs in ('gabled', 'hipped') and b['parts'] else {})})
-# samostatné stavby dominant (zřícenina, rozhledna): jen věž na bodu dominanty
 # samostatné stavby dominant (zřícenina, rozhledna, VTE): jen věž na bodu dominanty
 for d in DOMS:
     sp = d['spec']
@@ -1760,12 +1811,37 @@ for x, y, *_r in props['lamp']:
     lm_img[ys0:ys1, xs0:xs1] += blob[ys0 - y0:ys1 - y0, xs0 - x0:xs1 - x0]
 Image.fromarray((np.clip(lm_img, 0, 1) * 255).astype(np.uint8)).save(f'{OUT}/lightmap.png')
 
+# stáda zvířat na pastvinách (assets/upresneni.json -> stada)
+herds_out = []
+for h in UP.get('stada', UP.get('herds', [])):
+    typ_raw = str(h.get('typ', h.get('type', 'cow'))).lower()
+    typ = 'horse' if any(k in typ_raw for k in ('kun', 'kone', 'horse')) else 'deer' if any(k in typ_raw for k in ('srn', 'deer')) else 'cow'
+    hx, hy = to_local(float(h['lon']), float(h['lat']))
+    hr = float(h.get('radius', 30.0))
+    hpt = Point(hx, hy)
+    if EXT_P.contains(hpt) or hpt.buffer(hr).intersects(EXT):
+        hz = float(ground(hx, hy))
+        if not free(hx, hy):
+            cand = [(hx + math.cos(a) * d, hy + math.sin(a) * d) for d in np.linspace(3, hr, 8) for a in np.linspace(0, math.tau, 12)]
+            good = [p for p in cand if free(*p)]
+            if good:
+                hx, hy = min(good, key=lambda p: math.hypot(p[0] - hx, p[1] - hy))
+                hz = float(ground(hx, hy))
+        herds_out.append({
+            'typ': typ, 'x': round(hx, 2), 'y': round(hy, 2), 'z': round(hz, 2),
+            'n': int(h.get('pocet', h.get('count', 8))),
+            'r': round(hr, 1),
+            'mladata': bool(h.get('mladata', True))
+        })
+
 TOP = max([b['e'] + b['rh'] for b in buildings] + [t[2] + t[3] for t in trees] + [float(H.max())])
 json.dump({'chunk': CHUNK, 'center': [CX, CY], 'half': HALF, 'step': STEP, 'n': N, 'hmin': HMIN, 'heights': [round(float(v), 2) for v in H.ravel()],
            'ms': MS, 'hext': [round(float(v), 2) for v in HX.ravel()], 'nb': NB, 'margin': geo.MARGIN, 'skirt': geo.skirt_edges(CHUNK),
            'floor': geo.FLOOR, 'top': round(TOP, 1),
            'buildings': buildings, 'trees': trees, 'props': props, 'cars': cars, 'buses': buses, 'portals': portals, 'lines': lines_out,
-           'bridges': [{'p': [[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])], 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)]},
+           'herds': herds_out,
+           'bridges': [{'p': run, 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)
+                       for run in deck_runs([[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])])]},
           open(f'{OUT}/scene.json', 'w'), separators=(',', ':'))
 
 # podklady pro interaktivní vrstvu prohlížeče
@@ -1971,7 +2047,7 @@ for _, r in wat.iterrows():
     if g.geom_type in ('Polygon', 'MultiPolygon'):
         for p in polys(g):
             if p.area > 15: water_out['ponds'].append(zline(p.exterior) + ([] if r['class'] != 'swimming_pool' else []))
-    elif r['class'] in ('river', 'stream'):
+    elif r['class'] == 'river' or (r['class'] == 'stream' and POTOKY):
         water_out['streams'] += [zline(l) for l in lines(g)]
 piste_out = []                                 # pro lyžaře v prohlížeči: vždy shora dolů
 for l in PISTE:

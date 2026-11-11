@@ -15,6 +15,8 @@ from PIL import Image
 args = sys.argv[1:]
 if not args or args[0].startswith('-'): sys.exit(__doc__)
 NAZEV = args[0]
+import os
+if os.path.exists('mesto.json') and '--prepsat' not in args: sys.exit('mesto.json už existuje (ruční texty a MHD by se ztratily). Pro přepsání přidej --prepsat; starý soubor se uloží jako mesto.json.bak.')
 opt = lambda k, d=None: args[args.index(k) + 1] if k in args else d
 DOTAZ = opt('--dotaz', f'{NAZEV}, Česko')
 MAX = int(opt('--max', 0))
@@ -115,5 +117,9 @@ mesto = {
 }
 txt = json.dumps(mesto, ensure_ascii=False, indent=1)
 txt = re.sub(r'\[\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\]', r'[\1, \2]', txt)          # dvojice čísel na jeden řádek
+import os, shutil
+if os.path.exists('mesto.json'):
+    if '--prepsat' not in sys.argv: sys.exit('mesto.json už existuje (ruční texty a MHD by se ztratily). Pro přepsání přidej --prepsat; starý soubor se uloží jako mesto.json.bak.')
+    shutil.copy('mesto.json', 'mesto.json.bak')
 open('mesto.json', 'w', encoding='utf-8').write(txt + '\n')
 print('zapsáno mesto.json – zkontroluj texty (rod, název) a případně doplň MHD')

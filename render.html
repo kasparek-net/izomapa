@@ -221,27 +221,32 @@ const C255 = (rgb) => rgb.map((v) => v / 255);
 // ---------- materiály budov ----------
 const wallMat = mat(/* glsl */`
   varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
+  float gWin;                                                   // pořadí okna ve zdi (pro rozsvícení celého okna najednou)
   float win(float u, float len, float sp, float w){
     float n = floor((len - 0.6) / sp);
     if (n < 1.0) return 0.0;
     float off = (len - n * sp) * 0.5;
     float q = (u - off) / sp;
     if (q < 0.0 || q >= n) return 0.0;
-    return abs(fract(q) - 0.5) < w / (2.0 * sp) ? 1.0 : 0.0;
+    if (abs(fract(q) - 0.5) < w / (2.0 * sp)) { gWin = floor(q) + sp * 17.0; return 1.0; }
+    return 0.0;
   }
   void main(){
     vec3 n = fn(normalize(vN));
     vec3 col = vC;
     float u = vA.x, v = vA.y, len = vA.z, st = vA.w;
+    gWin = -1.0;
     bool w = false; bool door = false;
     float cell = 0.0;
     if (v > 0.0) {
       if (st > 14.5) {                // velká hala: skoro plná zeď, jen pár malých okének
         float a = floor(u / 6.4), r = floor(v / 5.2);
         w = fract(u / 6.4) > 0.72 && fract(v / 5.2) > 0.55 && fract(v / 5.2) < 0.78 && hash(vec2(a, r) + len) > 0.5;
+        gWin = a; cell = r;
       } else if (st > 13.5) {                // sklo a kámen (moderní stavby): pásy skla s příčkami
         w = fract(u / 1.6) > 0.12 && fract(v / 3.6) > 0.1;
         if (w && fract(u / 9.6) < 0.25) { w = false; }
+        gWin = floor(u / 1.6); cell = floor(v / 3.6);
       } else if (st > 12.5) {         // zámek: bílá omítka, červené šambrány a nárožní pásy
         float f = fract(v / 3.6) * 3.6;
         cell = floor(v / 3.6);
@@ -286,7 +291,7 @@ const wallMat = mat(/* glsl */`
       } else {                        // art deco: pilastry, římsy, ozdobná atika
         float f = fract(v / 3.3) * 3.3;
         cell = floor(v / 3.3);
-        float pu = mod(u, 3.2);
+        float pu = mod(u, 3.2); gWin = floor(u / 3.2);
         if (pu < 0.5) col *= 1.06;
         if (pu < 0.08 || abs(pu - 0.5) < 0.06) col *= 0.82;
         if (f < 0.22) col *= 0.86;
@@ -294,8 +299,12 @@ const wallMat = mat(/* glsl */`
         if (v < 3.4) { w = pu > 0.9 && pu < 2.8 && v > 0.4 && v < 3.0; if (v < 0.4) col = vec3(0.55, 0.53, 0.50); }
       }
     }
-    if (st > 4.5 && st < 5.5) w = abs(u - len * 0.5) < 0.55 && v > -1.3 && v < -0.25;   // vikýř: okno pod horní hranou
-    float hh = hash(floor((vW.xz + uOff) / 3.0) + vec2(cell * 7.0, floor(u / 2.4)));   // světové souřadnice = stejně přes šev
+    if (st > 4.5 && st < 5.5) { w = abs(u - len * 0.5) < 0.55 && v > -1.3 && v < -0.25; gWin = 0.0; }   // vikýř: okno pod horní hranou
+    // rozsvícení po celých oknech: zeď pozná podle jejího začátku ve světě (stejně přes šev), okno podle pořadí ve zdi
+    vec2 wd = normalize(vec2(-vN.z, vN.x) + 1e-6);
+    float sg = dot(dFdx(vW.xz), wd) * dFdx(u) + dot(dFdy(vW.xz), wd) * dFdy(u) < 0.0 ? -1.0 : 1.0;
+    vec2 ws = floor((vW.xz - wd * sg * u + uOff) * 0.5 + 0.25);
+    float hh = hash(ws * 0.618 + vec2(cell * 7.0, gWin >= 0.0 ? gWin : floor(u / 2.4)));
     if (uLights > 0.5) {
       vec3 e = vec3(0.0);
       if (w) {
@@ -940,6 +949,144 @@ function roofDeco(b, X, eave, rc) {
   const CAR = [[0.92, 0.92, 0.90], [0.70, 0.72, 0.75], [0.16, 0.17, 0.19], [0.72, 0.16, 0.14], [0.20, 0.32, 0.62], [0.38, 0.40, 0.43], [0.24, 0.42, 0.30], [0.80, 0.74, 0.60]];
   inst(carG, scene.cars, ([x, y, z, a]) => [x, y, z, a], (it) => CAR[it[4]]);
   CUSTOM.buildProps?.(P, { make, inst, F, id, pushBox, pushQuad, pushTri });
+
+  // stáda zvířat na pastvinách (krávy, koně, srnky) podle sezóny a denní doby
+  if (scene.herds && scene.herds.length) {
+    const groundH = (x, y) => {
+      const c = (x + HALF) / scene.step, r = (HALF - y) / scene.step;
+      const c0 = Math.max(0, Math.min(N - 2, Math.floor(c))), r0 = Math.max(0, Math.min(N - 2, Math.floor(r)));
+      const fc = Math.max(0, Math.min(1, c - c0)), fr = Math.max(0, Math.min(1, r - r0));
+      const h00 = HS[r0 * N + c0], h10 = HS[r0 * N + c0 + 1];
+      const h01 = HS[(r0 + 1) * N + c0], h11 = HS[(r0 + 1) * N + c0 + 1];
+      return (h00 * (1 - fc) + h10 * fc) * (1 - fr) + (h01 * (1 - fc) + h11 * fc) * fr;
+    };
+
+    const cowG = make((B) => {
+      pushBox(B, F, -1.25, 1.15, -0.58, 0.58, 0.65, 1.62, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, -0.35, 0.55, -0.60, 0.60, 0.95, 1.64, [0.18, 0.16, 0.15], [0, 1, 0, 0]);
+      pushBox(B, F, 1.05, 1.75, -0.42, 0.42, 1.05, 1.78, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 1.55, 1.82, -0.36, 0.36, 1.02, 1.32, [0.90, 0.72, 0.68], [0, 1, 0, 0]);
+      for (const s of [-0.95, 0.85]) for (const t of [-0.42, 0.42]) pushBox(B, F, s - 0.16, s + 0.16, t - 0.14, t + 0.14, 0, 0.70, [0.92, 0.90, 0.86], [0, 1, 0, 0]);
+    });
+    const calfG = make((B) => {
+      pushBox(B, F, -0.70, 0.65, -0.36, 0.36, 0.50, 1.10, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.55, 1.05, -0.28, 0.28, 0.75, 1.25, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.95, 1.12, -0.24, 0.24, 0.72, 0.95, [0.92, 0.75, 0.70], [0, 1, 0, 0]);
+      for (const s of [-0.55, 0.50]) for (const t of [-0.26, 0.26]) pushBox(B, F, s - 0.10, s + 0.10, t - 0.10, t + 0.10, 0, 0.52, [0.92, 0.90, 0.86], [0, 1, 0, 0]);
+    });
+    const COWC = [[0.95, 0.95, 0.92], [0.76, 0.46, 0.26], [0.92, 0.86, 0.74], [0.58, 0.32, 0.20], [0.20, 0.20, 0.22]];
+
+    const horseG = make((B) => {
+      pushBox(B, F, -1.20, 1.10, -0.48, 0.48, 0.82, 1.68, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.75, 1.45, -0.26, 0.26, 1.35, 2.25, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 1.15, 1.85, -0.28, 0.28, 1.95, 2.40, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, -1.45, -1.15, -0.16, 0.16, 0.55, 1.55, [0.16, 0.12, 0.10], [0, 1, 0, 0]);
+      for (const s of [-0.95, 0.85]) for (const t of [-0.35, 0.35]) pushBox(B, F, s - 0.14, s + 0.14, t - 0.12, t + 0.12, 0, 0.88, [0.22, 0.16, 0.12], [0, 1, 0, 0]);
+    });
+    const foalG = make((B) => {
+      pushBox(B, F, -0.70, 0.60, -0.30, 0.30, 0.65, 1.25, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.40, 0.85, -0.18, 0.18, 1.05, 1.65, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.65, 1.15, -0.18, 0.18, 1.45, 1.75, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, -0.90, -0.68, -0.10, 0.10, 0.60, 1.15, [0.16, 0.12, 0.10], [0, 1, 0, 0]);
+      for (const s of [-0.55, 0.45]) for (const t of [-0.22, 0.22]) pushBox(B, F, s - 0.09, s + 0.09, t - 0.08, t + 0.08, 0, 0.68, [0.22, 0.16, 0.12], [0, 1, 0, 0]);
+    });
+    const HORSEC = [[0.56, 0.32, 0.18], [0.18, 0.17, 0.17], [0.76, 0.44, 0.22], [0.88, 0.88, 0.86], [0.42, 0.32, 0.24]];
+
+    const deerG = make((B) => {
+      pushBox(B, F, -0.85, 0.75, -0.32, 0.32, 0.70, 1.30, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, -0.92, -0.82, -0.22, 0.22, 0.85, 1.20, [0.94, 0.94, 0.92], [0, 1, 0, 0]);
+      pushBox(B, F, 0.50, 0.95, -0.18, 0.18, 1.05, 1.75, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.75, 1.25, -0.18, 0.18, 1.55, 1.85, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.65, 0.78, -0.26, 0.26, 1.82, 2.05, [0.85, 0.52, 0.32], [0, 1, 0, 0]);
+      for (const s of [-0.68, 0.58]) for (const t of [-0.22, 0.22]) pushBox(B, F, s - 0.09, s + 0.09, t - 0.08, t + 0.08, 0, 0.75, [0.45, 0.30, 0.18], [0, 1, 0, 0]);
+      pushBox(B, F, 0.80, 0.90, -0.14, 0.14, 1.85, 2.30, [0.38, 0.32, 0.24], [0, 1, 0, 0]);
+    });
+    const fawnG = make((B) => {
+      pushBox(B, F, -0.50, 0.45, -0.22, 0.22, 0.45, 0.88, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, -0.35, 0.35, -0.12, 0.12, 0.86, 0.92, [0.96, 0.96, 0.94], [0, 1, 1, 0]);
+      pushBox(B, F, -0.55, -0.48, -0.15, 0.15, 0.55, 0.80, [0.94, 0.94, 0.92], [0, 1, 0, 0]);
+      pushBox(B, F, 0.30, 0.65, -0.14, 0.14, 0.70, 1.25, [1, 1, 1], [0, 0, 0, 0]);
+      pushBox(B, F, 0.48, 0.85, -0.14, 0.14, 1.10, 1.35, [1, 1, 1], [0, 0, 0, 0]);
+      for (const s of [-0.40, 0.35]) for (const t of [-0.15, 0.15]) pushBox(B, F, s - 0.07, s + 0.07, t - 0.06, t + 0.06, 0, 0.48, [0.45, 0.30, 0.18], [0, 1, 0, 0]);
+    });
+    const DEERC = [[0.74, 0.44, 0.22], [0.65, 0.36, 0.18], [0.80, 0.48, 0.24]];
+
+    const isNight = LIGHTS;
+    const isWinter = (SEASON === 'winter');
+    const isAutumn = (SEASON === 'autumn');
+    const isSpring = (SEASON === 'spring');
+    const isSummer = (SEASON === 'summer');
+
+    const prng = (seed) => {
+      let s = (Math.abs(seed) % 2147483647) + 1;
+      return () => { s = (s * 48271) % 2147483647; return (s - 1) / 2147483646; };
+    };
+
+    const cows = [], calves = [];
+    const horses = [], foals = [];
+    const deers = [], fawns = [];
+
+    for (let hi = 0; hi < scene.herds.length; hi++) {
+      const H = scene.herds[hi];
+      const rnd = prng(Math.round(H.x * 100 + H.y * 137 + hi * 1009));
+      const count = H.n || 8;
+      const baseR = H.r || 30;
+
+      let rEff = baseR;
+      if (isWinter || isNight) {
+        rEff = Math.max(3.2, baseR * 0.16);
+      } else if (isAutumn) {
+        rEff = Math.max(7.0, baseR * 0.45);
+      } else if (isSpring) {
+        rEff = baseR * 0.82;
+      }
+
+      const adultList = H.typ === 'horse' ? horses : H.typ === 'deer' ? deers : cows;
+      const youngList = H.typ === 'horse' ? foals : H.typ === 'deer' ? fawns : calves;
+
+      for (let i = 0; i < count; i++) {
+        let dist, ang;
+        if (isWinter || isNight) {
+          dist = 0.8 + Math.sqrt(rnd()) * rEff;
+          ang = (i / count) * Math.PI * 2 + (rnd() - 0.5) * 0.4;
+        } else {
+          dist = Math.sqrt(rnd()) * rEff;
+          ang = rnd() * Math.PI * 2;
+        }
+
+        const ax = H.x + Math.cos(ang) * dist;
+        const ay = H.y + Math.sin(ang) * dist;
+        const az = groundH(ax, ay);
+        const facing = (isWinter || isNight) ? ang + (rnd() - 0.5) * 0.8 : rnd() * Math.PI * 2;
+        const colIdx = Math.floor(rnd() * 8);
+
+        adultList.push([ax, ay, az, facing, colIdx]);
+
+        if (H.mladata !== false) {
+          if (isSpring && rnd() < 0.40) {
+            const side = rnd() < 0.5 ? -1 : 1;
+            const kx = ax + Math.cos(facing + side * Math.PI / 2) * 1.35 + (rnd() - 0.5) * 0.3;
+            const ky = ay + Math.sin(facing + side * Math.PI / 2) * 1.35 + (rnd() - 0.5) * 0.3;
+            youngList.push([kx, ky, groundH(kx, ky), facing + (rnd() - 0.5) * 0.3, colIdx]);
+          } else if (isSummer && rnd() < 0.28) {
+            const ka = rnd() * Math.PI * 2, kd = 1.8 + rnd() * 2.2;
+            const kx = ax + Math.cos(ka) * kd, ky = ay + Math.sin(ka) * kd;
+            youngList.push([kx, ky, groundH(kx, ky), rnd() * Math.PI * 2, colIdx]);
+          } else if ((isWinter || isNight) && i === 0 && count >= 4) {
+            const kx = H.x + (rnd() - 0.5) * 1.5, ky = H.y + (rnd() - 0.5) * 1.5;
+            youngList.push([kx, ky, groundH(kx, ky), rnd() * Math.PI * 2, colIdx]);
+          }
+        }
+      }
+    }
+
+    if (cows.length) inst(cowG, cows, ([x, y, z, a]) => [x, y, z, a], (it) => COWC[it[4] % COWC.length]);
+    if (calves.length) inst(calfG, calves, ([x, y, z, a]) => [x, y, z, a], (it) => COWC[it[4] % COWC.length]);
+    if (horses.length) inst(horseG, horses, ([x, y, z, a]) => [x, y, z, a], (it) => HORSEC[it[4] % HORSEC.length]);
+    if (foals.length) inst(foalG, foals, ([x, y, z, a]) => [x, y, z, a], (it) => HORSEC[it[4] % HORSEC.length]);
+    if (deers.length) inst(deerG, deers, ([x, y, z, a]) => [x, y, z, a], (it) => DEERC[it[4] % DEERC.length]);
+    if (fawns.length) inst(fawnG, fawns, ([x, y, z, a]) => [x, y, z, a], (it) => DEERC[it[4] % DEERC.length]);
+  }
 
   // ploty, živé ploty, zdi, vedení
   const L = newBuf();
