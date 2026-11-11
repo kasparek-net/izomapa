@@ -183,7 +183,29 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 .pin::after { content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 10px; background: var(--tile); transform: translateX(-50%); }
 .pin.need { background: var(--lamp); color: var(--night); border-color: var(--night); transform: translate(-50%, -260%); }
 .pin.need::after { background: var(--night); }
-.nolabels .pin, .far .pin:not(.need) { display: none !important; }
+.pin.neighbor {
+  pointer-events: auto; cursor: pointer; text-decoration: none;
+  background: var(--panel); border: 2px solid var(--lamp); color: var(--ink); font-weight: bold;
+  display: inline-flex; align-items: center; gap: 4px; transform: translate(-50%, -140%);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .4); transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  z-index: 2;
+}
+.pin.neighbor::after { content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 10px; background: var(--lamp); transform: translateX(-50%); }
+.pin.neighbor:hover, .pin.neighbor:focus-visible {
+  background: var(--panel-2); border-color: var(--grass); transform: translate(-50%, -146%) scale(1.05);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, .5); outline: none;
+}
+.pin.neighbor:hover::after, .pin.neighbor:focus-visible::after { background: var(--grass); }
+.pin.neighbor .pin-ico { font-size: .85em; color: var(--lamp); }
+.pin.neighbor:hover .pin-ico { color: var(--grass); }
+.card-neighbor-btn {
+  display: block; text-align: center; font-family: var(--display); font-size: .95rem; font-weight: bold;
+  text-decoration: none; background: var(--lamp); color: var(--night); border: 2px solid var(--night);
+  padding: 6px 10px; margin-bottom: 8px; box-shadow: 2px 2px 0 rgba(0, 0, 0, .3);
+  transition: transform .1s ease, background .1s ease;
+}
+.card-neighbor-btn:hover, .card-neighbor-btn:focus-visible { background: #ffe08a; transform: translateY(-1px); }
+.nolabels .pin, .far .pin:not(.need):not(.neighbor) { display: none !important; }
 .loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: var(--display); color: var(--muted); z-index: 1; pointer-events: none; }
 .mbar { display: none; }
 
@@ -459,6 +481,26 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (l.day) viewer.world.setItemIndex(l.day, k++);
     }
   };
+  const S_REV = { spring: 'jaro', summer: 'leto', autumn: 'podzim', winter: 'zima' };
+  const neighborHref = (n) => {
+    let u = n.url || '';
+    if (u.includes('@')) return u;
+    const lat = n.target_lat ?? (n.cil ? n.cil[0] : n.lat);
+    const lon = n.target_lon ?? (n.cil ? n.cil[1] : n.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return u;
+    let km = 1.4;
+    try {
+      if (viewer && viewer.viewport && cam) {
+        const w = viewer.viewport.getBounds(true).width * W * cam.mpp / 1000;
+        if (w > 0 && Number.isFinite(w)) km = Math.min(Math.max(Number(w.toFixed(2)), 0.05), 10);
+      }
+    } catch {}
+    const sTok = S_REV[state.season] || 'leto';
+    const nTok = state.night > 0.65 ? '-noc' : state.night > 0.25 ? '-soumrak' : '';
+    const hash = `#${sTok}${nTok}@${Number(lat).toFixed(5)},${Number(lon).toFixed(5)},${km},1`;
+    return u.split('#')[0] + hash;
+  };
+
   async function initLayers() {
     await addPreview(state.season);
     $('loading').hidden = true;
@@ -490,6 +532,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (const p of OV.places) {
       const el = document.createElement('div'); el.className = 'pin'; el.textContent = p.name; p.el = el;
       viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(p.xy[0] / W, p.xy[1] / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
+    }
+    for (const n of OV.neighbors || []) {
+      if (OBEC && n.obec && n.obec !== OBEC) continue;
+      const el = document.createElement('a'); el.className = 'pin neighbor'; el.href = neighborHref(n);
+      if (n.target) el.target = n.target;
+      if (el.target === '_blank') el.rel = 'noopener';
+      el.title = n.text || `Přejít na mapu: ${n.name}`;
+      el.innerHTML = `<span class="pin-ico">↗</span> ${n.name}`;
+      const upd = () => { el.href = neighborHref(n); };
+      el.addEventListener('pointerenter', upd);
+      el.addEventListener('pointerdown', (e) => { e.stopPropagation(); upd(); });
+      el.addEventListener('click', (e) => { e.stopPropagation(); upd(); });
+      n.el = el;
+      viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(n.xy[0] / W, n.xy[1] / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
     }
     ready = true; applyVisibility(); applyTime(); loadMini(); tickReal();
     viewer.viewport.fitBounds(homeBounds(), true);
@@ -608,6 +664,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function applyVisibility() {
     for (const l of LAYERS) if (l.day) l.day.setOpacity(layerOpacity(l));
     for (const p of OV.places) if (p.el) p.el.hidden = !shown(p.k);
+    for (const n of OV.neighbors || []) if (n.el) n.el.hidden = !shown(n.k);
     for (const n of OV.needs || []) if (n.el) n.el.hidden = !state.wip;
     document.querySelectorAll('[data-wip]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.wip === '1') === state.wip)));
     if (typeof renderPlaces === 'function') renderPlaces();
@@ -794,13 +851,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 
   // ---------- karta ----------
   const ROOF = { flat: 'plochá', gabled: 'sedlová', hipped: 'valbová', pyramidal: 'stanová' };
-  function showCard({ title, text, rows, lon, lat, k }) {
+  function showCard({ title, text, rows, lon, lat, k, link, linkText, target }) {
     $('cardTitle').textContent = title;
     if (k && !(LAYERS.find((l) => l.key === k) || {}).status?.startsWith('hotovo')) { const t = document.createElement('span'); t.className = 'wip-tag'; t.textContent = 'Rozpracováno'; $('cardTitle').append(' ', t); }
     $('cardText').hidden = !text; $('cardText').textContent = text || '';
     const dl = $('cardDl'); dl.replaceChildren();
     for (const [k, v] of rows) { if (v === undefined || v === null || v === '') continue; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
     const links = $('cardLinks'); links.replaceChildren();
+    if (link) {
+      const btn = document.createElement('a'); btn.href = link; btn.className = 'card-neighbor-btn';
+      if (target) btn.target = target;
+      if (btn.target === '_blank') btn.rel = 'noopener';
+      btn.textContent = linkText || `Přejít na mapu ${title} ↗`;
+      links.append(btn);
+    }
     const a = document.createElement('a'); a.target = '_blank'; a.rel = 'noopener';
     a.href = `https://mapy.cz/zakladni?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19&source=coor&id=${lon.toFixed(6)}%2C${lat.toFixed(6)}`;
     a.textContent = 'Ukázat ve skutečnosti (Mapy.cz)';
@@ -855,6 +919,17 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function showPoint(ix, iy) {
     state.sel = null;
     const [x, y] = imgToWorld(ix, iy); const [lon, lat] = lonlat(x, y);
+    // sousední mapa: klik do 40 m od špendlíku (1 px = 0,2 m)
+    let nb = null, nd = 200;
+    for (const n of OV.neighbors || []) {
+      if (!shown(n.k) || (OBEC && n.obec && n.obec !== OBEC)) continue;
+      const d = Math.hypot(ix - n.xy[0], iy - n.xy[1]);
+      if (d < nd) { nb = n; nd = d; }
+    }
+    if (nb) {
+      showCard({ title: nb.name, text: nb.text || 'Sousední izometrická mapa.', lon: nb.lon, lat: nb.lat, k: nb.k, link: neighborHref(nb), linkText: `Přejít na mapu ${nb.name} ↗`, target: nb.target, rows: [['Sousední mapa', nb.name]] });
+      return;
+    }
     // místo bez budovy (náměstí, hřbitov, přehrada): klik do 40 m od jeho špendlíku (1 px = 0,2 m)
     let pl = null, bd = 200;
     for (const p of OV.places) { if (!shown(p.k)) continue; const d = Math.hypot(ix - p.xy[0], iy - p.xy[1]); if (d < bd) { pl = p; bd = d; } }
@@ -922,6 +997,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   renderPlaces();
   const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const index = [];
+  for (const n of OV.neighbors || []) {
+    if (OBEC && n.obec && n.obec !== OBEC) continue;
+    index.push({ label: n.name, kind: 'soused', k: n.k, n: norm(n.name), go: () => { goTo(n.xy[0], n.xy[1], 1.4); showCard({ title: n.name, text: n.text || 'Sousední izometrická mapa.', lon: n.lon, lat: n.lat, k: n.k, link: neighborHref(n), linkText: `Přejít na mapu ${n.name} ↗`, target: n.target, rows: [['Sousední mapa', n.name]] }); } });
+  }
   for (const p of OV.places) index.push({ label: p.name, kind: 'místo', k: p.k, n: norm(p.name), go: () => { goTo(p.xy[0], p.xy[1], 1.4); showCard({ title: p.name, text: p.text, lon: p.lon, lat: p.lat, k: p.k, rows: [] }); } });
   for (const s of OV.streets) index.push({ label: s.name, kind: 'ulice', k: s.k, n: norm(s.name), go: () => goTo(s.xy[0], s.xy[1], 0.9) });
   // adresy celé mapy jsou ve zvláštním souboru, načtou se při prvním psaní do hledání
