@@ -1468,7 +1468,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t), trhyDnes: (t) => trhyDnes(t), trhLidi: (a, t) => trhLidi(a, t), get TRHM() { return TRHM; }, schoolDay: (n) => schoolDay(n), get SCHOOLS() { return SCHOOLS; }, schoolPaths: (q) => schoolPaths(q), kidPos: (p, s) => kidPos(p, s), hidden: (x, y) => { const h = gz(x, y); return figureHidden(x, y, h, toImg(x, y, h)); } };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), ringFree: (g) => ringFree(g), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t), trhyDnes: (t) => trhyDnes(t), trhLidi: (a, t) => trhLidi(a, t), get TRHM() { return TRHM; }, schoolDay: (n) => schoolDay(n), get SCHOOLS() { return SCHOOLS; }, schoolPaths: (q) => schoolPaths(q), kidPos: (p, s) => kidPos(p, s), hidden: (x, y) => { const h = gz(x, y); return figureHidden(x, y, h, toImg(x, y, h)); } };       // ladění v lokálním náhledu
   function figureHidden(x, y, h, p) {                      // postavu zakryje budova nebo koruna stromu
     if (occluded(p[0], p[1], depth(x, y, h))) return true;
     for (const q of treeShapes(x, y, h, [p[0] - 1, p[1] - 9, p[0] + 1, p[1]]))
