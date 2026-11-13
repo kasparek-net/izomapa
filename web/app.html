@@ -497,7 +497,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     } catch {}
     const sTok = S_REV[state.season] || 'leto';
     const nTok = state.night > 0.65 ? '-noc' : state.night > 0.25 ? '-soumrak' : '';
-    const hash = `#${sTok}${nTok}@${Number(lat).toFixed(5)},${Number(lon).toFixed(5)},${km},1`;
+    const hash = `#${sTok}${nTok}@${Number(lat).toFixed(5)},${Number(lon).toFixed(5)},${km}`;
     return u.split('#')[0] + hash;
   };
 
