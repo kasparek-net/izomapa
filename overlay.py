@@ -142,7 +142,7 @@ for chunk in chunks:
         d = px(cx, cy, b['base'])[2]
         church = b['cls'] == 'kostel'
         name, text = b['name'], None
-        if b['cls'] == 'kaple':
+        if b['cls'] == 'kaple' and not name:
             name = 'Hřbitovní kaple'
         inside = []
         if PL_TREE is not None:
@@ -336,6 +336,24 @@ for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
     for naz in [MESTO['nazev']] + [o['nazev'] for o in OBCE if o.get('nazev')]:
         nm = nm.replace(naz + '-', '')
     districts.append({'name': nm, 'xy': list(px(rp.x, rp.y, gz(rp.x, rp.y))[:2]), 'a': round(gg.area / 1e6, 2)})
+# bez čtvrtí v Overture (menší města): části obce z adres ČÚZK (postal_city = část obce, poslední úroveň = obec),
+# popisek doprostřed největší souvislé zástavby části (domy do 80 m od sebe)
+if not districts and os.path.exists('data_all/address.parquet'):
+    _obce = {MESTO['nazev']} | {o['nazev'] for o in OBCE if o.get('nazev')}
+    _casti = {}
+    for r in pq.read_table('data_all/address.parquet', columns=['postal_city', 'address_levels', 'geometry']).to_pylist():
+        lv = r['address_levels'] or []
+        if not r['postal_city'] or not lv or lv[-1]['value'] not in _obce or r['postal_city'] in _SKIP: continue
+        _casti.setdefault(r['postal_city'], []).append(to_local(*shapely.from_wkb(r['geometry']).coords[0]))
+    for nm, xy in _casti.items():
+        if len(xy) < 15: continue                       # samoty a osady s pár domy bez popisku
+        pts = shapely.points(np.array(xy, dtype=float))
+        blob = max(getattr(u := shapely.unary_union(shapely.buffer(pts, 40)), 'geoms', [u]), key=lambda g: g.area)
+        inn = pts[shapely.contains(blob, pts)]
+        mx, my = np.median([[p.x, p.y] for p in inn], axis=0)
+        p = min(inn, key=lambda q: (q.x - mx) ** 2 + (q.y - my) ** 2)    # nejbližší dům ke středu (ne pole mezi)
+        if chunk_of(p.x, p.y) not in CKEY: continue
+        districts.append({'name': nm, 'xy': list(px(p.x, p.y, gz(p.x, p.y))[:2]), 'a': round(shapely.MultiPoint(inn).convex_hull.area / 1e6, 2)})
 print('čtvrtí', len(districts))
 # školy (Overture land_use: school, college): děti k nim ráno chodí a odpoledne se rozcházejí (web/app.html)
 schools, _seen = [], set()
