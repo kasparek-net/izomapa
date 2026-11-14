@@ -336,16 +336,23 @@ for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
     for naz in [MESTO['nazev']] + [o['nazev'] for o in OBCE if o.get('nazev')]:
         nm = nm.replace(naz + '-', '')
     districts.append({'name': nm, 'xy': list(px(rp.x, rp.y, gz(rp.x, rp.y))[:2]), 'a': round(gg.area / 1e6, 2)})
-# bez čtvrtí v Overture (menší města): části obce z adres ČÚZK (postal_city = část obce, poslední úroveň = obec),
-# popisek doprostřed největší souvislé zástavby části (domy do 80 m od sebe)
+# bez čtvrtí v Overture (menší města): obce a jejich části z adres ČÚZK (postal_city = část obce, poslední úroveň = obec),
+# popisek doprostřed největší souvislé zástavby části (domy do 80 m od sebe). Kromě města a obcí z obce/*.json
+# i každá obec, jejíž území (Overture localadmin) leží z víc než poloviny v mapě. k: obec (větší písmo) / cast (menší)
 if not districts and os.path.exists('data_all/address.parquet'):
     _obce = {MESTO['nazev']} | {o['nazev'] for o in OBCE if o.get('nazev')}
+    _mapa = shapely.unary_union([shapely.box((2 * i - 1) * HALF, (2 * j - 1) * HALF, (2 * i + 1) * HALF, (2 * j + 1) * HALF) for i, j in CHUNKS])
+    for st, n, g in zip(_dv.subtype, _dv.names, _dv.geometry):
+        nm = n.get('primary') if isinstance(n, dict) else None
+        if st != 'localadmin' or not nm: continue
+        gg = shapely.ops.transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(g))
+        if gg.area and gg.intersection(_mapa).area / gg.area > 0.5: _obce.add(nm)
     _casti = {}
     for r in pq.read_table('data_all/address.parquet', columns=['postal_city', 'address_levels', 'geometry']).to_pylist():
         lv = r['address_levels'] or []
         if not r['postal_city'] or not lv or lv[-1]['value'] not in _obce or r['postal_city'] in _SKIP: continue
-        _casti.setdefault(r['postal_city'], []).append(to_local(*shapely.from_wkb(r['geometry']).coords[0]))
-    for nm, xy in _casti.items():
+        _casti.setdefault((r['postal_city'], lv[-1]['value']), []).append(to_local(*shapely.from_wkb(r['geometry']).coords[0]))
+    for (nm, obec), xy in _casti.items():
         if len(xy) < 15: continue                       # samoty a osady s pár domy bez popisku
         pts = shapely.points(np.array(xy, dtype=float))
         blob = max(getattr(u := shapely.unary_union(shapely.buffer(pts, 40)), 'geoms', [u]), key=lambda g: g.area)
@@ -353,7 +360,8 @@ if not districts and os.path.exists('data_all/address.parquet'):
         mx, my = np.median([[p.x, p.y] for p in inn], axis=0)
         p = min(inn, key=lambda q: (q.x - mx) ** 2 + (q.y - my) ** 2)    # nejbližší dům ke středu (ne pole mezi)
         if chunk_of(p.x, p.y) not in CKEY: continue
-        districts.append({'name': nm, 'xy': list(px(p.x, p.y, gz(p.x, p.y))[:2]), 'a': round(shapely.MultiPoint(inn).convex_hull.area / 1e6, 2)})
+        districts.append({'name': nm, 'xy': list(px(p.x, p.y, gz(p.x, p.y))[:2]), 'a': round(shapely.MultiPoint(inn).convex_hull.area / 1e6, 2),
+                          'k': 'obec' if nm == obec else 'cast'})
 print('čtvrtí', len(districts))
 # tramvaje: graf kolejí přes všechny čtverce, linky = nejkratší cesta mezi konečnými (TRAM_LINES), tam a zpět
 OFF = (0.0, 0.0)
@@ -392,8 +400,10 @@ for a_n, b_n, n_ in TRAM_LINES:
     trams.append({'w': [[round(x, 1), round(y, 1)] for x, y, z in pts], 'p': [list(px(x, y, z)) for x, y, z in pts], 'n': n_,
                   'stops': [list(px(TSTOP[n][0], TSTOP[n][1], 0)[:2]) + [n] for n in st]})
     print('tramvaj', a_n, '–', b_n, round(sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(on, on[1:]))), 'm', len(st), 'zastávek')
+# semafory (nastroje/semafory.py): [x, y, křižovatka] ve společných souřadnicích; silnicím je přiřadí prohlížeč
+signals = [[round(float(x), 1), round(float(y), 1), j] for la, lo, j in json.load(open('assets/semafory.json')) for x, y in [to_local(lo, la)]] if os.path.exists('assets/semafory.json') else []
 json.dump({'w': W, 'h': H, 'cam': cam, 'districts': districts, 'needs': needs, 'xmas': nam, 'chunks': {CKEY[c]: CHUNKS[c] for c in chunks}, 'bus': bus_route, 'trams': trams, 'decks': decks,
-           'streets': streets, 'places': places, 'neighbors': neighbors},
+           'streets': streets, 'places': places, 'neighbors': neighbors, **({'signals': signals} if signals else {})},
           open('site/overlay.json', 'w'), separators=(',', ':'), ensure_ascii=False)
 json.dump(addr_index, open('site/search.json', 'w'), separators=(',', ':'), ensure_ascii=False)   # adresy pro hledání, načte se až při psaní
 print('čtverců', len(chunks), 'budov', sum(len(v['buildings']) for v in per_chunk.values()), 'adres', len(addr_index),

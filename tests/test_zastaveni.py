@@ -1,5 +1,5 @@
 """Run after overlay.py from the build folder: python tests/test_zastaveni.py
-Semafory (z) a přejezdy (j) na kusu silnice jsou v metrech od začátku toho kusu, i když prep.py kus rozdělil."""
+Přejezdy (j) na kusu silnice jsou v metrech od začátku toho kusu, i když prep.py kus rozdělil."""
 import glob, json, math
 
 roads = [r for f in glob.glob('site/overlay/*.json') for r in json.load(open(f))['roads']]
@@ -20,7 +20,7 @@ def at(w, s):
 n = 0
 for r in roads:
     L = sum(math.dist(a[:2], b[:2]) for a, b in zip(r['w'], r['w'][1:]))
-    for z in r.get('z', []) + r.get('j', []):
+    for z in r.get('j', []):
         n += 1
         assert -0.5 <= z[0] <= L + 0.5, f'stop at {z[0]} m on a {L:.1f} m piece'
     for s, x, y in r.get('j', []):
