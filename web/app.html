@@ -1145,7 +1145,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const fx = $('fx'), ctx = fx.getContext('2d');
   viewer.canvas.insertBefore(fx, viewer.canvas.lastChild);           // mezi dlaždice a popisky: vozidla nepřekryjí názvy míst
   const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-  const DISTRICTS = (OV.districts || []).slice().sort((p, q) => q.a - p.a);
+  const DISTRICTS = (OV.districts || []).slice().sort((p, q) => (q.k === 'obec') - (p.k === 'obec') || q.a - p.a);   // obce před místními částmi
   const DISPLAY_FONT = getComputedStyle(document.documentElement).getPropertyValue('--display').trim() || 'monospace';
   const sid = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 1000003; };
   const occluded = (ix, iy, d) => {
@@ -1154,7 +1154,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return false;
   };
   // silniční graf
-  const roads = [], ends = new Map(), cars = [], sigs = [];
+  const roads = [], ends = new Map(), cars = [];
   // vjezd na kruhový objezd: auto dá přednost autům na okruhu (25 m před vjezdem nebo právě v něm)
   function yieldZ(r, y) {
     const e = y[0] < 1 ? r.w[0] : r.w[r.w.length - 1], z = [y[0]];
@@ -1170,12 +1170,21 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     return true;
   }
+  const blocked = (z) => z.rb ? !ringFree(z.rb) : (z.g || z.xc).closed;    // vjezd na kruhový objezd, zavřený přejezd (z.g), nebo semafor (z.xc)
   // železniční přejezdy (z[0] metry od začátku kusu, z[1..2] svět): zavřeno ~25 s před příjezdem vlaku, dokud neprojede poslední vůz
-  const XC = new Map(), xings = [];
+  // Přejezdy přes sousední koleje (do XG_M od sebe) tvoří jeden přejezd: jedny výstražníky před první a za poslední kolejí,
+  // zavřeno, když jede vlak po kterékoli koleji (v OSM je přejezd zvlášť na každé koleji).
+  const XC = new Map(), xings = [], XG = [], XG_M = 15;
   function addXing(r, z) {
     const key = Math.round(z[1]) + ',' + Math.round(z[2]);
     if (!XC.has(key)) XC.set(key, { x: z[1], y: z[2], closed: false, on: null });
-    z.xc = XC.get(key); xings.push([r, z]);
+    z.xc = XC.get(key);
+    let g = XG.find((q) => q.pts.some(([x, y]) => Math.hypot(x - z[1], y - z[2]) < XG_M));
+    if (!g) XG.push(g = { pts: [], cs: new Set(), closed: false });
+    g.pts.push([z[1], z[2]]); g.cs.add(z.xc); z.g = g;
+    const lead = xings.find(([r2, z2]) => r2 === r && z2.g === g);       // na jednom kusu silnice jedny výstražníky pro celou skupinu
+    if (lead) { lead[1].s0 = Math.min(lead[1].s0, z[0]); lead[1].s1 = Math.max(lead[1].s1, z[0]); }
+    else { z.s0 = z.s1 = z[0]; xings.push([r, z]); }
   }
   function xingShapes(c) {                                 // na kterých tratích (tvar, metry od začátku) přejezd leží
     c.on = [];
@@ -1198,25 +1207,26 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const shapeSigs = new Map();                             // semafory na trase autobusu: [metry po trase, semafor]; jen ve směru jízdy po stejné silnici
   function sigsOnShape(i) {
     const hit = shapeSigs.get(i);
-    if (hit && hit.n === sigs.length) return hit.list;
+    if (hit && hit.n === sigPosts.length) return hit.list;
     const sh = MHD.shapes[i], list = [];
-    for (const [r, z] of sigs) {
+    for (const [r, z] of sigPosts) {
       const o = along(r, z[0]), ol = Math.hypot(o.dx, o.dy) || 1;
       for (let k = 1; k < sh.w.length; k++) {
         const a = sh.w[k - 1], b = sh.w[k], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
         const t = Math.max(0, Math.min(1, ((o.x - a[0]) * dx + (o.y - a[1]) * dy) / l2));
-        if (Math.hypot(a[0] + dx * t - o.x, a[1] + dy * t - o.y) < 4 && Math.abs(dx * o.dx + dy * o.dy) / (Math.sqrt(l2) * ol) > 0.8) { list.push([sh.len[k - 1] + (sh.len[k] - sh.len[k - 1]) * t, z]); break; }
+        const dot = (dx * o.dx + dy * o.dy) / (Math.sqrt(l2) * ol);
+        if (Math.hypot(a[0] + dx * t - o.x, a[1] + dy * t - o.y) < 4 && Math.abs(dot) > 0.8 && (!z.t || Math.sign(dot) === z.t)) { list.push([sh.len[k - 1] + (sh.len[k] - sh.len[k - 1]) * t - z.d, z]); break; }   // stop čára z.d m před semaforem, jen směr ke křižovatce
       }
     }
-    shapeSigs.set(i, { n: sigs.length, list });
+    shapeSigs.set(i, { n: sigPosts.length, list });
     return list;
   }
   function busDelay(i, trip, el, dt) {                     // před zavřeným přejezdem a na červenou stát, pak zpoždění dohnat (o polovinu rychleji)
     let d = busWait.get(i) || 0, wait = false;
-    if (!XC.size && !sigs.length && !d) return 0;
+    if (!XC.size && !sigPosts.length && !d) return 0;
     const s = trainS(trip, el - d);
     for (const c of XC.values()) if (c.closed && c.on) for (const [sh, sc] of c.on) if (sh === trip[1] && s > sc - 10 && s < sc - 2) wait = true;
-    for (const [sp, z] of sigsOnShape(trip[1])) if (s > sp - 10 && s < sp - 2 && !sigGreen(z)) wait = true;
+    for (const [sp, z] of sigsOnShape(trip[1])) if (s > sp - 8 && s < sp && z.xc && z.xc.closed) wait = true;
     d = wait ? d + dt : Math.max(0, d - dt * 0.5);
     if (d) busWait.set(i, d); else busWait.delete(i);
     return d;
@@ -1231,6 +1241,71 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         const trip = MHD.trips[i], T = TRAINS[trainOf(MHD.routes[trip[0]][0])].cars.reduce((a, q) => a + q.len + 0.4, 0);
         return c.on.some(([sh, s]) => sh === trip[1] && trainS(trip, el + 25) + T / 2 > s - 5 && trainS(trip, el) - T / 2 < s + 8);
       });
+    }
+    for (const g of XG) g.closed = [...g.cs].some((c) => c.closed);
+  }
+  // semafory (OV.signals z nastroje/semafory.py, [x, y, křižovatka]): každá křižovatka má cyklus SIG_CYC s pro dvě osy
+  // (osa 0 = směr nejvyšší třídy silnice, kolmé příjezdy osa 1); samotný přechod má jen osu 0 a zbytek cyklu patří chodcům.
+  // Na kusu silnice r.sg: z = [metry od začátku, x, y], z.t směr jízdy ke křižovatce (0 = oba), z.d stop čára tolik m před bodem.
+  const SIG_CYC = 64, SIG = new Map(), sigPosts = [];
+  const SIG_RANK = { motorway: 7, trunk: 6, primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 1 };
+  for (const [x, y, j] of OV.signals || []) {
+    if (!SIG.has(j)) SIG.set(j, { pts: [], app: [], off: rnd(j + 900) * SIG_CYC, st: [{ closed: false, c: 'g' }, { closed: true, c: 'r' }] });
+    SIG.get(j).pts.push([x, y]);
+  }
+  for (const J of SIG.values()) { J.cx = J.pts.reduce((a, p) => a + p[0], 0) / J.pts.length; J.cy = J.pts.reduce((a, p) => a + p[1], 0) / J.pts.length; }
+  function projS(r, x, y) {                                // nejbližší bod kusu silnice: [vzdálenost, metry od začátku]
+    let best = 1e9, bs = 0;
+    for (let k = 1; k < r.w.length; k++) {
+      const a = r.w[k - 1], b = r.w[k], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)), d = Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
+      if (d < best) { best = d; bs = r.len[k - 1] + (r.len[k] - r.len[k - 1]) * t; }
+    }
+    return [best, bs];
+  }
+  function addSignals(r) {
+    if (!SIG.size || r.c === 'service' || r.c === 'living_street') return;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const p of r.w) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+    for (const J of SIG.values()) {
+      if (J.cx < x0 - 60 || J.cx > x1 + 60 || J.cy < y0 - 60 || J.cy > y1 + 60) continue;
+      for (const [px, py] of J.pts) {
+        const [d, s] = projS(r, px, py);
+        if (d > 8) continue;
+        const end = s < 1 ? -1 : s > r.L - 1 ? 1 : 0;        // semafor v uzlu na konci kusu: křižovatka je tam
+        if (end && r.L < 20) continue;                      // krátký kus uvnitř křižovatky: tam se nestojí
+        let t = end;
+        if (!end) { const sc = projS(r, J.cx, J.cy)[1]; t = Math.abs(sc - s) < 3 ? 0 : Math.sign(sc - s); }
+        if (r.o) { if (t && t !== r.o) continue; t = r.o; }   // jednosměrka: jen směr, kterým se jezdí
+        if ((r.sg || []).some((q) => q.J === J && (q.t === t || !q.t || !t))) continue;   // víc bodů jedné křižovatky na tomtéž kusu
+        const o = along(r, Math.max(0.5, Math.min(r.L - 0.5, s)));
+        const z = [s, px, py]; Object.assign(z, { t, d: end ? 9 : 3, J, ang: Math.atan2(o.dy, o.dx), rank: SIG_RANK[r.c] || 0 });
+        (r.sg = r.sg || []).push(z); J.app.push(z); sigPosts.push([r, z]);
+        const ref = J.app.reduce((a, q) => (q.rank > a.rank ? q : a));
+        for (const q of J.app) { let da = Math.abs(q.ang - ref.ang) % Math.PI; if (da > Math.PI / 2) da = Math.PI - da; q.xc = J.st[da > Math.PI / 4 ? 1 : 0]; }
+      }
+    }
+  }
+  function updateSignals() {                               // fáze podle hodin: všichni návštěvníci vidí stejnou barvu
+    const t = Date.now() / 1000;
+    for (const J of SIG.values()) {
+      const p = (t + J.off) % SIG_CYC;
+      J.st[0].c = p < 26 ? 'g' : p < 29 ? 'y' : 'r';
+      J.st[1].c = p >= 32 && p < 58 ? 'g' : p >= 58 && p < 61 ? 'y' : 'r';
+      for (const q of J.st) q.closed = q.c !== 'g';
+    }
+  }
+  const SIG_LAMP = { r: [0, '#ff3b30', '255,59,48'], y: [1, '#ffc21a', '255,194,26'], g: [2, '#38e06a', '56,224,106'] };
+  function drawSigPost(o, z, sx, ox, oy, night) {          // semafor: sloup a hlava se třemi světly, v noci svítící světlo září
+    const x = ox + o.ix * sx, y = oy + o.iy * sx, h = 24 * sx, q = Math.max(1.6, 2.4 * sx);
+    ctx.fillStyle = '#2a2c30'; ctx.fillRect(x - q * 0.3, y - h, q * 0.6, h);
+    const hx = x - q * 0.9, hy = y - h - q * 4.2, [on, col, rgb] = SIG_LAMP[z.xc.c];
+    ctx.fillStyle = '#17181b'; ctx.fillRect(hx, hy, q * 1.8, q * 4.4);
+    for (let k = 0; k < 3; k++) { ctx.fillStyle = k === on ? col : '#3a3b40'; ctx.fillRect(hx + q * 0.4, hy + q * (0.35 + k * 1.35), q, q); }
+    if (night > 0.3) {
+      const lx = hx + q * 0.9, ly = hy + q * (0.85 + on * 1.35), g = ctx.createRadialGradient(lx, ly, 0, lx, ly, q * 3.5);
+      g.addColorStop(0, `rgba(${rgb},${0.55 * Math.min(1, (night - 0.3) / 0.4)})`); g.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = g; ctx.fillRect(lx - q * 3.5, ly - q * 3.5, q * 7, q * 7);
     }
   }
   const ek = (p) => Math.round(p[0]) + ',' + Math.round(p[1]);
@@ -1253,7 +1328,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const i0 = roads.length;
     for (const r of d.roads) {
       const len = [0]; for (let i = 1; i < r.w.length; i++) len.push(len[i - 1] + Math.hypot(r.w[i][0] - r.w[i - 1][0], r.w[i][1] - r.w[i - 1][1]));
-      if (len[len.length - 1] > 1) { roads.push({ ...r, k, len, L: len[len.length - 1] }); const rr = roads[roads.length - 1]; for (const z of r.z || []) sigs.push([rr, z]); for (const z of r.j || []) addXing(rr, z); rr.zj = [...(r.z || []), ...(r.j || []), ...(r.y || []).map((y) => yieldZ(rr, y))]; if (r.rb) rr.rbk = r.rb[0].toFixed(0) + ',' + r.rb[1].toFixed(0); }   // i krátké kousky (kruhový objezd u vjezdů), jinak v okruhu zůstanou mezery a auta tam stojí
+      if (len[len.length - 1] > 1) { roads.push({ ...r, k, len, L: len[len.length - 1] }); const rr = roads[roads.length - 1]; for (const z of r.j || []) addXing(rr, z); rr.jy = [...(r.j || []), ...(r.y || []).map((y) => yieldZ(rr, y))]; if (r.rb) rr.rbk = r.rb[0].toFixed(0) + ',' + r.rb[1].toFixed(0); addSignals(rr); }   // i krátké kousky (kruhový objezd u vjezdů), jinak v okruhu zůstanou mezery a auta tam stojí
     }
     for (let i = i0; i < roads.length; i++) { const r = roads[i]; for (const [end, dir] of [[r.w[0], 1], [r.w[r.w.length - 1], -1]]) { const q = ek(end); if (!ends.has(q)) ends.set(q, []); ends.get(q).push([i, dir]); } }
     // konce, které se v datech minou o pár metrů (rozdělená vozovka, mostovka), propojit, ať auto nemusí otáčet ani mizet
@@ -1326,8 +1401,6 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const CLASS_KMH = { motorway: 110, trunk: 90, primary: 50, secondary: 50, tertiary: 50, unclassified: 40, residential: 30, living_street: 20 };
   const roadSpeed = (r) => (r.x ? Math.min(r.l || 50, 50) : r.l || CLASS_KMH[r.c] || 40) / 3.6;   // r.x = nájezdová rampa
   const carSpeed = (c, r) => Math.min(c.truck ? Math.min(roadSpeed(r), 22) * 0.85 : roadSpeed(r), (c.T.vmax || 999) / 3.6) * c.f;   // nákladní auta o něco pomaleji, popeláři a traktory pomalu
-  // semafory: dvě osy křižovatky se střídají (40 s cyklus je odhad); auta na červenou stojí ve frontě po 8 m
-  const sigGreen = (z) => { const t = (performance.now() / 1000 + z[1] * 7) % 40; return z[2] ? t >= 20 && t < 37 : t < 17; };
   const curbPt = (o, side, off) => {                       // bod u pravého okraje vozovky pro auta jedoucí po kusu (side 1) nebo proti (-1)
     const L = Math.hypot(o.dx, o.dy) || 1, x = o.x + o.dy / L * side * off, y = o.y - o.dx / L * side * off, h = o.z ?? gz(x, y), [ix, iy] = toImg(x, y, h);
     return { x, y, ix, iy, d: depth(x, y, h) };
@@ -1339,7 +1412,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     ctx.moveTo(x - q * 1.8, y - h - q * 3.6); ctx.lineTo(x + q * 1.8, y - h - q * 1.2); ctx.moveTo(x + q * 1.8, y - h - q * 3.6); ctx.lineTo(x - q * 1.8, y - h - q * 1.2); ctx.stroke();
     ctx.strokeStyle = '#f4f4f0'; ctx.lineWidth = q * 0.45; ctx.stroke();
     ctx.fillStyle = '#26262a'; ctx.fillRect(x - q * 2, y - h - q * 0.2, q * 4, q * 1.6);
-    const lamp = z.xc.closed ? [x + (ph ? 1.05 : -1.05) * q, '#ff4438', '255,68,56'] : Math.floor(now / 900) % 2 ? [x, '#f4f4f0', '244,244,240'] : null;
+    const lamp = z.g.closed ? [x + (ph ? 1.05 : -1.05) * q, '#ff4438', '255,68,56'] : Math.floor(now / 900) % 2 ? [x, '#f4f4f0', '244,244,240'] : null;
     if (!lamp) return;
     if (night > 0.3) {
       const g = ctx.createRadialGradient(lamp[0], y - h + q * 0.6, 0, lamp[0], y - h + q * 0.6, q * 3.5);
@@ -1348,15 +1421,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     ctx.fillStyle = lamp[1]; ctx.fillRect(lamp[0] - q * 0.6, y - h + q * 0.05, q * 1.2, q * 1.1);
   }
-  const isOpen = (z) => z.xc ? !z.xc.closed : z.rb ? ringFree(z.rb) : sigGreen(z);   // přejezd, vjezd na kruhový objezd, nebo semafor
   function stepCar(c, dt) {
-    if (c.hold) { if (!isOpen(c.hold)) return; c.hold.q = null; c.hold = null; }
+    if (c.hold) { if (blocked(c.hold)) return; c.hold.q = null; c.hold = null; }
     const r = roads[c.r], next = c.s + carSpeed(c, r) * dt * c.dir;
-    if (r.zj.length && c.q <= tShare) for (const z of r.zj) {   // červená nebo zavřený přejezd: zastavit 6 m před, další ve frontě podle délky vozu
-      if (isOpen(z)) continue;
-      const qi = c.dir > 0 ? 0 : 1, stop = z[0] - c.dir * (6 + ((z.q && z.q[qi]) || 0));   // z.q = délka fronty v m
+    for (const zs of [r.jy, r.sg]) if (zs) for (const z of zs) {   // zavřený přejezd, plný kruhový objezd (6 m před) nebo červená/žlutá na semaforu (z.d m před bodem); fronta po c.T.gap m
+      if (!blocked(z) || (z.t && z.t !== c.dir)) continue;  // semafor platí jen pro směr ke křižovatce
+      const D = z.d ?? 6, qi = c.dir > 0 ? 0 : 1, stop = z[0] - c.dir * (D + ((z.q && z.q[qi]) || 0));   // z.q = délka fronty v m
       if (c.dir * (stop - c.s) >= 0 && c.dir * (next - stop) > 0) { c.s = stop; c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; return; }
-      if (c.dir * (stop - c.s) < 0 && c.dir * (z[0] - c.dir * 6 - c.s) >= 0) { c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; return; }   // fronta mezitím narostla za auto: zastavit na místě
+      if (c.dir * (stop - c.s) < 0 && c.dir * (z[0] - c.dir * D - c.s) >= 0) { c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; return; }   // fronta mezitím narostla za auto: zastavit na místě
     }
     c.s = next;
     if (c.s < 0 || c.s > r.L) {
@@ -1547,7 +1619,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, sigGreen: (z) => sigGreen(z), ringFree: (g) => ringFree(g), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t), trhyDnes: (t) => trhyDnes(t), trhLidi: (a, t) => trhLidi(a, t), get TRHM() { return TRHM; }, schoolDay: (n) => schoolDay(n), get SCHOOLS() { return SCHOOLS; }, schoolPaths: (q) => schoolPaths(q), kidPos: (p, s) => kidPos(p, s), hidden: (x, y) => { const h = gz(x, y); return figureHidden(x, y, h, toImg(x, y, h)); } };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, state, XC, busWait, sigsOnShape, trainS, SIG, ringFree: (g) => ringFree(g), get planes() { return PLANES; }, zapFans: (z, t) => zapFans(z, t), zapPlayers: (z, t) => zapPlayers(z, t), zapDnes: (t) => zapDnes(t), trhyDnes: (t) => trhyDnes(t), trhLidi: (a, t) => trhLidi(a, t), get TRHM() { return TRHM; }, schoolDay: (n) => schoolDay(n), get SCHOOLS() { return SCHOOLS; }, schoolPaths: (q) => schoolPaths(q), kidPos: (p, s) => kidPos(p, s), hidden: (x, y) => { const h = gz(x, y); return figureHidden(x, y, h, toImg(x, y, h)); } };       // ladění v lokálním náhledu
   function figureHidden(x, y, h, p) {                      // postavu zakryje budova nebo koruna stromu
     if (occluded(p[0], p[1], depth(x, y, h))) return true;
     for (const q of treeShapes(x, y, h, [p[0] - 1, p[1] - 9, p[0] + 1, p[1]]))
@@ -2802,24 +2874,28 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         tShareT = now; tShareCount = cars.length; tShareSlow = eco || SLOW;
         const selection = limitCars(cars, trafficShare(), tShareSlow); tShare = selection.threshold; tAllowed = selection.allowed;
       }
+      if (SIG.size) updateSignals();
       for (const c of cars) if (carActive(c) || c.hold) stepCar(c, dt);
-      if (sx > 0.25) for (const [r, z] of sigs) {          // sloup se světlem kousek před křižovatkou
-        if (!shown(r.k)) continue;
-        const a8 = z[0] < r.L / 2, o = curbPt(along(r, a8 ? Math.min(r.L, z[0] + 8) : Math.max(0, z[0] - 8)), a8 ? -1 : 1, 4), dp = o.d;   // u okraje vozovky
-        if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 26, dp)) continue;   // za budovou se nekreslí
-        const x = ox + o.ix * sx, y = oy + o.iy * sx, h = 24 * sx, q = Math.max(2, 3 * sx);
-        ctx.fillStyle = '#26262a'; ctx.fillRect(x - q * 0.25, y - h, q * 0.5, h); ctx.fillRect(x - q, y - h - q * 2, q * 2, q * 2.4);
-        ctx.fillStyle = sigGreen(z) ? '#46e06a' : '#ff4438'; ctx.fillRect(x - q * 0.6, y - h - q * 1.6, q * 1.2, q * 1.2);
-      }
       const xFront = [];                                  // výstražníky před kolejí (blíž k divákovi) až po vlaku, ať je vlak nepřekryje
       if (sx > 0.25) for (const [r, z] of xings) {        // výstražník před přejezdem: zavřeno střídavě červená, otevřeno bílá přerušovaná
         if (!shown(r.k)) continue;
         const dc = depth(z[1], z[2], gz(z[1], z[2]));
-        for (const d of [-6, 6]) {                         // výstražník z obou stran koleje (když kus silnice pokračuje)
-          if (z[0] + d < 0 || z[0] + d > r.L) continue;
-          const o = curbPt(along(r, z[0] + d), d < 0 ? 1 : -1, 4), dp = o.d;   // vpravo u okraje vozovky pro auta, která k přejezdu jedou
+        for (const d of [-6, 6]) {                         // výstražník z obou stran kolejí (když kus silnice pokračuje)
+          const sp = d < 0 ? z.s0 + d : z.s1 + d;
+          if (sp < 0 || sp > r.L) continue;
+          const o = curbPt(along(r, sp), d < 0 ? 1 : -1, 4), dp = o.d;   // vpravo u okraje vozovky pro auta, která k přejezdu jedou
           if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 30, dp)) continue;   // za budovou (pata nebo výstražník) se nekreslí
           if (dp < dc) xFront.push([o, z]); else drawXPost(o, z, sx, ox, oy, now, night);
+        }
+      }
+      if (sx > 0.25) for (const [r, z] of sigPosts) {     // semafor vpravo u stop čáry pro auta, která ke křižovatce jedou
+        if (!shown(r.k) || !z.xc) continue;
+        const dc = depth(z.J.cx, z.J.cy, gz(z.J.cx, z.J.cy));
+        for (const dir of z.t ? [z.t] : [1, -1]) {
+          const s = z[0] - dir * z.d; if (s < 0 || s > r.L) continue;
+          const o = curbPt(along(r, s), dir, 4), dp = o.d;
+          if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 30, dp)) continue;
+          if (dp < dc) xFront.push([o, z, 1]); else drawSigPost(o, z, sx, ox, oy, night);
         }
       }
       if (sx > 0.12) for (const c of cars) {
@@ -2874,7 +2950,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (vis(o.ix, o.iy, 120)) drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2);
       }
       flushLights(night, sx);
-      for (const [o, z] of xFront) drawXPost(o, z, sx, ox, oy, now, night);   // až po světlech aut, ať je kužel nepřekryje
+      for (const [o, z, sg] of xFront) if (sg) drawSigPost(o, z, sx, ox, oy, night); else drawXPost(o, z, sx, ox, oy, now, night);   // až po světlech aut, ať je kužel nepřekryje
     }
     // lyžaři (jen v zimě)
     if (snowy && skiers.length) {
@@ -2965,9 +3041,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         for (const d of DISTRICTS) {                      // od největší čtvrti; překrývající se menší popisek vynechat
           const x = ox + d.xy[0] * sx, y = oy + d.xy[1] * sx;
           if (x < -200 || y < -60 || x > cw + 200 || y > ch + 60) continue;
-          const big = d.a > 3 ? 1 : 0.82;
-          ctx.font = `500 ${Math.round(15 * big)}px ${DISPLAY_FONT}`;
-          const tw = ctx.measureText(d.name.toUpperCase()).width / 2 + 6, th = 11;
+          const big = d.k === 'obec' ? 1.15 : d.k === 'cast' ? 0.72 : d.a > 3 ? 1 : 0.82;   // obec větší, místní část menší
+          ctx.font = `${d.k === 'obec' ? 700 : 500} ${Math.round(15 * big)}px ${DISPLAY_FONT}`;
+          const tw = ctx.measureText(d.name.toUpperCase()).width / 2 + 6, th = 11 * big;
           if (boxes.some(([bx, by, bw]) => Math.abs(bx - x) < bw + tw && Math.abs(by - y) < th * 2)) continue;
           boxes.push([x, y, tw]);
           ctx.globalAlpha = fadeD * 0.9;

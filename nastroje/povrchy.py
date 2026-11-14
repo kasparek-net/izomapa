@@ -25,7 +25,8 @@ if __name__ == '__main__':
             cut = lambda m: m[:h * K, :w * K].reshape(h, K, w, K).sum((1, 3))
             gs, ls = cut(g), cut(l)
             f = np.where(ls >= 5, gs / np.maximum(ls, 1), 0)
-            out[ty // K:ty // K + h, tx // K:tx // K + w] = (f * 255).astype(np.uint8)
+            h, w = min(h, H - ty // K), min(w, W - tx // K)          # dlaždice na okraji přečnívá výstup
+            out[ty // K:ty // K + h, tx // K:tx // K + w] = (f[:h, :w] * 255).astype(np.uint8)
     im = Image.fromarray(out).filter(ImageFilter.GaussianBlur(1.5)).point(lambda v: 255 if v > 150 else 0)
     im = im.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))    # bez ojedinělých buněk
     im.save('build/zelen_maska.png'); json.dump({'x0y1m': [s.X0, s.Y1, s.M * K]}, open('build/zelen_maska.json', 'w'))

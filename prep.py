@@ -584,6 +584,38 @@ for _, g, c, w, _n in roads:
 for pl in UP.get('plochy', []):
     g_ = Polygon([to_local(lo, la) for la, lo in pl['q']])
     fill(g_, C[pl['k']])
+# dětská a workoutová hřiště (assets/hriste.json z nastroje/hriste.py, OSM): 3D vybavení pro render.html (scene.play).
+# Zakreslené prvky (playground=*, fitness_station=*) na své místo, zbytek automaticky podle velikosti hřiště, pod
+# houpačkou, skluzavkou a prolézačkou písek. Poloha je deterministická (stejná i v pásu sousedního čtverce).
+HR = json.load(open('assets/hriste.json')) if os.path.exists('assets/hriste.json') else {'hriste': [], 'prvky': []}
+HR['hriste'] = HR['hriste'] + [{'id': f'u{_k}', 'k': _h.get('k', 'detske'), 'poly': _h['q'], 'll': _h['q'][0]}   # ruční (chybí v OSM)
+                               for _k, _h in enumerate(UP.get('hriste', []))]
+play = []
+_PRV = [(Point(*to_local(lo, la)), t) for (la, lo), t in ((q['ll'], q['t']) for q in HR['prvky'])]
+for h in HR['hriste']:
+    det = h['k'] == 'detske'
+    _g = Polygon([to_local(lo, la) for la, lo in h['poly']]) if h['poly'] else Point(*to_local(h['ll'][1], h['ll'][0])).buffer(7.0 if det else 5.0)
+    if not _g.is_valid: _g = _g.buffer(0)
+    if _g.is_empty or not _g.intersects(EXT) or _g.area < 12: continue
+    _r = random.Random(h['id'])
+    _o = list(_g.minimum_rotated_rectangle.exterior.coords)
+    _e = max(((_o[i], _o[i + 1]) for i in range(2)), key=lambda e: math.dist(*e))
+    _a = math.atan2(_e[1][1] - _e[0][1], _e[1][0] - _e[0][0])
+    _in = _g.buffer(-1.8); _in = _in if not _in.is_empty and _in.area > 4 else _g
+    mine = []
+    for _p, _t in _PRV:
+        if _g.buffer(3).contains(_p): mine.append([_p.x, _p.y, _a, _t])
+    n = max(2, min(6, round(_g.area / 70))) if det else max(2, min(4, round(_g.area / 45)))
+    seq = ['piskoviste', 'houpacka', 'skluzavka', 'prolezacka', 'houpadlo', 'kolotoc'] if det else ['hrazda', 'bradla', 'zebriny', 'lavice']
+    seq = [t for t in seq if t not in {m[3] for m in mine}]
+    x0_, y0_, x1_, y1_ = _in.bounds
+    for _t in seq[:max(0, n - len(mine))]:
+        for _ in range(150):
+            _x, _y = _r.uniform(x0_, x1_), _r.uniform(y0_, y1_)
+            if _in.contains(Point(_x, _y)) and all(math.hypot(_x - m[0], _y - m[1]) > 4.6 for m in mine): mine.append([_x, _y, _a, _t]); break
+    for _x, _y, _aa, _t in mine:
+        if _t in ('houpacka', 'skluzavka', 'prolezacka', 'kolotoc'): fill(Point(_x, _y).buffer(2.0 if _t != 'houpacka' else 2.4), C['sand'])
+        play.append([_x, _y, _aa, _t])
 # středová přerušovaná čára
 for _, g, c, w, _n in roads:
     if c in ('trunk', 'primary', 'secondary', 'tertiary') or (c == 'motorway' and w >= 7):     # dálnice: čára mezi pruhy, ne na sjezdu
@@ -1846,6 +1878,7 @@ json.dump({'chunk': CHUNK, 'center': [CX, CY], 'half': HALF, 'step': STEP, 'n': 
            'floor': geo.FLOOR, 'top': round(TOP, 1),
            'buildings': buildings, 'trees': trees, 'props': props, 'cars': cars, 'buses': buses, 'portals': portals, 'lines': lines_out,
            'herds': herds_out,
+           'play': [[round(float(x), 2), round(float(y), 2), round(float(ground(x, y)), 2), round(a, 3), t] for x, y, a, t in play],
            'bridges': [{'p': run, 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)
                        for run in deck_runs([[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])])]},
           open(f'{OUT}/scene.json', 'w'), separators=(',', ':'))
@@ -1958,25 +1991,12 @@ def piece_limit(l):
     for k in _sl_tree.query(m_.buffer(0.5)):
         if _sl[k][0].distance(m_) < 0.5: return _sl[k][1]
     return 0
-# semafory (nastroje/semafory.py): kus silnice si nese [metry od začátku, křižovatka, osa], osy mají zelenou střídavě
-_sig = json.load(open('assets/semafory.json')) if os.path.exists('assets/semafory.json') else []
-_sig_pts = [Point(to_local(lo, la)) for la, lo, _g in _sig]
-_sig_tree = shapely.STRtree(_sig_pts) if _sig_pts else None
-def piece_signals(l):
-    if _sig_tree is None: return []
-    out = []
-    for k in _sig_tree.query(l.buffer(10)):
-        s_ = l.project(_sig_pts[k]); a_, b_ = l.interpolate(max(0, s_ - 1)), l.interpolate(min(l.length, s_ + 1))
-        out.append([round(s_, 1), _sig[k][2], 0 if abs(b_.x - a_.x) >= abs(b_.y - a_.y) else 1])
-    return sorted(out)
 def _road(p3, l, c, n):
     o = {'p': p3, 'c': c, 'n': n}
     d_ = piece_oneway(l)
     if d_: o['o'] = d_
     lim = piece_limit(l)
     if lim: o['l'] = lim
-    z_ = piece_signals(l) if c != 'service' else []
-    if z_: o['z'] = z_
     if _v_tree is not None and c != 'service':
         v_, t_, lk_ = piece_intensity(l, c)
         o['v'] = int(v_ or _V_CLASS.get(c, 300))
@@ -2037,8 +2057,6 @@ if os.path.exists('assets/prejezdy.json'):
         j_ = [q for q in _pj.na_kusu(g_['p'], _pj_pts) if len(_rails.query(Point(q[1], q[2]), predicate='dwithin', distance=3.0))]   # silnice opravdu kříží kolej (ne souběžná ulice)
         if j_: g_['j'] = j_
 for g_ in graph:
-    if 'z' in g_: g_['z'] = piece_signals(LineString([(q[0], q[1]) for q in g_['p']]))   # kus mohl být rozdělen: metry od začátku tohoto kusu
-    if not g_.get('z'): g_.pop('z', None)
     g_.pop('_deck', None)
 print('železničních přejezdů', sum(len(g_.get('j', [])) for g_ in graph))
 sys.path.insert(0, 'nastroje'); import kruhace as _kr
