@@ -81,7 +81,7 @@ npm run nahled                      # náhled na http://localhost:8000
 | terén, voda, silnice, koleje, sjezdovky | |
 | mosty a lávky ve 3D s pozvolnými nájezdy, krátké podjezdy | |
 | 4 roční období, noc, déšť, sníh, mlha | |
-| auta, MHD podle jízdních řádů (GTFS), lyžaři | |
+| auta, MHD podle jízdních řádů (GTFS), lyžaři, chodci | |
 | klikací budovy s adresou, hledání, názvy částí obce | |
 | | hlášení nepřesností od lidí s administrací (volitelný server, `hlaseni/`) |
 

@@ -312,6 +312,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     <div class="layers">
       <label><input type="checkbox" id="l-labels" checked> Popisky</label>
       <label><input type="checkbox" id="l-traffic" checked> Doprava</label>
+      <label><input type="checkbox" id="l-people" checked> Lidé</label>
       <label><input type="checkbox" id="l-smoke" checked> Kouř z&nbsp;komínů</label>
       <label><input type="checkbox" id="l-hover" checked> Zvýraznit budovy</label>
     </div>
@@ -1639,6 +1640,171 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     R(lean > 0 ? 0 : -1, 8, 2, 1, q.hat);              // čepice
     R(lean > 0 ? 2 : -3, 4, 1, 3, '#9aa0a8');          // hůlka
   }
+  // ---- chodci: pixeloví lidé (postava 16 bodů po 10 cm) po pěších cestách a náměstích (overlay walk) a po chodnících podél ulic (roads).
+  // Oblečení podle ročního období, počet podle hodiny (realTime), kreslí se jen zblízka; obrázek každé postavy se kreslí jednou do cache.
+  const PEOPLE = [], PWK = new Map();                         // PWK: konce pěších čar -> [čára, směr]
+  const PDENS = { p: 3, f: 0.9, s: 0.5, t: 0.2, k: 0.2 };     // lidí na 100 m podle druhu cesty (p pěší zóna, f chodník, s schody, t cesta, k cyklostezka)
+  const PSIDE = { residential: 0.22, living_street: 0.5, tertiary: 0.35, secondary: 0.35, primary: 0.3, unclassified: 0.1 };   // chodníky podél ulic
+  const PSIDE_OFF = { residential: 3.8, living_street: 2.6, tertiary: 5, secondary: 5.6, primary: 6.2, unclassified: 3.6 };
+  const PEOPLE_SHARE = [.06, .04, .03, .03, .04, .12, .35, .7, .75, .7, .75, .85, .9, .85, .85, .95, 1, 1, .85, .65, .45, .3, .18, .1];
+  const pinPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const pEk = (p) => Math.round(p[0]) + ',' + Math.round(p[1]);
+  onChunk.push((k, d) => {
+    let i = PEOPLE.length * 7 + k.length * 131 + 17;
+    const add = (o) => { const n = ++i; PEOPLE.push({ k, q: rnd(n), oi: Math.floor(rnd(n + 1) * 160), v: 1.05 + rnd(n + 2) * 0.5, ph: rnd(n + 3) * 4, wait: 0,
+      kid: rnd(n + 4) < 0.1, pair: rnd(n + 5) < 0.13, dog: rnd(n + 6) < 0.06 ? ['#7a5532', '#e8e0d0', '#2b2b30', '#b08a4e', '#d9bf7a'][n % 5] : null, ...o }); };
+    const W = d.walk || {}, lines = W.l || [], kinds = W.c || '';
+    lines.forEach((w, j) => {
+      const len = [0]; for (let m = 1; m < w.length; m++) len.push(len[m - 1] + Math.hypot(w[m][0] - w[m - 1][0], w[m][1] - w[m - 1][1]));
+      const r = { w, len, L: len[len.length - 1], c: kinds[j] || 'f', k };
+      for (const [e, dir] of [[w[0], 1], [w[w.length - 1], -1]]) { const q = pEk(e); if (!PWK.has(q)) PWK.set(q, []); PWK.get(q).push([r, dir]); }
+      const n = r.L / 100 * (PDENS[r.c] || 0.5), cnt = Math.floor(n) + (rnd(i + j) < n % 1 ? 1 : 0);
+      for (let m = 0; m < cnt; m++) add({ m: 'l', r, s: rnd(i + m * 3) * r.L, dir: rnd(i + m) < 0.5 ? 1 : -1, side: (rnd(i + m * 5) - 0.5) * 1.4 });
+    });
+    for (const P of W.a || []) {                             // náměstí a pěší plochy: chodí mezi náhodnými body uvnitř
+      let A = 0; for (let a = 0, b = P.length - 1; a < P.length; b = a++) A += (P[b][0] + P[a][0]) * (P[b][1] - P[a][1]); A = Math.abs(A / 2);
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of P) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+      const ar = { P, x0, y0, x1, y1 }, cnt = Math.min(60, Math.round(A / 450));
+      for (let m = 0; m < cnt; m++) for (let t = 0; t < 30; t++) { const x = x0 + rnd(i + m * 31 + t) * (x1 - x0), y = y0 + rnd(i + m * 37 + t + 5) * (y1 - y0); if (pinPoly(P, x, y)) { add({ m: 'a', ar, x, y, tx: x, ty: y }); break; } }
+    }
+    for (let j = 0; j < roads.length; j++) {                 // chodníky podél ulic tohoto čtverce
+      const r = roads[j]; if (r.k !== k || r.tunnel || !PSIDE[r.c]) continue;
+      const n = r.L / 100 * PSIDE[r.c] * (r.v ? Math.min(2, 0.6 + r.v / 12000) : 1), cnt = Math.floor(n) + (rnd(i + j * 3) < n % 1 ? 1 : 0);
+      for (let m = 0; m < cnt; m++) add({ m: 'r', ri: j, s: rnd(i + m * 7 + j) * r.L, dir: rnd(i + m + j) < 0.5 ? 1 : -1, side: rnd(i + m * 11 + j) < 0.5 ? 1 : -1 });
+    }
+  });
+  function pPos(p) {                                         // svět [x, y, z, dx, dy] podle druhu cesty
+    if (p.m === 'a') return [p.x, p.y, gz(p.x, p.y), p.vx || 0, p.vy || 1];
+    if (p.m === 'r') {
+      const r = roads[p.ri], o = along(r, p.s), L = Math.hypot(o.dx, o.dy) || 1, off = (PSIDE_OFF[r.c] || 4) * p.side;
+      const x = o.x + o.dy / L * off, y = o.y - o.dx / L * off; return [x, y, o.z ?? gz(x, y), o.dx * p.dir, o.dy * p.dir];
+    }
+    const r = p.r, Ls = r.len; let i = 1; while (i < Ls.length - 1 && Ls[i] < p.s) i++;
+    const a = r.w[i - 1], b = r.w[i], t = Math.max(0, Math.min(1, (p.s - Ls[i - 1]) / ((Ls[i] - Ls[i - 1]) || 1))), dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    const x = a[0] + dx * t + dy / L * p.side, y = a[1] + dy * t - dx / L * p.side; return [x, y, gz(x, y), dx * p.dir, dy * p.dir];
+  }
+  function stepPerson(p, dt) {
+    if (p.wait > 0) { p.wait -= dt; p.moving = false; return; }
+    p.moving = true; p.ph += dt * 7.5 * p.v;
+    if (p.m === 'a') {
+      const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+      if (d < 0.5) { if (Math.random() < 0.3) p.wait = 1 + Math.random() * 5; for (let t = 0; t < 12; t++) { const a = p.ar, x = p.x + (Math.random() - 0.5) * 40, y = p.y + (Math.random() - 0.5) * 40; if (pinPoly(a.P, x, y)) { p.tx = x; p.ty = y; break; } } return; }
+      const s = Math.min(d, p.v * dt); p.x += dx / d * s; p.y += dy / d * s; p.vx = dx; p.vy = dy; return;
+    }
+    const r = p.m === 'r' ? roads[p.ri] : p.r;
+    p.s += p.v * dt * p.dir;
+    if (p.s >= 0 && p.s <= r.L) return;
+    const endPt = p.s < 0 ? r.w[0] : r.w[r.w.length - 1];
+    if (Math.random() < 0.15) p.wait = 1 + Math.random() * 4;                 // zastaví se (výloha, telefon)
+    let opts;
+    if (p.m === 'l') opts = (PWK.get(pEk(endPt)) || []).filter(([q]) => q !== r);
+    else opts = (ends.get(ek(endPt)) || []).filter(([j]) => j !== p.ri && PSIDE[roads[j].c] && !roads[j].tunnel);
+    if (opts.length && Math.random() < 0.85) {
+      const [q, dir] = opts[Math.floor(Math.random() * opts.length)];
+      if (p.m === 'l') { p.r = q; } else { p.ri = q; } p.dir = dir; p.s = dir > 0 ? 0 : (p.m === 'l' ? q : roads[q]).L;
+    } else { p.dir *= -1; p.s = Math.max(0, Math.min(r.L, p.s)); }               // sem tam: otočí se
+  }
+  // šatník: barvy a střihy podle období (náhodné, ale stálé podle čísla postavy)
+  const P_SKIN = ['#f6dcc6', '#efcfb2', '#e9c19f', '#f3d5bd', '#e4b896'], P_HAIR = ['#2b1d14', '#4a3020', '#7a5532', '#b08a4e', '#d9bf7a', '#a8432a', '#9a9a9a', '#e6dfcf'];
+  const P_PAL = {
+    summer: { top: ['#f4f1ea', '#e94b3c', '#f2c230', '#5aa7e0', '#57b77a', '#f08ab0', '#2f3a4a', '#f39a3d', '#8e6cc9', '#ffffff'], bot: ['#3d5a86', '#2c4468', '#c8b48a', '#5a6b4a', '#2a2a2e', '#e8e2d2'] },
+    spring: { top: ['#9fc7e8', '#f3e3b5', '#a8d5a2', '#e8a0a8', '#f4f1ea', '#6f8fb8', '#d9c27a', '#c4573e'], bot: ['#3d5a86', '#2c4468', '#2a2a2e', '#6b5f50', '#c8b48a'] },
+    autumn: { top: ['#b5652c', '#7a5a2e', '#6b7a3a', '#8a2f2f', '#2f4a6b', '#c99a3a', '#4a4038', '#9c4a2a', '#d7cdb8'], bot: ['#2c4468', '#2a2a2e', '#4a4640', '#6b5f50', '#3d3530'] },
+    winter: { top: ['#1f2a3a', '#2b2b30', '#7a1f2a', '#3b5a7a', '#c23a2a', '#e8e4da', '#2f5a3f', '#5a4a7a', '#d6a12a', '#e86a2a'], bot: ['#2a2a2e', '#1f2430', '#3d3530', '#2c4468'] },
+  };
+  const P_ACC = ['#c23a2a', '#f2c230', '#2f6fd1', '#e8e4da', '#2aa36b', '#e0629a', '#e86a2a', '#1d1f24'];
+  const OUTF = {};
+  function outfitOf(season, i, kid) {
+    const key = season + (kid ? 'k' : '') + i; if (OUTF[key]) return OUTF[key];
+    let n = i * 977 + (kid ? 50000 : 0) + { spring: 1, summer: 2, autumn: 3, winter: 4 }[season] * 100000;
+    const R = () => rnd(++n), pick = (a) => a[Math.floor(R() * a.length)], ch = (x) => R() < x, P = P_PAL[season] || P_PAL.summer;
+    const o = { kid, skin: pick(P_SKIN), hair: pick(kid ? P_HAIR.slice(0, 6) : P_HAIR), shoes: pick(['#2a2a2e', '#f2f0ea', '#6b4a30', '#1d1f24', '#8a2f2f']), season };
+    o.hairStyle = pick(kid ? ['short', 'long', 'bun'] : ['short', 'short', 'long', 'bun', 'long', 'bald']); if (o.hairStyle === 'bald' && o.hair !== '#9a9a9a') o.hairStyle = 'short';
+    o.topC = pick(P.top); o.topC2 = pick(P.top); o.botC = pick(P.bot);
+    if (season === 'summer') { o.top = pick(['tee', 'tee', 'tee', 'dress', 'shirt', 'tank']); o.bot = o.top === 'dress' ? 'none' : pick(['shorts', 'shorts', 'jeans', 'skirt', 'trousers']); if (ch(0.15)) o.hat = { t: 'cap', c: pick(P_ACC) }; o.glasses = ch(0.3); }
+    else if (season === 'spring') { o.top = pick(['long', 'jacket', 'hoodie', 'jacket', 'tee']); o.bot = pick(['jeans', 'jeans', 'trousers', 'skirt']); if (ch(0.08)) o.hat = { t: 'cap', c: pick(P_ACC) }; }
+    else if (season === 'autumn') { o.top = pick(['jacket', 'hoodie', 'coat', 'jacket', 'long']); o.bot = pick(['jeans', 'trousers', 'trousers', 'skirt']); if (ch(0.4)) o.scarf = pick(P_ACC); if (ch(0.35)) o.hat = { t: pick(['beanie', 'beanie', 'beret']), c: pick(P_ACC) }; }
+    else { o.top = pick(['puffer', 'puffer', 'coat', 'coat', 'jacket']); o.bot = pick(['trousers', 'jeans', 'trousers']); o.scarf = ch(0.75) ? pick(P_ACC) : null; o.gloves = ch(0.6) ? pick(['#1d1f24', o.scarf || '#c23a2a', '#e8e4da']) : null; o.hat = ch(0.85) ? { t: pick(['beanie', 'bobble', 'bobble']), c: pick(P_ACC), c2: pick(P_ACC) } : null; o.shoes = pick(['#2a2a2e', '#4a3020', '#1d1f24']); }
+    const b = R();
+    if (!kid) o.bag = b < 0.22 ? { t: 'backpack', c: pick(['#2a2a2e', '#2f4a6b', '#8a2f2f', '#6b7a3a', '#d6a12a']) } : b < 0.4 ? { t: 'handbag', c: pick(['#6b4a30', '#1d1f24', '#c23a2a', '#e8e2d2']) } : b < 0.5 ? { t: 'shopper', c: pick(['#e8e4da', '#f2c230', '#2aa36b']) } : null;
+    else if (b < 0.4) o.bag = { t: 'backpack', c: pick(P_ACC) };
+    return (OUTF[key] = o);
+  }
+  const PGW = 9, PGH = 20, PCX = 4, PBASE = 18;               // mřížka postavy (body), nohy uprostřed dole
+  const pShade = (hex, f) => { const v = parseInt(hex.slice(1), 16); return `rgb(${[v >> 16, (v >> 8) & 255, v & 255].map((c) => Math.max(0, Math.min(255, Math.round(c * f))))})`; };
+  function personGrid(o, back, frame) {
+    const g = Array.from({ length: PGH }, () => Array(PGW).fill(null)), CX = PCX;
+    const set = (x, y, c) => { if (x >= 0 && x < PGW && y >= 0 && y < PGH && c) g[y][x] = c; };
+    const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
+    const legH = o.kid ? 3 : 4, torsoH = o.kid ? 3 : 4, bob = frame % 2 ? -1 : 0, shoeY = PBASE, legTop = shoeY - legH, hip = legTop - 1, tTop = hip - torsoH, neck = tTop - 1, headB = neck - 1, headT = headB - 3;
+    const B = (y) => y + bob, lift = frame === 1 ? 'L' : frame === 3 ? 'R' : '', cold = o.season === 'winter' || o.season === 'autumn';
+    const legC = { jeans: o.botC, trousers: o.botC, shorts: o.botC, skirt: o.skin, none: o.skin }[o.bot] || o.botC;
+    for (const [side, x0] of [['L', CX - 2], ['R', CX + 1]]) {
+      const up = lift === side ? 1 : 0;
+      for (let y = legTop; y < shoeY - up; y++) rect(x0, B(y), x0 + 1, B(y), o.bot === 'shorts' && y >= legTop + 2 ? o.skin : (o.top === 'dress' || o.bot === 'skirt') && y >= legTop + 1 ? (cold ? '#2a2a2e' : o.skin) : legC);
+      rect(x0, B(shoeY - up), x0 + 1, B(shoeY - up), o.shoes);
+    }
+    const arm = { tee: 'short', tank: 'none', dress: 'short' }[o.top] || 'long', wide = o.top === 'puffer';
+    rect(CX - 2 - (wide ? 1 : 0), B(tTop), CX + 2 + (wide ? 1 : 0), B(hip), o.topC);
+    if (wide) { rect(CX - 3, B(tTop + 1), CX + 3, B(tTop + 1), pShade(o.topC, 0.78)); rect(CX - 3, B(tTop + 3), CX + 3, B(tTop + 3), pShade(o.topC, 0.78)); }
+    if (o.top === 'coat') rect(CX - 2, B(hip + 1), CX + 2, B(hip + 2), o.topC);
+    if (o.top === 'jacket' && !back) rect(CX, B(tTop), CX, B(hip), o.topC2);
+    if (o.top === 'hoodie') { if (back) rect(CX - 1, B(neck), CX + 1, B(tTop + 1), pShade(o.topC, 0.85)); else { set(CX - 1, B(tTop + 1), '#f2f0ea'); set(CX + 1, B(tTop + 1), '#f2f0ea'); } }
+    if (o.top === 'dress') { rect(CX - 2, B(hip + 1), CX + 2, B(hip + 1), o.topC); rect(CX - 3, B(hip + 2), CX + 3, B(hip + 2), o.topC); }
+    if (o.bot === 'skirt') { rect(CX - 2, B(hip), CX + 2, B(hip), o.botC); rect(CX - 3, B(hip + 1), CX + 3, B(hip + 1), o.botC); }
+    else if (o.top !== 'dress' && o.top !== 'coat') rect(CX - 2, B(hip), CX + 2, B(hip), pShade(legC, 0.85));
+    const sw = frame === 1 ? 1 : frame === 3 ? -1 : 0;
+    for (const [x, s] of [[CX - 3 - (wide ? 1 : 0), sw], [CX + 3 + (wide ? 1 : 0), -sw]]) {
+      const y1 = hip + (s < 0 ? -1 : 0);
+      for (let y = tTop; y <= y1; y++) set(x, B(y), arm === 'none' ? o.skin : arm === 'long' || y <= tTop + 1 ? pShade(o.topC, 0.9) : o.skin);
+      set(x, B(y1 + 1), o.gloves || o.skin);
+    }
+    set(CX, B(neck), o.skin);
+    if (o.scarf) { rect(CX - 1, B(neck), CX + 1, B(neck), o.scarf); if (!back) rect(CX - 1, B(tTop), CX - 1, B(tTop + 2), o.scarf); }
+    rect(CX - 1, B(headT), CX + 1, B(headB), back ? o.hair : o.skin);
+    if (!back) {
+      if (o.hairStyle !== 'bald') rect(CX - 1, B(headT), CX + 1, B(headT), o.hair);
+      if (o.hairStyle === 'long') { for (const x of [CX - 2, CX - 1, CX + 1, CX + 2]) set(x, B(headT + 1), o.hair); rect(CX - 2, B(headT + 2), CX - 2, B(neck + 1), o.hair); rect(CX + 2, B(headT + 2), CX + 2, B(neck + 1), o.hair); }
+      if (o.glasses) rect(CX - 1, B(headT + 1), CX + 1, B(headT + 1), '#1d1f24'); else { set(CX - 1, B(headT + 1), '#3a2a22'); set(CX + 1, B(headT + 1), '#3a2a22'); }
+    } else { if (o.hairStyle === 'bald') rect(CX - 1, B(headT), CX + 1, B(headB), pShade(o.skin, 0.95)); if (o.hairStyle === 'long') rect(CX - 1, B(neck), CX + 1, B(tTop + 2), o.hair); }
+    if (o.hairStyle === 'bun') set(CX, B(headT - 1), o.hair);
+    if (o.hat) {
+      const c = o.hat.c;
+      if (o.hat.t === 'cap') { rect(CX - 1, B(headT - 1), CX + 1, B(headT), c); if (!back) set(CX + 2, B(headT), pShade(c, 0.8)); }
+      if (o.hat.t === 'beanie' || o.hat.t === 'bobble') { rect(CX - 1, B(headT - 1), CX + 1, B(headT), c); rect(CX - 1, B(headT + (back ? 1 : 0)), CX + 1, B(headT + (back ? 1 : 0)), pShade(c, 0.8)); }
+      if (o.hat.t === 'bobble') set(CX, B(headT - 2), o.hat.c2 || '#f2f0ea');
+      if (o.hat.t === 'beret') { rect(CX - 2, B(headT - 1), CX + 1, B(headT - 1), c); rect(CX - 1, B(headT), CX + 1, B(headT), c); }
+    }
+    if (o.bag) {
+      const c = o.bag.c;
+      if (o.bag.t === 'backpack') { if (back) { rect(CX - 2, B(tTop + 1), CX + 2, B(hip - 1), c); rect(CX - 2, B(tTop + 1), CX + 2, B(tTop + 1), pShade(c, 0.75)); } else { set(CX - 2, B(tTop), pShade(c, 0.8)); set(CX + 2, B(tTop), pShade(c, 0.8)); } }
+      if (o.bag.t === 'handbag') { rect(CX + 4, B(hip), CX + 4, B(hip + 1), c); set(CX + 3, B(tTop + 1), pShade(c, 0.7)); }
+      if (o.bag.t === 'shopper') rect(CX - 4, B(hip + 1), CX - 3, B(hip + 3), c);
+    }
+    return g;
+  }
+  // obrázek postavy s obrysem (1 bod = 1 px, okraj 1 px), v noci ztmavený; cache podle oblečení, směru, kroku a tmy
+  const PSPR = new Map();
+  function personSprite(o, key, back, mir, frame, nb) {
+    const id = key + (back ? 'b' : 'f') + (mir ? 'm' : '') + frame + nb;
+    let c = PSPR.get(id); if (c) return c;
+    if (PSPR.size > 6000) PSPR.clear();
+    const g = personGrid(o, back, frame), f = 1 - nb * 0.12, at = (x, y) => y >= 0 && y < PGH && x >= 0 && x < PGW ? g[y][mir ? PGW - 1 - x : x] : null;
+    c = document.createElement('canvas'); c.width = PGW + 2; c.height = PGH + 2; const q = c.getContext('2d');
+    q.fillStyle = 'rgba(24,26,32,0.85)';
+    for (let y = -1; y <= PGH; y++) for (let x = -1; x <= PGW; x++) if (!at(x, y) && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) q.fillRect(x + 1, y + 1, 1, 1);
+    for (let y = 0; y < PGH; y++) for (let x = 0; x < PGW; x++) {
+      const col = at(x, y); if (!col) continue;
+      q.fillStyle = col[0] === '#' ? pShade(col, f) : col; q.fillRect(x + 1, y + 1, 1, 1);
+      if (!at(x + 1, y)) { q.fillStyle = 'rgba(0,0,0,0.16)'; q.fillRect(x + 1, y + 1, 1, 1); }
+    }
+    PSPR.set(id, c); return c;
+  }
+  function drawDogAt(X, Y, u, mir, frame, col) {
+    const rows = [[0, 0, 0, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 0], frame % 2 ? [1, 0, 0, 1, 0] : [0, 1, 0, 0, 1]], ox = X - 2.5 * u, oy = Y - 4 * u;
+    ctx.fillStyle = 'rgba(24,26,32,0.85)'; rows.forEach((r, j) => r.forEach((v, i) => { if (v) ctx.fillRect(ox + (mir ? 4 - i : i) * u - u, oy + j * u - u, 3 * u, 3 * u); }));
+    rows.forEach((r, j) => r.forEach((v, i) => { if (v) { ctx.fillStyle = j === 3 ? pShade(col, 0.7) : col; ctx.fillRect(ox + (mir ? 4 - i : i) * u, oy + j * u, u, u); } }));
+  }
   // jedoucí vozidla: stejný model jako zaparkovaná auta v renderu (karoserie, prosklení, střecha, 4 kola), stěny stínované
   // stejným sluncem (od jihovýchodu). Kreslí se jako render: do malého obrázku v rozlišení mapy (1 px = cam.mpp),
   // s tmavým obrysem, a zvětší se bez vyhlazení. Obrázky se cachují podle barvy a směru (48 směrů).
@@ -2694,6 +2860,52 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
       flushLights(night, sx);
       for (const [o, z, sg] of xFront) if (sg) drawSigPost(o, z, sx, ox, oy, night); else drawXPost(o, z, sx, ox, oy, now, night);   // až po světlech aut, ať je kužel nepřekryje
+    }
+    // chodci (jen zblízka, krok a pohyb jen u těch na obrazovce)
+    if ($('l-people').checked && PEOPLE.length) {
+      const hpx = Math.abs(toImg(0, 0, 1)[1] - toImg(0, 0, 0)[1]), u = hpx * 0.1 * sx;   // velikost bodu postavy na obrazovce
+      if (u >= 0.3) {
+        if (now - (window.__pHT || 0) > 30000) { window.__pHT = now; window.__pH = +new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(new Date()); }
+        let share = $('realTime').checked ? PEOPLE_SHARE[window.__pH] : 1 - 0.85 * night;
+        if (state.weather === 'rain') share *= 0.45; else if (state.weather === 'snow') share *= 0.75;
+        if (eco || SLOW) share *= 0.5;
+        const nb = Math.min(4, Math.round(night * 5)), list = [];
+        for (const p of PEOPLE) {
+          if (p.q > share || !shown(p.k)) continue;
+          const P = pPos(p), ip = toImg(P[0], P[1], P[2]);
+          if (!vis(ip[0], ip[1], 30)) continue;
+          stepPerson(p, dt); list.push([p, P, ip]);
+        }
+        list.sort((a, b) => a[2][1] - b[2][1]);
+        const hidden = (x, y, h, ip) => {
+          const dp = depth(x, y, h);
+          if (occluded(ip[0], ip[1], dp) || occluded(ip[0], ip[1] - hpx * 1.2, dp)) return true;
+          for (const q of treeShapes(x, y, h, [ip[0] - 1, ip[1] - 9, ip[0] + 1, ip[1]]))
+            if (q[0] === 1 ? ((ip[0] - q[1][0]) / q[2]) ** 2 + ((ip[1] - 4 - q[1][1]) / q[3]) ** 2 < 1 : ip[1] - 4 > q[1][1] && ip[1] - 4 < q[2][1] && Math.abs(ip[0] - q[1][0]) < q[3] * (ip[1] - 4 - q[1][1]) / (q[2][1] - q[1][1])) return true;
+          return false;
+        };
+        const put = (o, key, ip, back, mir, fr) => {
+          const X = ox + ip[0] * sx, Y = oy + ip[1] * sx;
+          ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(X - 2.5 * u, Y - 0.6 * u, 5 * u, Math.max(1, u));
+          ctx.drawImage(personSprite(o, key, back, mir, fr, nb), X - (PCX + 1.5) * u, Y - (PBASE + 2) * u, (PGW + 2) * u, (PGH + 2) * u);
+        };
+        for (const [p, P, ip] of list) {
+          if (hidden(P[0], P[1], P[2], ip)) continue;
+          const s1 = toImg(P[0] + P[3] * 0.05, P[1] + P[4] * 0.05, P[2]), back = s1[1] - ip[1] < 0, mir = s1[0] - ip[0] < 0, fr = p.moving ? Math.floor(p.ph) % 4 : 0;
+          const L = Math.hypot(P[3], P[4]) || 1, nx = -P[4] / L, ny = P[3] / L;   // kolmo ke směru chůze
+          const near = (off, fwd) => { const x = P[0] + nx * off + P[3] / L * fwd, y = P[1] + ny * off + P[4] / L * fwd, h = gz(x, y); return [x, y, h, toImg(x, y, h)]; };
+          const comp = [];
+          if (p.pair) comp.push(['a', near(0.65, 0.1), (p.oi + 53) % 160]);
+          if (p.kid) comp.push(['k', near(-0.6, -0.2), p.oi]);
+          const all = [['m', [P[0], P[1], P[2], ip], p.oi], ...comp].sort((a, b) => a[1][3][1] - b[1][3][1]);
+          for (const [t, q, oi] of all) {
+            if (t !== 'm' && hidden(q[0], q[1], q[2], q[3])) continue;
+            const kid = t === 'k', o = outfitOf(state.season, oi, kid);
+            put(o, state.season + (kid ? 'k' : '') + oi, q[3], back, mir, fr);
+          }
+          if (p.dog) { const q = near(-0.9, 0.9); if (!hidden(q[0], q[1], q[2], q[3])) drawDogAt(ox + q[3][0] * sx, oy + q[3][1] * sx, u, mir, fr, p.dog); }
+        }
+      }
     }
     // lyžaři (jen v zimě)
     if (snowy && skiers.length) {
