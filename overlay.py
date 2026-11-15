@@ -65,6 +65,47 @@ for f in sorted(glob.glob('data*/land_use.parquet')):
 AREA_TREE = shapely.STRtree([a[2] for a in AREAS]) if AREAS else None
 PL_TREE = shapely.STRtree([shapely.geometry.Point(p[0], p[1]) for p in PLACES_DB]) if PLACES_DB else None
 
+# chodci (web/app.html): pěší cesty z Overture po čtvercích, společné souřadnice [x, y] po 0,1 m.
+# l = čáry, c = druh (p pěší zóna, f chodník, s schody, t cesta v parku/lese, k cyklostezka), a = pěší plochy a náměstí (polygony).
+# Chodníky podél ulic, které v datech nejsou, si prohlížeč dopočítá ze silnic (roads). Vypnout: "chodci": false v mesto.json.
+WALK_K = {'pedestrian': 'p', 'footway': 'f', 'steps': 's', 'path': 't', 'cycleway': 'k', 'living_street': 'p', 'bridleway': 't'}
+_WALK, _WALK_SRC = {}, None
+def _walk_src():
+    global _WALK_SRC
+    if _WALK_SRC is not None: return _WALK_SRC
+    tr = lambda g: shapely.ops.transform(lambda x, y, z=None: to_local(x, y), g)
+    lines, areas = [], []
+    if MESTO.get('chodci', True) is not False:
+        for f in sorted(glob.glob('data_all/segment.parquet') or glob.glob('data*/segment.parquet')):
+            t = pq.read_table(f, columns=['class', 'geometry', 'road_flags']).to_pydict()
+            for c, g, fl in zip(t['class'], t['geometry'], t['road_flags']):
+                k = WALK_K.get(c)
+                if not k or any('is_tunnel' in (q.get('values') or []) and not q.get('between') for q in fl or []): continue
+                lines.append((k, tr(shapely.from_wkb(g))))
+        for f in sorted(glob.glob('data_all/land_use.parquet') or glob.glob('data*/land_use.parquet')):
+            t = pq.read_table(f, columns=['class', 'geometry']).to_pydict()
+            areas += [tr(shapely.from_wkb(g)) for c, g in zip(t['class'], t['geometry']) if c in ('pedestrian', 'plaza')]
+    _WALK_SRC = (lines, areas)
+    return _WALK_SRC
+def walk_of(chunk):
+    if tuple(chunk) in _WALK: return _WALK[tuple(chunk)]
+    lines, areas = _walk_src()
+    cx, cy = chunk_center(chunk)
+    box = shapely.box(cx - HALF, cy - HALF, cx + HALF, cy + HALF)
+    L, C, A = [], [], []
+    for k, g in lines:
+        g = g.intersection(box)
+        for q in getattr(g, 'geoms', [g]):
+            if q.geom_type != 'LineString' or q.length < 4: continue
+            L.append([[round(x, 1), round(y, 1)] for x, y in q.simplify(0.4).coords]); C.append(k)
+    for g in areas:
+        g = g.intersection(box)
+        for q in getattr(g, 'geoms', [g]):
+            if q.geom_type != 'Polygon' or q.area < 150: continue
+            A.append([[round(x, 1), round(y, 1)] for x, y in q.simplify(1.0).exterior.coords[:-1]])
+    _WALK[tuple(chunk)] = {'walk': {'l': L, 'c': ''.join(C), 'a': A}} if L or A else {}
+    return _WALK[tuple(chunk)]
+
 ONE_BUILDING = set(MESTO.get('jedna_budova', []))      # dominanty se zónami střech: v prepu samostatné díly, na mapě jedna budova
 
 
@@ -194,7 +235,9 @@ for chunk in chunks:
     # stromy u silnic, kolejí a sjezdovek: auta, tramvaje a lyžaři se za jejich korunami schovají (svět, z terénu, výška, jehličnan)
     sc_ = json.load(open(f'{chunk_dir(chunk)}/scene.json'))
     T_ = [t for t in sc_['trees'] if (len(t) < 6 or t[5] != 2) and abs(t[0]) <= HALF and abs(t[1]) <= HALF]
-    ln_ = [shapely.LineString([(x, y) for x, y, _ in r['p']]) for r in src['roads'] if len(r['p']) > 1] + \
+    _wk = walk_of(chunk).get('walk', {})   # stromy i u pěších zón, ať se za ně chodci schovají (ne u lesních cest: data by nabobtnala)
+    ln_ = [shapely.LineString([(x - OFF[0], y - OFF[1]) for x, y in w_]) for w_, c_ in zip(_wk.get('l', []), _wk.get('c', '')) if c_ == 'p'] + \
+      [shapely.LineString([(x, y) for x, y, _ in r['p']]) for r in src['roads'] if len(r['p']) > 1] + \
           [shapely.LineString([(x, y) for x, y, _ in l]) for l in src.get('trams', []) + src.get('pistes', []) if len(l) > 1]
     vtrees = []
     if ln_ and T_:
@@ -223,7 +266,7 @@ for chunk in chunks:
                     ta, tb, _ = px(t[0], t[1], t[2] + h_ * 0.62); ra, rb, _ = px(t[0] + r_, t[1], t[2] + h_ * 0.62)
                     if (a_ - ta) ** 2 + (b_ - tb) ** 2 < (ra - ta) ** 2 + (rb - tb) ** 2: skryta = True; break
             if not skryta: svicky.append([round(a_), round(b_), round(u, 3)])
-    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees, 'svicky': svicky}
+    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees, 'svicky': svicky, **walk_of(chunk)}
 
 
 
