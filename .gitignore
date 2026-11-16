@@ -16,6 +16,14 @@ assets/dmp_vysky.json
 assets/strechy_orto.json
 assets/hrebeny.json
 
+# vlastní modely památek tvého města a jejich výběr (sdílené jsou jen nástroje, stavebnice a návody v pamatky/)
+/pamatky/*.json
+/pamatky/*.js
+/pamatky/*.tmp
+!/pamatky/_kit.js
+!/pamatky/_ukazka.js
+!/pamatky/_drobne.js
+
 # konfigurace tvého města (python novy_mesto.py); ukázka je v priklady/mesto.json
 /mesto.json
 /mista.json

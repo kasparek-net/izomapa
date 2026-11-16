@@ -52,6 +52,37 @@ Bez AI to jde taky:
 npm run nahled                      # náhled na http://localhost:8000
 ```
 
+## Základní, nebo detailní rozlišení
+
+Mapa v prohlížeči není živé 3D, ale předem vykreslené obrázky (dlaždice). Rozlišení určuje, kolik metrů ukazuje jeden
+pixel obrázku. Agent se na něj zeptá při zakládání města a řekne vám, jak velký web z toho vyjde. Bez agenta:
+`novy_mesto.py "Název" --detailni`, nebo později v `mesto.json` `"rozliseni": "detailni"` a `./postav.sh render`.
+
+![Kostel v Chrastavě při největším přiblížení: vlevo základní rozlišení, vpravo detailní](priklady/rozliseni_kostel.webp)
+
+*Kostel v Chrastavě při největším přiblížení. Model je v obou případech stejný, vpravo je jen vykreslený do 2× jemnějších
+pixelů: ostřejší ciferníky, fiály a okna. Na běžném přiblížení (celé náměstí) rozdíl nepoznáte.*
+
+| | **Základní** (0,2 m na pixel, výchozí) | **Detailní** (0,1 m na pixel) |
+|---|---|---|
+| Vzhled | pixel-art jako na [izomapa.fun](https://izomapa.fun) | při největším přiblížení ostřejší okna, hodiny, římsy a vlastní modely památek |
+| Velikost webu na čtverec 2,3 × 2,3 km | 80–230 MB, ~450 souborů | zhruba 2,7× víc, ~1 400 souborů |
+| Kolik návštěvník stáhne | výchozí stav | celá mapa stejně, při přiblížení na ulici o 35–60 % víc |
+| Plynulost v prohlížeči | plynulá | plynulá; na slabém telefonu může při přiblížení krátce zaškobrtnout, než dorazí detail |
+| Sestavení mapy (render a dlaždice) | ~4 GB paměti na čtverec | zhruba 3× déle, ~8 GB paměti na čtverec (počítač s 16 GB) |
+| Hodí se pro | větší města, slabší počítač, hosting s limitem velikosti nebo počtu souborů | vesnice a malá města (zhruba do 10 čtverců), hlavně s vlastními modely památek |
+
+Proč se mapa nezpomalí: prohlížeč nic nepočítá ve 3D, jen skládá obrázky a stahuje jen ty, které jsou zrovna na
+obrazovce. Detailní rozlišení přidá jednu úroveň přiblížení navíc, která se načte, až když ji člověk opravdu přiblíží.
+Auta, MHD, počasí a obrysy budov při najetí myší fungují v obou rozlišeních stejně.
+
+Změřeno na zkušební Chrastavě (2 čtverce, 4 roční období a noc, Mac s M4 a 16 GB): web 161 MB a 800 souborů
+proti 443 MB a 2 600 souborům, `./postav.sh render` 2 minuty proti 6 minutám. Stahování dat je u obou stejné.
+Velikost záleží na hustotě zástavby, pole a lesy se komprimují líp než centrum města.
+
+Když si nejste jistí, začněte základním. Přepnout jde kdykoli, jen se celá mapa vykreslí znovu (data se znovu
+nestahují).
+
 ## K čemu se to hodí
 
 - hravá mapa obce na web města, infocentra, školy nebo spolku,
@@ -78,11 +109,12 @@ npm run nahled                      # náhled na http://localhost:8000
 | skutečné výšky budov a tvar střech (laser ČÚZK) | příběhy míst (`mista.json`), jen když o ně požádáte |
 | les jen tam, kde opravdu je (ortofoto ČÚZK) | oprava chyb v OpenStreetMap |
 | pole s plodinou podle ročního období, louky (ZABAGED) | vlastní modely zvláštních staveb |
-| terén, voda, silnice, koleje, sjezdovky | |
+| terén, voda, silnice, koleje, sjezdovky | vlastní 3D modely památek s dashboardem Před / po (`pamatky/`) |
 | mosty a lávky ve 3D s pozvolnými nájezdy, krátké podjezdy | |
 | 4 roční období, noc, déšť, sníh, mlha | |
 | auta, MHD podle jízdních řádů (GTFS), lyžaři, chodci | |
 | klikací budovy s adresou, hledání, názvy částí obce | |
+| | vánoční výzdoba: strom, kluziště, stánky, zapnutá podle data (`assets/vanoce.json`, `./vanoce.sh`) |
 | | hlášení nepřesností od lidí s administrací (volitelný server, `hlaseni/`) |
 
 **Mosty a lávky** jsou skutečné 3D mostovky: nad silnicí nebo tratí mají podjezdnou výšku a nájezdy na ně vedou
@@ -94,6 +126,49 @@ je užší než obousměrná silnice a sjezdy mají jeden pruh. Kratší podjezd
 **Příběhy míst se samy negenerují.** Mapa je bez nich úplně v pořádku. Vzniknou jen tehdy, když o ně agenta
 požádáte. Návod mu ukládá psát jen z ověřených zdrojů (web obce, Památkový katalog, Wikipedie) a nic si nevymýšlet,
 ale i tak se může splést, proto fakta před zveřejněním ověřte.
+
+## Vlastní modely památek (volitelné)
+
+![Dashboard Před / po: kostel sv. Vavřince v Chrastavě před vlastním modelem a po něm](priklady/pamatky_dashboard.webp)
+
+*Dashboard Před / po: kostel sv. Vavřince v Chrastavě. Vlevo, jak ho z dat postaví automatika, vpravo model, který
+agent napsal podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK. Pod tím model ze čtyř stran a tlačítka
+Schváleno / Předělat / Později.*
+
+Kostel, radnice, zámek nebo kašna jsou z dat jen obecné budovy, ale právě podle nich lidé svoje město na mapě poznají.
+Když je mapa hotová, napište agentovi:
+
+> Udělej modely památek.
+
+Jak to funguje:
+
+1. **Kandidáti.** Agent najde kulturní památky ve vašem městě (Wikidata, Ústřední seznam kulturních památek),
+   dominanty a pojmenované budovy z OpenStreetMap a seřadí je podle toho, kolik z nich je z pohledu mapy (od jihozápadu)
+   opravdu vidět. Spolu vyberete, které vymodelovat. Začněte pár nejviditelnějšími.
+2. **Podklady.** Ke každé stavbě stáhne fotky z Wikimedia Commons, výřez ortofota ČÚZK s obrysy budov a laserové výšky.
+   Vaše vlastní fotky ve složce `fotky/<stavba>/` jsou ještě lepší. Podklady zůstávají jen na vašem počítači.
+3. **Model.** Agent (u více staveb tým: koordinátor, modeláři a rešeršér) napíše 3D model ze stavebnice: zdi s okny
+   a římsami, střechy, věže, báně, sochy. Model nahradí obecnou budovu ve stejném půdorysu, sousední domy na něj navazují.
+4. **Dashboard Před / po** (`npm run pamatky`, http://127.0.0.1:8792, běží jen na vašem počítači): stejný výřez mapy
+   bez modelu a s modelem (po kliknutí přepínáte mezerníkem na stejném místě), model ze čtyř stran, fotky a poznámky
+   modeláře. U každé stavby kliknete **Schváleno**, **Předělat** s komentářem (agent model opraví) nebo **Později**.
+   Schvaluje vždy člověk, ne agent.
+5. **Do mapy** jdou jen schválené modely. `pamatky/render_mapa.sh` přepočítá jen čtverce, kterých se týkají,
+   a obnoví klikací vrstvu, aby obrys při najetí myší seděl i s věží.
+
+![Radnice v Chrastavě v dashboardu Před / po](priklady/pamatky_radnice.webp)
+
+*Radnice v Chrastavě: z dat obecný dům s červenou střechou, jako model žlutá novorenesanční budova se štítem do náměstí
+a hodinovou věží. Obě ukázky jsou rychlé zkušební modely na pár kol ladění; s více koly a vlastními fotkami vyjdou
+detailnější.*
+
+Jak moc je detail modelu na mapě vidět, záleží na rozlišení (viz [Základní, nebo detailní rozlišení](#základní-nebo-detailní-rozlišení)):
+v detailním je znát i členění oken nebo ciferník, v základním hlavně tvar, střechy a věže. Na velikost webu má model
+vliv jen přes rozlišení, ne přes svou složitost.
+
+Velká stavba v plné kvalitě spotřebuje znatelnou část limitu předplatného AI, malý dům nebo socha mnohem méně.
+Modely i podklady zůstávají u vás (jsou v `.gitignore`). Podrobný návod je v [pamatky/README.md](pamatky/README.md),
+postup pro agenty v [pamatky/ZADANI_MODELARE.md](pamatky/ZADANI_MODELARE.md).
 
 ## Data a licence
 
@@ -110,6 +185,8 @@ ale i tak se může splést, proto fakta před zveřejněním ověřte.
 | [Celostátní sčítání dopravy ŘSD](https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy) (volitelné, `"doprava"` v `mesto.json`) | kolik aut jezdí po které silnici | **podmínky si ověřte**: web ŘSD uvádí CC BY-SA 4.0, u souboru licence není; denní křivka je odhad |
 | OpenStreetMap přes Overpass (volitelné, `nastroje/kominy.py`) | komíny, chladicí věže, vysílače, nádrže, rozhledny, nadzemní potrubí | ODbL: uvést „© přispěvatelé OpenStreetMap“ |
 | Pasporty města Kopřivnice (jen tato mapa, `nastroje/stromy_mesta.py`, `nastroje/mobiliar_mesta.py`) | stromy, lavičky, koše, zastávky, hřiště, drobné památky | se souhlasem města, data nejsou součástí repozitáře; uvést „© Město Kopřivnice“ |
+| [Wikidata](https://www.wikidata.org/) (volitelné, `pamatky/`) | seznam kulturních památek pro vlastní modely | CC0 |
+| [Wikimedia Commons](https://commons.wikimedia.org/) (volitelné, `pamatky/`) | fotky jako podklad pro modely | různé licence: jen místní podklad, nezveřejňovat |
 | [Open-Meteo](https://open-meteo.com/) (volitelné, `"vitr": true` a `"pocasi": true` v `mesto.json`) | skutečný vítr pro kouř z komínů, skutečné počasí v mapě | CC BY 4.0, zdarma jen pro nekomerční použití; prohlížeč návštěvníka se k službě připojuje přímo |
 | [Copernicus CAMS](https://atmosphere.copernicus.eu/) přes Open-Meteo (s `"pocasi": true`) | opar podle PM2,5 (model, ne měření ve městě) | s uvedením zdroje |
 
@@ -127,7 +204,8 @@ i svoje úpravy a zachovat informaci o autorovi.
   Na Windows skripty spouštějte v Git Bash (`sh ./setup.sh`, `sh ./postav.sh`) a před ručním spuštěním
   Pythonu (`novy_mesto.py` apod.) nastavte `export PYTHONUTF8=1`.
 - Python 3.9+, Node 18+.
-- Disk: malé město jednotky GB, krajské město desítky GB.
+- Disk: malé město jednotky GB, krajské město desítky GB. Detailní rozlišení zhruba dvojnásobek.
+- Paměť: na detailní rozlišení aspoň 16 GB (skládání dlaždic jednoho čtverce si vezme až 6 GB).
 - Hosting pro statický web. Výsledek je obyčejná složka `site/` s tisíci obrázků, nahrajete ji kamkoli, kde zvládnou
   hodně souborů. Kam a jak, je na vás.
 
@@ -149,10 +227,12 @@ nastroje/       les.py (ortofoto, maska lesa), zabaged.py (pole, louky), pole.py
 prep.py         data -> scéna čtverce (budovy, stromy, textury terénu podle ročního období)
 render.html     renderer (three.js), render.mjs ho pouští po dlaždicích v Chromiu
 dzi.py          dlaždice -> Deep Zoom pyramidy (WebP) do site/tiles/
+vanoce.sh       vánoční výzdoba jako průhledná vrstva (jen čtverce s výzdobou)
 overlay.py      klikací vrstva: obrysy budov, adresy, ulice, místa, doprava
 mhd.py          jízdní řády GTFS -> site/mhd.json (krajské GTFS ořízne na mapu)
 road_route.py   trasy autobusů po silnicích pro GTFS bez shapes.txt (např. IDS JMK)
 nastroje/mhd_cisjr.py  oficiální jízdní řády autobusů a vlaků CIS JŘ (bez GTFS dopravce) -> build/gtfs.zip pro mhd.py
+pamatky/        volitelné vlastní modely památek: kandidáti, podklady, stavebnice, náhled, dashboard Před / po
 hlaseni/        volitelný server: hlášení nepřesností a administrace /admin
 web/app.html    prohlížeč, build_html.py z něj udělá site/index.html
 ```
@@ -167,9 +247,10 @@ Statický web sám hlášení uložit neumí, potřebuje malý server. Hotový j
 s databází D1 (na malou mapu stačí bezplatný tarif). Jinde to jde taky, `hlaseni/worker.js` je krátký a agent ho
 přepíše pro jiný hosting.
 
-1. V `mesto.json` nastavte `"hlaseni": true` a spusťte `python build_html.py` (v mapě se objeví tlačítko a do `site/`
+1. V `mesto.json` nastavte `"hlaseni": true` a spusťte `.venv/bin/python build_html.py` (v mapě se objeví tlačítko a do `site/`
    přibude `admin.html`).
-2. `cp hlaseni/wrangler.example.jsonc wrangler.jsonc`, doplňte název a `npx wrangler d1 create izomapa-hlaseni`
+2. `npm install` (doinstaluje nástroj wrangler, `setup.sh` ho kvůli velikosti vynechává),
+   `cp hlaseni/wrangler.example.jsonc wrangler.jsonc`, doplňte název a `npx wrangler d1 create izomapa-hlaseni`
    (vypíše `database_id`, to patří do `wrangler.jsonc`).
 3. `npx wrangler d1 migrations apply izomapa-hlaseni --remote`
 4. `npx wrangler secret put ADMIN_PASSWORD` (heslo do administrace) a `npx wrangler deploy`.

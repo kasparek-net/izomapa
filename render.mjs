@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = Object.fromEntries(process.argv.slice(2).map((a) => a.split('=')));
-const mpp = args.mpp || '0.4', tile = args.tile || '1024';
+// rozlišení dlaždic: mpp=… nebo podle "rozliseni" v mesto.json (stejná tabulka jako geo.ROZLISENI)
+const MESTO = JSON.parse(fs.readFileSync(path.join(ROOT, process.env.IZO_MESTO || 'mesto.json'), 'utf8'));
+const ROZLISENI = { zakladni: '0.2', detailni: '0.1' };
+const mpp = args.mpp || ROZLISENI[MESTO.rozliseni || 'zakladni'], tile = args.tile || '1024';
+if (!mpp) { console.error(`mesto.json: "rozliseni" má být "zakladni" nebo "detailni", ne "${MESTO.rozliseni}"`); process.exit(1); }
 const outDir = path.join(ROOT, args.out || 'build/tiles');
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -79,7 +83,7 @@ if (args.stromy) {                             // jen kresby stromů pro prohlí
 const MARK = path.join(outDir, 'rozpracovano');             // značka nedokončeného renderu (dzi.py podle ní odmítne směs starých a nových dlaždic)
 fs.writeFileSync(MARK, '');
 const only = args.only ? args.only.split(',').map(Number) : null;
-const list = args.tiles ? new Set(args.tiles.split(';')) : null;
+const list = args.tiles ? new Set(args.tiles.split(';')) : info.need ? new Set(info.need) : null;   // vrstva xmas: jen dlaždice s obsahem
 for (let j = 0; j < info.rows; j++) for (let i = 0; i < info.cols; i++) {
   if (only && (only[0] !== i || only[1] !== j)) continue;
   if (list && !list.has(`${i}_${j}`)) continue;

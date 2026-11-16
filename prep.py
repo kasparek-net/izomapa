@@ -63,6 +63,13 @@ HREBENY = json.load(open('assets/hrebeny.json')) if os.path.exists('assets/hrebe
 DMP = json.load(open('assets/dmp_vysky.json')) if os.path.exists('assets/dmp_vysky.json') else {}
 if os.path.exists('assets/dmp_rucne.json'): DMP.update({k: v for k, v in json.load(open('assets/dmp_rucne.json')).items() if not k.startswith('_')})   # ověřená měření z kontrolního seznamu
 DMP.update(UP.get('dmp', {}))                                 # ruční doplnění měření
+# vlastní modely památek (pamatky/, kreslí je render.html): skutečný vršek modelu pro obrys při najetí myší
+# (pamatky/pred_po.mjs zapíše pamatky/vrsky.json; oid v seznamu stačí začátkem). Do dlaždic jdou jen modely schválené
+# v dashboardu (pamatky/schvalene.json), proto i vršky jen jejich.
+PAM_SCHV = set(json.load(open('pamatky/schvalene.json', encoding='utf-8'))) if os.path.exists('pamatky/schvalene.json') else set()
+PAM_VRSKY = [(o, v['vrsek']) for s_, v in (json.load(open('pamatky/vrsky.json', encoding='utf-8')).items() if os.path.exists('pamatky/vrsky.json') else [])
+             if s_ in PAM_SCHV for o in v.get('oids', []) if o]
+def pam_vrsek(key): return next((v for o, v in PAM_VRSKY if str(key).startswith(o)), None)
 
 
 def h01(s):
@@ -1364,11 +1371,13 @@ for _, r in bld.iterrows():
         if dsp:
             top_ = b['e'] + (b['rh'] if b['r'] != 'flat' else 0.0)
             if b.get('dz'): top_ = max(top_, b['e'] + max(q[6] for q in b['dz']))
+        pam_ = pam_vrsek(key)                                          # vlastní model památky: vršek modelu (i s věží)
+        if pam_ is not None: top_ = pam_
         binfo.append({'id': bid, 'oid': key, 'name': nm, 'cls': CLS_CZ.get(c, 'budova' if not c else c), 'floors': floors,
                       'h': round(total, 1), 'roof': rs, 'addr': adrs, 'lon': round(float(lon), 6), 'lat': round(float(lat), 6),
-                      'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2),
+                      'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2), **({'pam': 1} if pam_ is not None else {}),
                       **({'roof_geometry': {'eave': b['e'], 'height': b['rh'], 'parts': b['parts']}}
-                         if not lm and rs in ('gabled', 'hipped') and b['parts'] else {})})
+                         if not lm and pam_ is None and rs in ('gabled', 'hipped') and b['parts'] else {})})
 # samostatné stavby dominant (zřícenina, rozhledna, VTE): jen věž na bodu dominanty
 for d in DOMS:
     sp = d['spec']
@@ -1872,12 +1881,35 @@ for h in UP.get('stada', UP.get('herds', [])):
             'mladata': bool(h.get('mladata', True))
         })
 
+# vánoční stromy a kluziště (mesto.json "vanocni_strom", "kluziste"): v zimním renderu jako 3D stavba, prohlížeč nad ně kreslí
+# jen blikající světýlka a bruslaře. Do scény patří i v pásu sousedů (kvůli švům a stínům).
+_vs_ = geo.MESTO.get('vanocni_strom') or []
+if _vs_ and not isinstance(_vs_[0], list): _vs_ = [_vs_]
+xmas = []
+for _la, _lo in _vs_:
+    _x, _y = to_local(_lo, _la)
+    if AREA.contains(Point(_x, _y)): xmas.append([round(float(_x), 2), round(float(_y), 2), round(float(ground(_x, _y)), 2)])
+rinks = []
+for _k in geo.MESTO.get('kluziste') or []:
+    _x, _y = to_local(_k['lon'], _k['lat']); _a = math.radians(_k.get('a', 0)); _L, _W = _k.get('d', 40), _k.get('s', 20)
+    if not AREA.contains(Point(_x, _y)): continue
+    _zs = [float(ground(_x + math.cos(_a) * i * _L / 2 - math.sin(_a) * j * _W / 2, _y + math.sin(_a) * i * _L / 2 + math.cos(_a) * j * _W / 2)) for i in (-1, 0, 1) for j in (-1, 0, 1)]
+    rinks.append([round(float(_x), 2), round(float(_y), 2), round(min(_zs), 2), round(max(_zs), 2), round(_a, 4), _L, _W])
+# vánoční stánky (mesto.json "vanocni_stanky": [{lat, lon: střed řady, a: směr řady ve ° od východu, n: počet, w: šířka stánku m, m: mezera m}]),
+# pult je na pravé straně od směru řady (lokální −t); jen v zimním renderu
+stalls = []
+for _k in geo.MESTO.get('vanocni_stanky') or []:
+    _x, _y = to_local(_k['lon'], _k['lat']); _a = math.radians(_k.get('a', 0)); _n, _w, _m = _k.get('n', 5), _k.get('w', 3.0), _k.get('m', 1.2)
+    for _i in range(_n):
+        _s = (_i - (_n - 1) / 2) * (_w + _m); _sx, _sy = _x + math.cos(_a) * _s, _y + math.sin(_a) * _s
+        if AREA.contains(Point(_sx, _sy)): stalls.append([round(float(_sx), 2), round(float(_sy), 2), round(float(ground(_sx, _sy)), 2), round(_a, 4), _w, _i])
 TOP = max([b['e'] + b['rh'] for b in buildings] + [t[2] + t[3] for t in trees] + [float(H.max())])
 json.dump({'chunk': CHUNK, 'center': [CX, CY], 'half': HALF, 'step': STEP, 'n': N, 'hmin': HMIN, 'heights': [round(float(v), 2) for v in H.ravel()],
            'ms': MS, 'hext': [round(float(v), 2) for v in HX.ravel()], 'nb': NB, 'margin': geo.MARGIN, 'skirt': geo.skirt_edges(CHUNK),
            'floor': geo.FLOOR, 'top': round(TOP, 1),
            'buildings': buildings, 'trees': trees, 'props': props, 'cars': cars, 'buses': buses, 'portals': portals, 'lines': lines_out,
            'herds': herds_out,
+           'xmas': xmas, 'rinks': rinks, 'stalls': stalls,
            'play': [[round(float(x), 2), round(float(y), 2), round(float(ground(x, y)), 2), round(a, 3), t] for x, y, a, t in play],
            'bridges': [{'p': run, 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)
                        for run in deck_runs([[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])])]},

@@ -13,8 +13,20 @@ jiné město. Komunikuj česky, věcně, a před dlouhými kroky řekni, kolik b
    Vypíše počet čtverců 2,3 × 2,3 km. Řekni uživateli, kolik to je a jak dlouho to potrvá (orientačně: stažení
    10–30 min, render 5–10 min na čtverec na Macu s Apple Silicon). U velkého města nabídni nejdřív centrum:
    `--max 4` (jen 4 čtverce kolem středu).
+   **Rozlišení:** vždy se zeptej, než začne stavba, a vysvětli to lidsky (podklad je sekce „Základní, nebo detailní
+   rozlišení“ v README, obrázek `priklady/rozliseni_kostel.webp` mu můžeš ukázat). Třeba: „Chceš mapu v základním,
+   nebo detailním rozlišení? Detailní (0,1 m na pixel) je při největším přiblížení ostřejší, je na něm vidět víc
+   z budov a hlavně z vlastních modelů památek. Na běžném přiblížení vypadají obě stejně. Detailní web bude zhruba
+   2,7× větší (u tebe odhadem …), render potrvá zhruba 3× déle (stahování dat stejně) a na slabém telefonu může mapa
+   při přiblížení krátce zaškobrtnout.“ Čísla vezmi z řádku „odhad webu“, který vypsal `novy_mesto.py`.
+   Doporučení: vesnice a malé město (zhruba do 10 čtverců) klidně detailní, hlavně když chce vlastní modely památek;
+   větší město, počítač s méně než 16 GB paměti nebo hosting s limitem velikosti či počtu souborů: základní.
+   Když neví, základní (přepnout jde později). Volbu zapiš do `mesto.json` `"rozliseni": "zakladni"` nebo
+   `"detailni"`. Změna po stavbě znamená `./postav.sh render` (rozlišení je v otisku renderu, takže se vykreslí
+   celá mapa znovu, data zůstanou);
+   míchat rozlišení mezi čtverci nejde, `dzi.py` to odmítne.
 3. **Texty v `mesto.json`:** zkontroluj rod („Izometrický Liberec“, „Izometrická Chrastava“, „Izometrické Brno“),
-   `podtitul` a `popis`. Vánoční strom: `vanocni_strom: [lat, lon]` hlavního náměstí.
+   `podtitul` a `popis`. Vánoční strom: `vanocni_strom: [lat, lon]` hlavního náměstí (celá výzdoba: `assets/vanoce.json`, viz níže).
    **MHD:** zeptej se uživatele: „Chceš v mapě i jezdící MHD podle jízdních řádů?“ Když ano, najdi sám, jestli má
    dopravce města vlastní veřejné GTFS, nebo je město v krajském systému, a doplň `mhd.gtfs` (URL zipu), `mhd.zdroj`
    (název dopravce) a `mhd.zdroj_url`. Krajské GTFS (IDS JMK, KORDIS) jde taky: `mhd.py` vezme jen autobusy, trolejbusy
@@ -38,7 +50,8 @@ jiné město. Komunikuj česky, věcně, a před dlouhými kroky řekni, kolik b
 5. **Kontrola:** `python compose.py summer 8` udělá `build/nahled_summer.png`. Prohlédni si ho (švy mezi čtverci,
    prázdná místa, divné barvy) a pošli uživateli. Pak `npm run nahled` a mapa běží na http://localhost:8000.
 6. **Doladění s uživatelem** (níže). Po každé úpravě: `./postav.sh render` (jen scény, render a web). Kreslí jen čtverce, kde se
-   změnila scéna nebo kód renderu (otisk v `build/…/otisk_renderu`, `nastroje/otisk.py`), ostatní přeskočí. Vše znovu: smaž `site/tiles`.
+   změnila scéna, kód renderu, rozlišení nebo schválené modely památek ve čtverci (otisk v `build/…/otisk_renderu`,
+   `nastroje/otisk.py`), ostatní přeskočí. Vše znovu: smaž `site/tiles`.
    Render běží souběžně po několika čtvercích (`render_par.sh`, počet podle paměti: na čtverec ~4 GB a 3 jádra, nejvýš 4). Na slabším počítači nebo při potížích `./render_par.sh 1` = po jednom; jen vybrané čtverce `./render_par.sh 2 "0,0 1,0"`.
 7. **Řekni uživateli na rovinu**, že mapu musí projít a porovnat se skutečností (data i ty se můžete mýlit),
    hlavně fakta v příbězích míst, než ji zveřejní. Kredit „Vytvořeno nástrojem izomapa od Adama Klatovského“
@@ -70,6 +83,15 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
   Napárování na budovu: bod uvnitř půdorysu, jinak největší budova do 25 m (`match_doms` v `prep.py`).
   Ukázka je v `priklady/dominanty.json`.
 - **Vlastní kód a lokální úpravy města nepatří do sdíleného `prep.py` ani `render.html`!** Pro specifické úpravy terénu, hřbitovů a rekvizit použij `assets/custom_prep.py` (fáze `HOOK` `terrain` / `cemetery` / `props`, ukázka v `priklady/custom_prep.py`). Pro specifické 3D modely použij `assets/custom_models.js`. Oba soubory jsou v `.gitignore` a načítají se automaticky, takže hlavní kód zůstává čistý pro upstream git.
+- **Vlastní modely památek** (když o ně uživatel požádá, např. „udělej modely památek“; nenabízej je dřív, než je mapa
+  hotová) → `pamatky/`. Přečti `pamatky/README.md` a `pamatky/ZADANI_MODELARE.md` a postupuj podle nich: kandidáti
+  (`pamatky/kandidati.py`), výběr s uživatelem (`sestav.py --novy`), podklady, modely `pamatky/<slug>.js` (stavebnice
+  `_kit.js`), snímky `pred_po.mjs`, dashboard `npm run pamatky` (http://127.0.0.1:8792). **Schvaluje jen uživatel**
+  v dashboardu; nikdy neklikej Schváleno za něj ani nezapisuj `rozhodnuti.json`. Do dlaždic jdou jen schválené
+  (`pamatky/render_mapa.sh`). Řekni mu předem, že velká stavba spotřebuje znatelnou část limitu předplatného.
+  Detail modelu laď podle `"rozliseni"` v `mesto.json`: u základního (0,2 m/px) zanikne všechno pod ~30 cm, u detailního
+  (0,1 m/px) jsou vidět i prvky od ~15 cm. Když uživatel chce co nejlepší modely a mapa je v základním rozlišení,
+  připomeň mu, že detailní rozlišení je ukáže líp (sekce „Základní, nebo detailní rozlišení“ v README).
 - **Příběhy míst** → `mista.json`: `[{"nazev", "lat", "lon", "text"}]`. Texty piš jen z ověřených zdrojů (web obce,
   Památkový katalog, Wikipedie s odkazem). Když si nejsi jistý, zeptej se uživatele. Nic si nevymýšlej.
   Ukázka je v `priklady/mista.json`.
@@ -92,6 +114,7 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Komíny, věže, nádrže, potrubí:** `.venv/bin/python nastroje/kominy.py` vyrobí `assets/kominy.json` a `assets/potrubi.json` z OSM (výška z tagu `height`). Komín od 100 m dostane výstražné pruhy. Vzhled jednoho komína: `assets/upresneni.json`, `"kominy": [{"lat", "lon", "wc": barva, "pr": 0}]`. Po změně je potřeba nový render dotčených čtverců.
 - **Železniční přejezdy (volitelné):** `.venv/bin/python nastroje/prejezdy.py` vyrobí `assets/prejezdy.json` z OSM (`railway=level_crossing`), `prep.py` je přiřadí silnicím, které tam kříží kolej. Přejezd se zavře asi 25 s před příjezdem vlaku podle jízdních řádů a otevře, až projede poslední vůz; auta před ním čekají ve frontě. Bez souboru nebo bez vlaků v MHD auta nečekají. Render není potřeba, stačí `prep.py`, `overlay.py` a `build_html.py`.
 - **Semafory (volitelné):** `.venv/bin/python nastroje/semafory.py` vyrobí `assets/semafory.json` z Overture (`traffic_signals`, body do 40 m = jedna křižovatka). Prohlížeč je přiřadí silnicím: dvoufázový cyklus 64 s podle hodin (všichni návštěvníci vidí stejnou barvu), auta stojí na červenou ve frontě u stop čáry, u stop čáry stojí sloup se světly. Render není potřeba, stačí `overlay.py` a `build_html.py`.
+- **Vánoční výzdoba (volitelné):** `assets/vanoce.json` (ukázka v `priklady/vanoce.json`): `od`/`do` (měsíc-den), `stromy` [[lat, lon]], `kluziste` [{`lat`, `lon`, `d` délka m, `s` šířka m, `a` natočení delší strany ve ° od východu}], `stanky` [{`lat`, `lon` střed řady, `a` směr řady, `n` počet, `w` šířka stánku, `m` mezera}]. Strom, kluziště a stánky jsou 3D ve zvláštní průhledné vrstvě (`render.html` `mode=xmas`, varianty `xmas_winter` se sněhem a `xmas_autumn` bez), renderují se jen dlaždice, kde něco je. Prohlížeč vrstvu zapíná podle data a jen na podzim a v zimě (při ručně zvoleném jaru nebo létě se nekreslí), v menu jde vypnout, kreslí blikající světýlka, bruslaře a večer osvětlené stánky. Po změně `./vanoce.sh` (jen dotčené čtverce, pár minut; `postav.sh` ho pouští sám). Bez souboru zůstává plochý strom z `vanocni_strom` v `mesto.json`.
 - **Chodci (výchozí zapnuto):** `overlay.py` dá do dat čtverců pěší cesty, schody, pěší zóny a náměstí z Overture (`walk`), prohlížeč k nim přidá chodníky podél ulic. Pixelové postavy (16 bodů po 10 cm) chodí sem tam, někdy ve dvojici, s dítětem nebo se psem, oblečení podle ročního období (v zimě čepice a bundy), bez deštníků. Počet podle denní doby, v dešti a na slabých zařízeních méně, kreslí se jen zblízka, vrstva „Lidé“. Vypnout: `"chodci": false` v `mesto.json`. Render není potřeba, stačí `overlay.py` a `build_html.py`.
 - **Letadla (volitelné, výchozí vypnuto):** `"letadla": true` v `mesto.json` zobrazí v prohlížeči letadla v úrovni mraků (menší sportovní letadla) a nad nimi (dopravní proudová letadla). Polohy stahuje každých 20 s z `api/flights` v okruhu města, s plynulou interpolací pohybu. Prohlížeč se na adsb.lol ani OpenSky přímo nedostane (CORS), proto data z adsb.lol (ODbL, bez klíče) podává prostředník `functions/api/flights.js` s 15s cache pro všechny návštěvníky. Na Cloudflare Pages se nasadí sám, když se `wrangler pages deploy site` spouští z kořene repa; s workerem z `hlaseni/` ho obslouží worker. U proudových letadel kreslí kondenzační čáry unášené větrem, vrhá stín na terén a v noci bliká pozičními a výstražnými světly. Kliknutím na letadlo se zapne jeho plynulé sledování kamerou. Bez prostředníka (jiný statický hosting) se letadla nekreslí a prohlížeč se po první odpovědi 404 přestane ptát. Vymyšlená letadla mapa neukazuje.
 - **Domácí zápasy (volitelné):** `"zapasy"` v `mesto.json`: `"mista": {"klíč": {"nazev", "sport": "hokej"|"fotbal", "cesty": [[[lat, lon], …, vchod]], "stitek": [lat, lon], "hriste": [roh, roh po délce, protější roh, roh po šířce], "divaku", "barvy": [dres, trenky]}}`, `"rozpis": [{"misto", "kdy": "2026-12-02T18:00", "domaci", "hoste"}]` (místní čas), `"zdroje": [{"nazev", "url"}]` do patičky. V den zápasu ukáže štítek, 45 min před začátkem přicházejí fanoušci po `cesty` ke vchodu a po konci odcházejí; na fotbale běhají hráči (`hriste` z ortofota). Krytá hala (hokej) má jen fanoušky venku. Termíny přepiš ručně z rozpisu klubu nebo svazu a ověř podmínky jejich užití.
@@ -106,7 +129,8 @@ Automaticky z dat vyjde celé město. Ručně je potřeba:
 - **Názvy čtvrtí a místních částí** (při oddálení): z Overture (`macrohood`, `microhood`). Když je Overture pro město nemá (menší města), `overlay.py` vezme obce a jejich části z adres ČÚZK (`postal_city`) a popisek dá k domu uprostřed největší souvislé zástavby části (domy do 80 m od sebe, aspoň 15 adres). Kromě města a obcí z `obce/*.json` dostane popisek i každá obec, jejíž území (Overture `localadmin`) leží z víc než poloviny v mapě. Obec (i hlavní část se stejným názvem) má větší tučné písmo, ostatní místní části menší. Skrýt název: `"skryte_casti": ["Název"]` v `mesto.json`. Render není potřeba, stačí `overlay.py`.
 
 Rychlá kontrola jednoho místa bez celého čtverce:
-`python prep.py data_c0_-1 0,-1` a `node render.mjs mpp=0.2 dir=build/c0_-1 out=build/test season=summer alpha=1 "tiles=7_3;7_4"`.
+`python prep.py data_c0_-1 0,-1` a `node render.mjs dir=build/c0_-1 out=build/test season=summer alpha=1 "tiles=7_3;7_4"`
+(rozlišení podle `mesto.json`; u detailního jsou dlaždice 2× menší kus mapy, čísla dlaždic jsou jiná).
 Ukazuj uživateli výřezy před a po.
 
 - **Hlášení nepřesností** (volitelné): `"hlaseni": true` v `mesto.json` zobrazí v kartě tlačítko a `build_html.py`
@@ -152,9 +176,17 @@ Ukazuj uživateli výřezy před a po.
   Tunel kratší než 60 m je podjezd: kreslí se jako cesta (nad ním vede most), delší tunely se nekreslí.
 - `render.html` + `render.mjs`: three.js v headless Chromiu po dlaždicích, varianty `spring summer autumn winter lights`.
   Na macOS s GPU (Metal), na Windows s GPU (Direct3D 11). Výstup se může o odstín lišit mezi běhy, proto se renderuje vždy celý čtverec.
+  Rozlišení dlaždic: `"rozliseni"` v `mesto.json` (`geo.MPP`: základní 0,2, detailní 0,1 m/px; `render.mjs` bez `mpp=`
+  si ho vezme odtud). Klikací vrstva, animace prohlížeče a kresby stromů jsou vždy v pixelech 0,2 m (`geo.MPP_OVERLAY`,
+  v prohlížeči `UM`), detailní dlaždice prohlížeč jen zobrazí v přesnějším měřítku. Proto se prahy přiblížení a velikosti
+  aut v `web/app.html` mezi rozlišeními nemění.
 - `dzi.py`: paleta a Deep Zoom pyramidy (WebP). `compose.py`: složený náhled. `preview.py`: rychlý náhled pro web.
 - `overlay.py`: klikací vrstva (obrys budovy = konvexní obal půdorysu dole a nahoře). Po úpravě budov vždy spustit
   a obrys zkontrolovat v prohlížeči.
 - `build_html.py` vyrobí i `site/og.jpg` (náhled pro sdílení, výřez středu), když je v `mesto.json` vyplněné `url`; vlastní `site/og.jpg` nepřepíše. Pokud existuje složka `obce/*.json` (více obcí v jedné mapě), vyrobí pro každou obec i `site/index_<obec>.html` a `site/obce/<obec>/og.jpg` s vlastním výchozím pohledem (`"pohled": [lat, lon, km]`, volitelně `"domu_celek": true`) a texty.
+- `pamatky/`: vlastní modely památek. `render.html` je načte (blok „vlastní modely památek“): budovy v jejich půdorysu
+  nekreslí obecně a zavolá model; běžný render bere jen `pamatky/schvalene.json`, `?pam=vse` i neschválené (náhledy),
+  `?pam=0` žádné; `window.renderView` vyrenderuje jednu stavbu z libovolné strany. `prep.py` bere vršky schválených
+  modelů pro obrys při najetí myší (`pamatky/vrsky.json`) a označí je `pam`, `overlay.py` jim pak nepřidává věž kostela.
 - `web/app.html`: prohlížeč (OpenSeadragon + animovaná vrstva: auta, MHD, lyžaři, kouř, počasí). Texty `{{…}}`
   doplní `build_html.py` z `mesto.json` (příp. `obce/<obec>.json`).

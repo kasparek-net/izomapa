@@ -1,9 +1,11 @@
 """Run after overlay.py from the build folder: python tests/test_zastaveni.py
-Přejezdy (j) na kusu silnice jsou v metrech od začátku toho kusu, i když prep.py kus rozdělil."""
-import glob, json, math
+Přejezdy (j) na kusu silnice jsou v metrech od začátku toho kusu a leží na něm."""
+import glob, json, math, unittest
 
 roads = [r for f in glob.glob('site/overlay/*.json') for r in json.load(open(f))['roads']]
-assert roads, 'no roads in overlay'
+if not roads:                       # čistý klon bez postavené mapy: v sadě testů přeskočit, samostatně ohlásit
+    if __name__ == '__main__': raise SystemExit('no roads in overlay (spusť po overlay.py ve složce mapy)')
+    raise unittest.SkipTest('bez site/overlay/*.json, test běží až po overlay.py')
 
 
 def at(w, s):

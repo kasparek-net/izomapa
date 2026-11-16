@@ -7,10 +7,13 @@ import heapq, json, math
 import numpy as np
 from shapely.geometry import MultiPoint
 import os
-from geo import CAM_X, CAM_Y, CHUNKS, HALF, KX, KY, LAT0, LON0, MESTO, Image2D, chunk_center, chunk_dir, to_local
+from geo import CAM_X, CAM_Y, CHUNKS, HALF, KX, KY, LAT0, LON0, MESTO, MPP_OVERLAY, Image2D, chunk_center, chunk_dir, to_local
 
 # souřadnice obrázku = pixely čtverce (0, 0); ostatní čtverce leží mimo (záporné / větší souřadnice)
 info = json.load(open('build/tiles_autumn/info.json'))
+if info['mpp'] != MPP_OVERLAY:          # detailní rozlišení: dlaždice jsou jemnější, obrysy a animace prohlížeče zůstávají v pixelech 0,2 m
+    k = info['mpp'] / MPP_OVERLAY
+    info = {**info, 'mpp': MPP_OVERLAY, 'width': round(info['width'] * k), 'height': round(info['height'] * k)}
 im = Image2D(info)
 W, H = info['width'], info['height']
 OFF = (0.0, 0.0)          # posun aktuálně zpracovávaného čtverce (lokální -> společné souřadnice)
@@ -141,7 +144,7 @@ for chunk in chunks:
     # budovy: obrys = konvexní obal půdorysu dole a nahoře
     for b in merge_parts(src['buildings']):
         ring = np.array(b['ring'])
-        top = b['top'] + (22 if b['cls'] == 'kostel' else 0.6)
+        top = b['top'] + (22 if b['cls'] == 'kostel' and not b.get('pam') else 0.6)   # věž kostela (vlastní model památky ji má ve vršku)
         pts = [px(x, y, z)[:2] for x, y in ring for z in (b['base'], top)]
         hull = MultiPoint(pts).convex_hull
         if hull.geom_type != 'Polygon': continue

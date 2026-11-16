@@ -3,6 +3,10 @@
 python novy_mesto.py "Chrastava"                 # hranice obce z OpenStreetMap (Nominatim)
 python novy_mesto.py "Chrastava" --max 4         # jen 4 čtverce nejblíž středu (rychlý první pokus)
 python novy_mesto.py "Praha 6" --dotaz "Praha 6, Česko"
+python novy_mesto.py "Chrastava" --detailni      # detailní rozlišení 0,1 m/px (jinak základní 0,2 m/px), viz README
+
+Vypíše počet čtverců a odhad velikosti webu pro základní i detailní rozlišení. Rozlišení jde změnit i později
+v mesto.json ("rozliseni": "zakladni" / "detailni"), pak je potřeba přerenderovat celou mapu (./postav.sh render).
 
 Čtverec patří do mapy, když v něm leží aspoň 5 % jeho plochy z území obce. Mřížka se posune tak,
 aby čtverců bylo co nejméně. Nulová výška terénu a spodek řezu se změří z výškového modelu Terrarium.
@@ -72,6 +76,11 @@ cx, cy = ox + i0 * S, oy + j0 * S
 if MAX: cells = sorted(cells, key=lambda ij: (ij[0] ** 2 + ij[1] ** 2, ij))[:MAX]
 lon0, lat0 = c.x + cx / KX, c.y + cy / KY
 print('čtverců', len(cells), cells)
+# odhad velikosti webu (site/) podle vyzkoušených map: čtverec v 0,2 m/px má se všemi obdobími a nocí 80 MB (venkov)
+# až 230 MB (hustá zástavba) a ~450 souborů; detailní 0,1 m/px je ~2,7× větší a má ~3× víc souborů
+n = len(cells); gb = lambda mb: f'{mb / 1000:.1f} GB'.replace('.', ',') if mb >= 1000 else f'{mb:.0f} MB'
+print(f'odhad webu: základní rozlišení {gb(80 * n)}–{gb(150 * n)}, ~{450 * n} souborů; '
+      f'detailní {gb(80 * n * 2.7)}–{gb(150 * n * 2.7)}, ~{1400 * n} souborů')
 
 # 3) výšky terénu (Terrarium z12) v obdélníku mapy
 I = [a for a, _ in cells]; J = [b for _, b in cells]
@@ -98,8 +107,18 @@ h = np.concatenate(hs)
 href = float(np.percentile(h, 25)); dno = math.floor(float(h.min()) - href - 30)
 print(f'terén {h.min():.0f}–{h.max():.0f} m n. m., nula {href:.0f} m, spodek řezu {dno} m')
 
-rod = 'á' if NAZEV.endswith('a') else 'é' if NAZEV[-1] in 'oeěí' else 'ý'
-adj = f'Izometrick{rod}'
+def rod(nazev):
+    """koncovka „Izometrick…“ podle podstatného jména v názvu obce (odhad, výpis níž připomene kontrolu):
+    přídavná jména a čísla se přeskočí (Nové Město, Mladá Boleslav, Horní Police, Praha 6); -a ženský rod,
+    -o/-e/-ě/-í/-y/-i střední rod nebo množné číslo (Brno, Pardubice, Ústí, Žleby), jinak mužský (Liberec)"""
+    slova = [w for w in re.split(r'[\s-]+', nazev) if w and not w[0].isdigit()]
+    jm = next((w for w in slova if not w.lower().endswith(('ý', 'á', 'é', 'ní'))), slova[0] if slova else nazev).lower()
+    if jm.endswith('a') or jm.endswith(('ves', 'eň', 'ouc', 'slav', 'íč', 'řim', 'yšl')): return 'á'   # Plzeň, Olomouc, Nová Ves
+    if jm[-1:] in 'oeěíyi': return 'é'
+    return 'ý'
+
+
+adj = f'Izometrick{rod(NAZEV)}'
 mesto = {
     'nazev': NAZEV,
     'titulek': f'{adj} {NAZEV}',
@@ -110,6 +129,7 @@ mesto = {
     'stred': [round(lon0, 6), round(lat0, 6)],
     'polovina': HALF,
     'ctverce': [list(ij) for ij in sorted(cells, key=lambda ij: (-ij[1], ij[0]))],
+    'rozliseni': 'detailni' if '--detailni' in args else 'zakladni',
     'href': round(href, 1),
     'dno': dno,
     'mhd': {'gtfs': None, 'zdroj': None, 'zdroj_url': None},

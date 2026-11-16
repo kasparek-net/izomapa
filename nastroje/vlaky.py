@@ -17,8 +17,8 @@ BARVA = {'1154': '#2a5ba8', '3616': '#1e1e22', '3246': '#f2c21a', '1156': '#b530
 STANICE = 'build/vlaky/stanice.json'
 if not os.path.exists(STANICE):
     X0, X1, Y0, Y1 = bbox_lonlat(0)
-    s3 = fs.S3FileSystem(anonymous=True, region='us-west-2')
-    d = ds.dataset('overturemaps-us-west-2/release/2026-10-21.0/theme=base/type=infrastructure/', filesystem=s3, format='parquet')
+    from nastroje import overture
+    d = overture.dataset('base', 'infrastructure')
     f = (ds.field('bbox', 'xmin') < X1 + 0.5) & (ds.field('bbox', 'xmax') > X0 - 0.5) & (ds.field('bbox', 'ymin') < Y1 + 0.35) & (ds.field('bbox', 'ymax') > Y0 - 0.35)
     t = d.to_table(filter=f, columns=['names', 'class', 'bbox']).to_pylist()
     st = {}

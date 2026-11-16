@@ -21,8 +21,11 @@ try:
         s = M(); s.l = ctypes.sizeof(M); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(s)); mem = s.t
 except Exception:
     mem = 8 << 30
-# na čtverec ~4 GB paměti (render v prohlížeči + systém), na čtverec aspoň 3 jádra; nejvýš 4
-print(max(1, min(4, int(mem / (4 << 30)), (os.cpu_count() or 2) // 3)))
+# na čtverec ~4 GB paměti (render v prohlížeči + systém), u detailního rozlišení ~8 GB (skládání dlaždic dzi.py
+# potřebuje až 6 GB); na čtverec aspoň 3 jádra; nejvýš 4
+import geo
+na_ctverec = 4 if geo.MPP >= 0.2 else 8
+print(max(1, min(4, int(mem / (na_ctverec << 30)), (os.cpu_count() or 2) // 3)))
 PY
 )}
 LIST=${2:-$(python -c "import geo; print(' '.join(f'{i},{j}' for i, j in sorted(geo.CHUNKS)))")}
