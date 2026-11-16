@@ -1,15 +1,17 @@
 """Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap).
 Pokud existuje složka obce/*.json, vyrobí pro každou obec i site/index_<obec>.html a site/obce/<obec>/og.jpg."""
-import hashlib, html, json, os, re
+import hashlib, html, json, math, os, re
 from urllib.parse import urljoin
 from PIL import Image
 import geo
 from geo import MESTO
 
 
-def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=1, latlon=None):
-    """náhled pro sdílení (og:image) 1200×630: výřez středu města z letních dlaždic (o úroveň menší než plné rozlišení)"""
+def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=None, latlon=None):
+    """náhled pro sdílení (og:image) 1200×630: výřez středu města z letních dlaždic v 0,4 m/px (u základního rozlišení
+    o úroveň menší než plné, u detailního o dvě, aby byl výřez stejně velký)"""
     t = json.load(open('site/tiles.json')); base = t['base']
+    if dolu is None: dolu = 1 + round(math.log2(0.2 / base['mpp']))
     x, y = geo.to_local(latlon[1], latlon[0]) if latlon else (0, 0)
     c = geo.chunk_of(float(x), float(y)) if latlon else (0, 0)
     s = (t.get('chunks') or {}).get(f'c{c[0]}_{c[1]}', {}).get('summer') if c != (0, 0) else None
@@ -67,6 +69,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
     mhd = M.get('mhd') or {}
     pohled = M.get('pohled')
     strom = M.get('vanocni_strom')
+    if isinstance(strom, list) and strom and isinstance(strom[0], list): strom = strom[0]      # víc stromů: náhled podle prvního
     fill = {
         'TITULEK': E(M['titulek']), 'POPIS': E(M['popis']), 'MESTO': E(M['nazev']), 'H1_A': E(M['h1'][0]), 'H1_B': E(M['h1'][1]),
         'PODTITUL': E(M['podtitul']),
@@ -75,9 +78,14 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
         'LETADLA': 'true' if M.get('letadla', False) else 'false',
+        'MHD': 'true' if mhd.get('gtfs') or os.path.exists('site/mhd.json') else 'false',   # mhd.json vyrábí mhd.py jen s GTFS
         'POHLED': json.dumps(pohled if isinstance(pohled, list) and len(pohled) >= 2 else None),
         'DOMU_CELEK': 'true' if M.get('domu_celek') else 'false',
         'STROM': json.dumps(strom if isinstance(strom, list) and len(strom) == 2 else None),
+        'XMAS_LL': json.dumps((lambda v: v if v and isinstance(v[0], list) else [v] if v else [])(M.get('vanocni_strom'))),   # vánoční stromy [[lat, lon], ...]
+        'KLUZISTE': json.dumps(M.get('kluziste') or []),
+        'STANKY': json.dumps(M.get('vanocni_stanky') or []),
+        'VANOCE': json.dumps(M.get('vanoce') or None),                 # termín vánoční vrstvy {"od": "11-11", "do": "01-06"} (assets/vanoce.json)
         'OBEC': json.dumps(M.get('nazev') if je_obec else None, ensure_ascii=False),
         'VLAK': json.dumps({'vychozi': (M.get('vlak') or {}).get('vychozi', 'regionova') if isinstance(M.get('vlak'), dict) else M.get('vlak', 'regionova'), 'linky': M['vlak'].get('linky', {}) if isinstance(M.get('vlak'), dict) else {}}),
         'DOPRAVA_ZDROJ': ', intenzity dopravy © <a href="https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy" target="_blank" rel="noopener">ŘSD ČR</a> (Celostátní sčítání dopravy)' if M.get('doprava') else '',

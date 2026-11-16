@@ -5,11 +5,10 @@ python fetch_data.py --chunk -1,0  # čtverec mapy s rezervou 300 m -> data_c-1_
 python fetch_data.py --places      # názvy a firmy (Overture places) pro karty budov -> data/places.parquet
 python fetch_data.py --deleni      # městské části a osady (Overture divisions) -> data_all/division_area.parquet
 """
-import math, os, subprocess, sys, time
-import pyarrow.dataset as ds, pyarrow.fs as fs, pyarrow.parquet as pq
+import math, os, subprocess, sys, time, urllib.request
+import pyarrow.dataset as ds, pyarrow.parquet as pq
 import geo
-
-REL = '2026-10-21.0'
+from nastroje import overture      # vydání Overture (když vyzkoušené z S3 zmizí, vezme se nejnovější)
 LAYERS = [('buildings', 'building'), ('transportation', 'segment'), ('base', 'land_use'), ('base', 'water'),
           ('base', 'land_cover'), ('base', 'infrastructure'), ('base', 'land'), ('addresses', 'address')]
 
@@ -31,15 +30,13 @@ def dem(D, X0, X1, Y0, Y1, z=14):
 
 if sys.argv[1:2] == ['--vse']:
     # Overture se prohledává po celém světě (pomalé), proto každou vrstvu jednou pro celou mapu a čtverce se z ní vyříznou lokálně
-    proxy = os.environ.get('HTTPS_PROXY')
-    s3 = fs.S3FileSystem(anonymous=True, region='us-west-2', **({'proxy_options': proxy} if proxy else {}))
     os.makedirs('data_all', exist_ok=True)
     X0, X1, Y0, Y1 = geo.bbox_lonlat(400)
     for theme, typ in LAYERS:
         out = f'data_all/{typ}.parquet'
         if os.path.exists(out): continue
         t = time.time()
-        d = ds.dataset(f'overturemaps-us-west-2/release/{REL}/theme={theme}/type={typ}/', filesystem=s3, format='parquet')
+        d = overture.dataset(theme, typ)
         f = ((ds.field('bbox', 'xmin') < X1) & (ds.field('bbox', 'xmax') > X0) & (ds.field('bbox', 'ymin') < Y1) & (ds.field('bbox', 'ymax') > Y0))
         tb = d.to_table(filter=f); pq.write_table(tb, out)
         print(typ, tb.num_rows, f'{time.time() - t:.0f}s', flush=True)
@@ -62,9 +59,7 @@ if sys.argv[1:2] == ['--vse']:
     if not os.path.exists('data_all/division_area.parquet'): subprocess.run([sys.executable, __file__, '--deleni'], check=True)
     sys.exit()
 if sys.argv[1:2] == ['--deleni']:
-    proxy = os.environ.get('HTTPS_PROXY')
-    s3 = fs.S3FileSystem(anonymous=True, region='us-west-2', **({'proxy_options': proxy} if proxy else {}))
-    d = ds.dataset(f'overturemaps-us-west-2/release/2026-10-21.0/theme=divisions/type=division_area/', filesystem=s3, format='parquet')
+    d = overture.dataset('divisions', 'division_area')
     X0, X1, Y0, Y1 = geo.bbox_lonlat(0)
     f = ((ds.field('bbox', 'xmin') < X1) & (ds.field('bbox', 'xmax') > X0)
          & (ds.field('bbox', 'ymin') < Y1) & (ds.field('bbox', 'ymax') > Y0))
@@ -74,9 +69,7 @@ if sys.argv[1:2] == ['--deleni']:
     print('částí obcí', tb.num_rows)
     sys.exit()
 if sys.argv[1:2] == ['--places']:
-    proxy = os.environ.get('HTTPS_PROXY')
-    s3 = fs.S3FileSystem(anonymous=True, region='us-west-2', **({'proxy_options': proxy} if proxy else {}))
-    d = ds.dataset('overturemaps-us-west-2/release/2026-10-21.0/theme=places/type=place/', filesystem=s3, format='parquet')
+    d = overture.dataset('places', 'place')
     X0, X1, Y0, Y1 = geo.bbox_lonlat(0)             # celá mapa
     f = ((ds.field('bbox', 'xmin') < X1) & (ds.field('bbox', 'xmax') > X0)
          & (ds.field('bbox', 'ymin') < Y1) & (ds.field('bbox', 'ymax') > Y0))
@@ -94,11 +87,9 @@ else:
     cx, cy = geo.chunk_center(c); r = geo.HALF + 300
     (X0, X1), (Y0, Y1) = geo.to_lonlat([cx - r, cx + r], [cy - r, cy + r])
 os.makedirs(f'{OUT}/dem', exist_ok=True)
-proxy = os.environ.get('HTTPS_PROXY')
-s3 = fs.S3FileSystem(anonymous=True, region='us-west-2', **({'proxy_options': proxy} if proxy else {}))
 for theme, typ in LAYERS:
     t = time.time()
-    d = ds.dataset(f'overturemaps-us-west-2/release/{REL}/theme={theme}/type={typ}/', filesystem=s3, format='parquet')
+    d = overture.dataset(theme, typ)
     f = ((ds.field('bbox', 'xmin') < X1) & (ds.field('bbox', 'xmax') > X0)
          & (ds.field('bbox', 'ymin') < Y1) & (ds.field('bbox', 'ymax') > Y0))
     tb = d.to_table(filter=f)

@@ -54,7 +54,8 @@ class TestSousedi(unittest.TestCase):
         self.assertIn("p.el.hidden = !shown(p.k)", html)
         self.assertIn("n.el.hidden = !shown(n.k)", html)
         self.assertIn("neighborHref", html)
-        self.assertIn(",1`", html)
+        self.assertIn(",${km}`;", html)            # odkaz vede doprostřed sousední obce, bez značky „tady jsi“ (,1)
+        self.assertNotIn(",${km},1`", html)
 
     def test_build_html_with_neighbors(self):
         with tempfile.TemporaryDirectory() as td:

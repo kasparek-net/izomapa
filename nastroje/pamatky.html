@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Památky – před a po</title>
+<style>
+  :root { --bg: #f4f2ec; --card: #fff; --ink: #1f2328; --mute: #6b6f76; --line: #e3e0d7; --acc: #2f6f4f; --warn: #b4572a; --info: #3c5f99; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17191c; --card: #212429; --ink: #e9e7e2; --mute: #9aa0a8; --line: #33373d; --acc: #6cc196; --warn: #e08a5d; --info: #8fb0e6; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 11px; cursor: pointer; font: inherit; font-size: 13px; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip .n { opacity: .6; margin-left: 4px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+  .head b { font-size: 16px; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--bg); color: var(--mute); }
+  .tag.ok { color: var(--acc); } .tag.predelat { color: var(--warn); } .tag.pozdeji { color: var(--info); }
+  .meta { color: var(--mute); font-size: 13px; }
+  .imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .side { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+  .refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 8px; }
+  figure { margin: 0; } figure img { width: 100%; border-radius: 8px; display: block; background: var(--bg); cursor: zoom-in; }
+  .refs img { height: 110px; object-fit: cover; }
+  figcaption { font-size: 12px; color: var(--mute); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .none { padding: 30px; text-align: center; color: var(--mute); border: 1px dashed var(--line); border-radius: 8px; }
+  details { margin-top: 8px; } summary { cursor: pointer; color: var(--mute); font-size: 13px; }
+  details pre { white-space: pre-wrap; font: 13px/1.45 inherit; background: var(--bg); padding: 10px; border-radius: 8px; margin: 6px 0 0; }
+  .act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: flex-start; }
+  .act textarea { flex: 1 1 260px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font: inherit; background: var(--bg); color: var(--ink); }
+  .btn { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; }
+  .btn.ok[aria-pressed="true"] { background: var(--acc); color: #fff; border-color: var(--acc); }
+  .btn.predelat[aria-pressed="true"] { background: var(--warn); color: #fff; border-color: var(--warn); }
+  .btn.pozdeji[aria-pressed="true"] { background: var(--info); color: #fff; border-color: var(--info); }
+  .saved { font-size: 12px; color: var(--mute); align-self: center; }
+  a { color: var(--info); }
+  #lb { position: fixed; inset: 0; background: #000d; display: none; z-index: 10; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
+  #lb.on { display: flex; }
+  #lb img { max-width: 96vw; max-height: 84vh; border-radius: 8px; image-rendering: pixelated; }
+  #lb .lbar { display: flex; gap: 8px; align-items: center; color: #eee; font-size: 14px; }
+  #lb .btn { background: #2a2d33; color: #eee; border-color: #444; }
+  @media (max-width: 760px) { .imgs { grid-template-columns: 1fr; } .side { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Památky – vlastní modely, před a po <span id="mesto"></span> <span class="meta" id="sum"></span></h1>
+  <div class="bar" id="roz" style="margin-bottom:6px"></div>
+  <div class="bar" id="sk"></div>
+</header>
+<main id="list"></main>
+<div id="lb" role="dialog" aria-modal="true"><img alt=""><div class="lbar"><button class="btn" id="lbt">Před ⟷ Po (mezerník)</button><span id="lbc"></span><button class="btn" id="lbx">Zavřít (Esc)</button></div></div>
+<script>
+// skupiny (výběry, várky, čtvrti): klíč = "skupina" v pamatky/<slug>.json, popisky volitelně v pamatky/skupiny.json {"klíč": "popisek"}
+let SK = {}, MAPA = 'http://127.0.0.1:8000/';
+const ROZ = { ok: 'Schváleno', predelat: 'Předělat', pozdeji: 'Později' };
+const FR = { neposouzeno: 'Neposouzeno', ok: 'Schváleno', predelat: 'Předělat', pozdeji: 'Později' };
+let P = [], R = {}, fr = 'vse', fs = 'vse';
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const mapy = (e) => `https://mapy.com/cs/letecka?x=${e.lon}&y=${e.lat}&z=19&m3d=1&height=160&yaw=45&pitch=-42`;   // jen k prohlédnutí, nikdy neobkreslovat
+const osm = (e) => `https://www.openstreetmap.org/?mlat=${e.lat}&mlon=${e.lon}#map=19/${e.lat}/${e.lon}`;
+const izo = (e) => `${MAPA.replace(/#.*$/, '').replace(/\/?$/, '/')}#leto@${(+e.lat).toFixed(5)},${(+e.lon).toFixed(5)},0.15`;
+const kat = (e) => `https://pamatkovykatalog.cz/uskp/podle-relevance/1/seznam/?uskp=${encodeURIComponent(e.uskp || '')}`;
+const stavOf = (e) => (R[e.slug] || {}).stav || 'neposouzeno';
+async function load() {
+  const j = (u) => fetch(u, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  const [d, r, n] = await Promise.all([j('dashboard.json'), j('rozhodnuti.json'), j('nastaveni.json')]);
+  P = Object.values(d); R = r;
+  SK = Object.fromEntries([...new Set(P.map((e) => e.skupina || ''))].filter(Boolean).sort().map((k) => [k, k]));
+  Object.assign(SK, n.skupiny || {});
+  if (n.url) MAPA = n.url;
+  if (n.mesto) { document.getElementById('mesto').textContent = '· ' + n.mesto; document.title = `Památky – před a po · ${n.mesto}`; }
+  render();
+}
+function chips(el, opts, cur, set, count) {
+  el.innerHTML = '';
+  for (const [k, v] of Object.entries({ vse: 'Vše', ...opts })) {
+    const n = count(k); if (k !== 'vse' && !n) continue;
+    const b = document.createElement('button'); b.className = 'chip'; b.setAttribute('aria-pressed', cur === k);
+    b.innerHTML = `${esc(v)}<span class="n">${n}</span>`; b.onclick = () => { set(k); render(); }; el.append(b);
+  }
+}
+function render() {
+  const okR = (e, k = fr) => k === 'vse' || stavOf(e) === k, okS = (e, k = fs) => k === 'vse' || e.skupina === k;
+  chips(document.getElementById('roz'), FR, fr, (k) => { fr = k; }, (k) => P.filter((e) => okR(e, k) && okS(e)).length);
+  chips(document.getElementById('sk'), SK, fs, (k) => { fs = k; }, (k) => P.filter((e) => okS(e, k) && okR(e)).length);
+  const hotovo = P.filter((e) => e.stats).length, ok = P.filter((e) => stavOf(e) === 'ok').length, presk = P.filter((e) => !e.ma_model && e.preskocit).length;
+  document.getElementById('sum').textContent = `· ${P.length} položek · s modelem ${hotovo} · schváleno ${ok}${presk ? ` · vynecháno ${presk}` : ''}`;
+  const L = document.getElementById('list'); L.innerHTML = '';
+  for (const e of P) {
+    if (!okR(e) || !okS(e)) continue;
+    if (!e.ma_model && e.preskocit) continue;   // vynechané ("preskocit" v pamatky/<slug>.json, např. z mapy nejde vidět) – jen v souhrnu
+    const r = R[e.slug] || {}, t = e.snimky || 0, st = e.stats || {};
+    const im = (k) => `img/${e.slug}_${k}.jpg?t=${t}`;
+    const c = document.createElement('section'); c.className = 'card';
+    c.innerHTML = `
+      <div class="head"><b>${esc(e.nazev)}</b><span class="tag">${esc(SK[e.skupina] || e.skupina)}</span>
+        ${r.stav ? `<span class="tag ${r.stav}">${ROZ[r.stav]}</span>` : ''}
+        <span class="meta">${st.trojuhelniku ? `${st.trojuhelniku.toLocaleString('cs')} trojúhelníků` : 'model zatím není'}</span></div>
+      <div class="meta">${e.uskp ? `<a href="${kat(e)}" target="_blank" rel="noopener">Památkový katalog ${esc(e.uskp)}</a> · ` : ''}${e.wikidata ? `<a href="https://www.wikidata.org/wiki/${esc(e.wikidata)}" target="_blank" rel="noopener">Wikidata</a> · ` : ''}<a href="${osm(e)}" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="${mapy(e)}" target="_blank" rel="noopener" title="Jen k prohlédnutí. Z Mapy.cz, Google ani Apple Maps se nesmí obkreslovat.">Mapy.cz 3D (jen prohlédnout)</a> · <a href="${izo(e)}" target="_blank" rel="noopener">na mapě</a></div>
+      ${e.stats ? `<div class="imgs">
+        <figure><img loading="lazy" src="${im('pred')}" data-lb="pred" alt=""><figcaption>Před (dnes na mapě)</figcaption></figure>
+        <figure><img loading="lazy" src="${im('po')}" data-lb="po" alt=""><figcaption>Po (vlastní model)</figcaption></figure>
+      </div>
+      <div class="side">${[['jz', 'od jihozápadu (jako mapa)'], ['jv', 'od jihovýchodu'], ['sz', 'od severozápadu'], ['sv', 'od severovýchodu']].map(([k, l]) =>
+        `<figure><img loading="lazy" src="${im(k)}" data-lb="${k}" alt=""><figcaption>Model ${l}</figcaption></figure>`).join('')}</div>`
+      : '<div class="none" style="margin-top:8px">Model se ještě dělá – snímky přibudou po <code>node pamatky/pred_po.mjs</code>.</div>'}
+      ${(e.fotky || []).length ? `<div class="refs">${(e.fotky || []).map((f) => `<figure><a href="${esc(f.commons)}" target="_blank" rel="noopener" title="${esc(f.autor)} · ${esc(f.licence)}"><img loading="lazy" src="${esc(f.soubor)}" alt=""></a><figcaption>${esc(f.autor)} · ${esc(f.licence)}</figcaption></figure>`).join('')}</div>` : ''}
+      ${e.model ? `<details><summary>Poznámky modeláře</summary><pre>${esc(e.model)}</pre></details>` : ''}
+      <div class="act">
+        ${Object.entries(ROZ).map(([k, v]) => `<button class="btn ${k}" data-s="${k}" aria-pressed="${r.stav === k}" title="Znovu kliknutím zrušíš">${v}</button>`).join('')}
+        <textarea placeholder="Komentář (např. věž je moc tlustá, střecha má být tmavší…)">${esc(r.komentar)}</textarea>
+        <span class="saved">${r.kdy ? 'uloženo' : ''}</span>
+      </div>`;
+    const ta = c.querySelector('textarea'), sv = c.querySelector('.saved');
+    const save = async (stav) => {
+      const cur = R[e.slug] || {}; const body = { slug: e.slug, stav: stav !== undefined ? stav : (cur.stav ?? null), komentar: ta.value };
+      const ok = await fetch('/rozhodnuti', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.ok).catch(() => false);
+      if (ok) { R[e.slug] = { ...body, kdy: new Date().toISOString() }; sv.textContent = 'uloženo'; } else sv.textContent = 'neuloženo!';
+      c.querySelectorAll('.btn').forEach((x) => x.setAttribute('aria-pressed', x.dataset.s === R[e.slug]?.stav));
+    };
+    c.querySelectorAll('.act .btn').forEach((x) => { x.onclick = () => save((R[e.slug] || {}).stav === x.dataset.s ? null : x.dataset.s); });
+    ta.onchange = () => save();
+    c.querySelectorAll('img[data-lb]').forEach((x) => { x.onclick = () => openLb(e, x.dataset.lb); });
+    L.append(c);
+  }
+}
+// lightbox: u před/po přepínání mezerníkem (rychlé porovnání na stejném místě)
+const lb = document.getElementById('lb'), lbi = lb.querySelector('img'), lbc = document.getElementById('lbc'), lbt = document.getElementById('lbt');
+let lbE = null, lbK = 'po';
+function showLb() { lbi.src = `img/${lbE.slug}_${lbK}.jpg?t=${lbE.snimky || 0}`; lbc.textContent = `${lbE.nazev} · ${{ pred: 'PŘED', po: 'PO', jz: 'model JZ', jv: 'model JV', sz: 'model SZ', sv: 'model SV' }[lbK]}`; lbt.style.display = lbK === 'pred' || lbK === 'po' ? '' : 'none'; }
+function openLb(e, k) { lbE = e; lbK = k; showLb(); lb.classList.add('on'); }
+const toggle = () => { if (lbK === 'pred' || lbK === 'po') { lbK = lbK === 'po' ? 'pred' : 'po'; showLb(); } };
+lbt.onclick = toggle; document.getElementById('lbx').onclick = () => lb.classList.remove('on');
+lb.onclick = (ev) => { if (ev.target === lb) lb.classList.remove('on'); };
+document.addEventListener('keydown', (ev) => { if (!lb.classList.contains('on')) return; if (ev.key === 'Escape') lb.classList.remove('on'); if (ev.key === ' ') { ev.preventDefault(); toggle(); } });
+load();
+</script>
+</body>
+</html>

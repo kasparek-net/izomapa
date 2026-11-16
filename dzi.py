@@ -25,12 +25,16 @@ def build(variant, chunk=None):
     info = json.load(open(f'{src}/info.json'))
     # render.mjs si na začátku odloží značku a po poslední dlaždici ji smaže: když zůstala, render spadl uprostřed
     if os.path.exists(f'{src}/rozpracovano'): sys.exit(f'{src}: render neskončil (zůstala značka „rozpracovano“), dlaždice by byly směs starých a nových. Spusť render znovu.')
+    from geo import MPP           # všechny čtverce mapy musí mít stejné rozlišení (prohlížeč je skládá vedle sebe)
+    if abs(info['mpp'] - MPP) > 1e-9: sys.exit(f'{src}: dlaždice jsou v {info["mpp"]} m/px, ale mesto.json chce {MPP} m/px („rozliseni“). Po změně rozlišení přerenderuj celou mapu: ./postav.sh render')
     T = info['tile']
     alpha = True        # všechny čtverce jsou průhledné vrstvy (skládají se podle hloubky, žádný není podklad)
     img = Image.new('RGBA' if alpha else 'RGB', (info['width'], info['height']), (0, 0, 0, 0) if alpha else (0, 0, 0))
     for j in range(info['rows']):
         for i in range(info['cols']):
-            t = Image.open(f'{src}/{i}_{j}.png')
+            f = f'{src}/{i}_{j}.png'
+            if not os.path.exists(f) and variant.startswith('xmas'): continue     # vrstva xmas: prázdné dlaždice se nerenderují
+            t = Image.open(f)
             img.paste(t.convert('RGBA' if alpha else 'RGB'), (i * T, j * T))
     if alpha: return build_alpha(variant, chunk, img, info)
     # jednotná paleta pro celou mapu; paleta se hledá na zmenšenině, pak se aplikuje na celek

@@ -1,0 +1,9 @@
+{
+  "_pozn": "Vánoční výzdoba jako samostatná vrstva mapy (zkopírovat do assets/vanoce.json a doplnit polohy na vlastním náměstí). od/do = měsíc-den zapnutí a vypnutí, ukazuje se jen na podzim a v zimě. Po změně: ./vanoce.sh",
+  "_vzor": "stromy: [[lat, lon]], kluziste: [{lat, lon, d: 30, s: 15, a: 0}], stanky: [{lat, lon, a: 90, n: 6}]",
+  "od": "11-28",
+  "do": "01-06",
+  "stromy": [],
+  "kluziste": [],
+  "stanky": []
+}

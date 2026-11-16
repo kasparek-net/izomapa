@@ -16,6 +16,9 @@ const SEASON_ID = { spring: 0, summer: 1, autumn: 2, winter: 3 }[SEASON];
 const LIGHTS = PARAMS.mode === 'lights';
 // stupeň nočních světel: podíl svítících oken v bytech a v budovách, kde se pracuje (odhad tvaru dne, ne měření)
 const STAGE = { vecer: [0.56, 0.25], prace: [0.35, 0.70], noc: [0.08, 0.05] }[PARAMS.stage || 'vecer'];
+// samostatná průhledná vrstva 'xmas' = vánoční výzdoba (assets/vanoce.json), prohlížeč ji zapíná podle data.
+// Ostatní scéna se v ní kreslí jen do hloubky (zakrývá), barvu nezapisuje.
+const XMAS = PARAMS.mode === 'xmas';
 const PAD = 4;
 const DIR = PARAMS.dir || 'build';
 const ALPHA = PARAMS.alpha === '1';            // průhledné pozadí (čtverce se skládají přes sebe)
@@ -91,13 +94,16 @@ void main(){
 }`;
 const shadowRT = new THREE.WebGLRenderTarget(8192, 8192, { depthTexture: new THREE.DepthTexture(8192, 8192, THREE.FloatType) });
 const allMats = [];
+// ořez pro pohledy na jednu stavbu (renderView, náhledy památek): vše dál než uClip.z od bodu uClip.xy (three x, z) se nekreslí; 0 = bez ořezu
+const CLIP = { value: new THREE.Vector3(0, 0, 0) };
+const CLIPF = (src) => src.replace('void main(){', 'uniform vec3 uClip;\nvoid main(){ if (uClip.z > 0.0 && length(vW.xz - uClip.xy) > uClip.z) discard;');
 function mat(frag, extra = {}, side = THREE.FrontSide) {
   const m = new THREE.ShaderMaterial({
     uniforms: {
       uSun: { value: SUN }, uCam: { value: camDir }, uShadow: { value: shadowRT.depthTexture }, uLightVP: { value: new THREE.Matrix4() },
-      uSeason: { value: SEASON_ID }, uLights: { value: LIGHTS ? 1 : 0 }, uOff: { value: new THREE.Vector2(OFFX, -OFFY) }, uLit: { value: new THREE.Vector2(STAGE[0], STAGE[1]) }, ...extra,
+      uSeason: { value: SEASON_ID }, uLights: { value: LIGHTS ? 1 : 0 }, uOff: { value: new THREE.Vector2(OFFX, -OFFY) }, uLit: { value: new THREE.Vector2(STAGE[0], STAGE[1]) }, uClip: CLIP, ...extra,
     },
-    vertexShader: VERT, fragmentShader: COMMON + frag, side,
+    vertexShader: VERT, fragmentShader: CLIPF(COMMON + frag), side,
   });
   allMats.push(m);
   return m;
@@ -339,7 +345,7 @@ const roofMat = mat(/* glsl */`
     gl_FragColor = vec4(shade(col, n, vW), 1.0);
   }`, {}, THREE.DoubleSide);
 // obecný materiál pro mobiliář, auta, komíny...  aw.x = svítí, aw.y = nebarvit instancí, aw.z = v zimě sníh nahoře
-const solidMat = mat(/* glsl */`
+const SOLID_FRAG = /* glsl */`
   varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
   void main(){
     if (uLights > 0.5) { gl_FragColor = vec4(vA.x > 0.5 ? vec3(1.0, 0.86, 0.6) * vA.x : vec3(0.0), 1.0); return; }
@@ -347,7 +353,9 @@ const solidMat = mat(/* glsl */`
     vec3 col = vC;
     if (winter() && vA.z > 0.5 && n.y > 0.6) col = SNOW;
     gl_FragColor = vec4(shade(col, n, vW), 1.0);
-  }`, {}, THREE.DoubleSide);
+  }`;
+const solidMat = mat(SOLID_FRAG, {}, THREE.DoubleSide);
+const ovMat = mat(SOLID_FRAG, {}, THREE.DoubleSide);      // vlastní materiál vrstvy xmas (ostatní materiály se v ní kreslí jen do hloubky)
 
 // ---------- budovy ----------
 function pointInPoly(x, y, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
@@ -386,10 +394,81 @@ function roofDeco(b, X, eave, rc) {
   }
 }
 
+// ---------- vlastní modely památek (pamatky/<slug>.js, návod pamatky/README.md) ----------
+// Budovy scény, jejichž vnitřní bod leží v půdorysu památky (pamatky/<slug>.json → budovy[].ring, světové souřadnice), se nekreslí
+// obecně (ani věže a komíny dominant z assets/dominanty.json), místo nich se jednou zavolá model. Do dlaždic (render bez parametru
+// pam) jdou jen modely schválené v dashboardu (pamatky/schvalene.json, vyrobí pamatky/schvalit.py). ?pam=0 vypne všechny (výřezy
+// „před“), ?pam=vse vezme i neschválené z pamatky/seznam.json (náhledy), ?pamatka=a,b jen vybrané, ?pamextra=a zkušební model mimo
+// seznam, ?jen=1 skryje ostatní budovy. Chyby modelu jdou do konzole a window.PAM_LOG, počty trojúhelníků a vršky do window.PAM_STATS.
+const PAM = [];
+let PAM_KIT = null;
+window.PAM_LOG = []; window.PAM_STATS = {};
+if (PARAMS.pam !== '0') {
+  const vse = PARAMS.pam === 'vse' || !!PARAMS.pamatka;
+  const list = [...new Set([...(await fetch(vse ? 'pamatky/seznam.json' : 'pamatky/schvalene.json').then((r) => (r.ok ? r.json() : [])).catch(() => [])),
+    ...(PARAMS.pamextra ? PARAMS.pamextra.split(',') : [])])];
+  const only = PARAMS.pamatka ? new Set(PARAMS.pamatka.split(',')) : null, V = PARAMS.v || Date.now();
+  if (list.length) try { PAM_KIT = (await import(`./pamatky/_kit.js?v=${V}`)).makeKit; } catch (e) { window.PAM_LOG.push(`_kit.js: ${e.message}`); }
+  for (const s of PAM_KIT ? list : []) {
+    if (only && !only.has(s)) continue;
+    if (!/^[a-z0-9-]{1,40}$/.test(s)) { window.PAM_LOG.push(`${s}: neplatný název (jen a–z, 0–9, pomlčka)`); continue; }
+    let d; try { d = await fetch(`pamatky/${s}.json?v=${V}`).then((r) => r.json()); } catch (e) { window.PAM_LOG.push(`${s}.json: ${e.message}`); continue; }
+    const dosah = (d.budovy || []).length ? HE + 120 : HE;           // samostatná stavba (sloup) jen uvnitř výřezu
+    if (!d.ram || !d.bod || Math.abs(d.bod[0] - OFFX) > dosah || Math.abs(d.bod[1] - OFFY) > dosah) continue;   // mimo tento čtverec
+    let fn; try { fn = (await import(`./pamatky/${s}.js?v=${V}`)).default; } catch (e) { window.PAM_LOG.push(`${s}.js: ${e.message}`); console.log('PAMATKA CHYBA', s, e.message); continue; }
+    PAM.push({ s, d, fn, kus: [], rings: (d.budovy || []).map((q) => q.ring.map(([x, y]) => [x - OFFX, y - OFFY])) });
+  }
+  // vnitřní bod budovy: těžiště největšího trojúhelníku z triangulace půdorysu
+  const vnitrni = (P) => {
+    let best = null, ba = -1;
+    for (const [i, j, k] of THREE.ShapeUtils.triangulateShape(P.map(([x, y]) => new THREE.Vector2(x, y)), [])) {
+      const a = Math.abs((P[j][0] - P[i][0]) * (P[k][1] - P[i][1]) - (P[k][0] - P[i][0]) * (P[j][1] - P[i][1]));
+      if (a > ba) { ba = a; best = [(P[i][0] + P[j][0] + P[k][0]) / 3, (P[i][1] + P[j][1] + P[k][1]) / 3]; }
+    }
+    return best || P[0];
+  };
+  if (PAM.some((q) => q.rings.length)) for (const b of scene.buildings) {
+    if (!b.p || b.p.length < 3) continue;
+    const [ix, iy] = vnitrni(b.p);
+    const q = PAM.find((q) => q.rings.some((rg) => pointInPoly(ix, iy, rg)));
+    if (q) { b.pm = q.s; q.kus.push(b); }
+  }
+}
+const pamVyska = (x, y) => {                                           // terén v bodě (místní souřadnice), bilineárně z mřížky výšek
+  const st = scene.step, fc = (x + HALF) / st, fr = (HALF - y) / st;
+  const c0 = Math.max(0, Math.min(N - 2, Math.floor(fc))), r0 = Math.max(0, Math.min(N - 2, Math.floor(fr)));
+  const u = Math.max(0, Math.min(1, fc - c0)), v = Math.max(0, Math.min(1, fr - r0)), h = (r, c) => HS[r * N + c];
+  return (h(r0, c0) * (1 - u) + h(r0, c0 + 1) * u) * (1 - v) + (h(r0 + 1, c0) * (1 - u) + h(r0 + 1, c0 + 1) * u) * v;
+};
+function polyArea(P) { let s = 0; for (let i = 0; i < P.length; i++) { const [x0, y0] = P[i], [x1, y1] = P[(i + 1) % P.length]; s += x0 * y1 - x1 * y0; } return s / 2; }
+function pamModely(W, R, X) {
+  for (const q of PAM) {
+    const d = q.d, kus = q.kus.sort((a, b) => Math.abs(polyArea(b.p)) - Math.abs(polyArea(a.p))), big = kus[0];   // největší díl první
+    if ((d.budovy || []).length && !kus.length) continue;              // budovy památky v tomto čtverci nejsou (ani v pásu u švu)
+    const bod = [d.bod[0] - OFFX, d.bod[1] - OFFY];
+    const g = big ? big.g : pamVyska(...bod), base = kus.length ? Math.min(...kus.map((b) => b.b)) : g - 0.6;
+    const rr = Math.hypot(d.ram.L, d.ram.W) / 2 + 40, cx = d.ram.x - OFFX, cy = d.ram.y - OFFY;
+    const okoli = scene.buildings.filter((b) => !b.pm && b.p && b.p.length > 2 && Math.hypot(b.p[0][0] - cx, b.p[0][1] - cy) < rr).map((b) => ({ p: b.p, e: b.e, g: b.g }));
+    const M = { slug: q.s, nazev: d.nazev, data: d, g, b: base, bod, okoli,
+      ram: { x: d.ram.x - OFFX, y: d.ram.y - OFFY, a: d.ram.a, L: d.ram.L, W: d.ram.W },
+      budovy: kus.map((b) => ({ p: b.p, g: b.g, b: b.b, e: b.e, r: b.r, rh: b.rh, wc: b.wc, rc: b.rc, parts: b.parts, s: b.s, tw: b.tw })) };
+    const n0 = W.p.length + R.p.length + X.p.length, z0 = [W.p.length, R.p.length, X.p.length];
+    try { q.fn(M, PAM_KIT({ THREE, W, R, X, pushTri, vyska: pamVyska, sezona: SEASON, noc: LIGHTS, stromy: scene.trees }, M)); }
+    catch (e) { window.PAM_LOG.push(`${q.s}: ${e.stack || e.message}`); console.log('PAMATKA CHYBA', q.s, e.stack || e.message); }
+    // skutečný vršek a obálka modelu (pro obrys při najetí myší: pamatky/pred_po.mjs -> pamatky/vrsky.json -> prep.py)
+    let top = -1e9, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    [W, R, X].forEach((B, k) => { for (let i = z0[k]; i < B.p.length; i += 3) { const x = B.p[i], z = B.p[i + 1], y = -B.p[i + 2]; if (z > top) top = z; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } });
+    window.PAM_STATS[q.s] = { trojuhelniku: Math.round((W.p.length + R.p.length + X.p.length - n0) / 9), budov: kus.length,
+      vrsek: Math.round(top * 100) / 100, g: Math.round(g * 100) / 100, obalka: [x0 + OFFX, y0 + OFFY, x1 + OFFX, y1 + OFFY].map((v) => Math.round(v * 100) / 100) };
+  }
+}
+
 {
   const W = newBuf(), R = newBuf(), X = newBuf();
   const deg = THREE.MathUtils.degToRad;
+  pamModely(W, R, X);
   for (const b of scene.buildings) {
+    if (b.pm || (PARAMS.jen && !b.only)) continue;   // kreslí ji vlastní model památky (výše); ?jen=1 = jen modely památek (náhled)
     if (b.only) continue;            // samostatná věž dominanty (kreslí se níž)
     if (b.md) {   // vlastní modely podle půdorysu: portál a prosklený pavilon
       let best = 0, ang = 0;
@@ -667,6 +746,7 @@ function roofDeco(b, X, eave, rc) {
     for (const k of [0.3, 0.6, 0.85]) pushBox(X, f, -1.3, 1.3, -1.3, 1.3, t.to + (s.mast - t.to) * k, t.to + (s.mast - t.to) * k + 0.8, steel, aw);
   };
   for (const b of scene.buildings) {
+    if (b.pm || PARAMS.jen) continue;  // vlastní model památky (věže a komíny dominanty má model sám)
     if (b.lm && CUSTOM.landmarks?.[b.lm]?.(b, { X, W, R, frameAt, ring, pushBox, pushQuad, pushTri, GOLDC, C255, tv })) continue;
     for (const t of b.tw || []) {
       const f = frameAt(t.x, t.y, 0, t.a), T = t.w / 2, n = t.round ? 10 : 4, rot = t.round ? 0 : Math.PI / 4;
@@ -869,7 +949,10 @@ function roofDeco(b, X, eave, rc) {
   inst(benchG, P.bench, id);
   inst(binG, P.bin, id);
   inst(recG, P.recycling, id);
-  inst(shelterG, P.shelter, ([x, y, z, a]) => [x + Math.cos(a - Math.PI / 2) * 0.5, y + Math.sin(a - Math.PI / 2) * 0.5, z, a]);
+  // zastávka, kterou je sama památka (pamatky/<slug>.json "zastavka": true) – obecný přístřešek do 12 m od jejího bodu nekreslit
+  const pamZast = PAM.filter((q) => q.d.zastavka).map((q) => [q.d.bod[0] - OFFX, q.d.bod[1] - OFFY]);
+  inst(shelterG, pamZast.length ? (P.shelter || []).filter(([x, y]) => !pamZast.some(([bx, by]) => Math.hypot(x - bx, y - by) < 12)) : P.shelter,
+    ([x, y, z, a]) => [x + Math.cos(a - Math.PI / 2) * 0.5, y + Math.sin(a - Math.PI / 2) * 0.5, z, a]);
   // hroby: náhrobek + obruba
   const graveG = make((B) => {
     pushBox(B, F, -0.35, 0.35, -0.08, 0.08, 0, 1, [1, 1, 1], [0, 0, 1, 0]);
@@ -947,7 +1030,9 @@ function roofDeco(b, X, eave, rc) {
     for (const s of [-1.35, 1.35]) for (const t of [-0.82, 0.82]) pushBox(B, F, s - 0.32, s + 0.32, t - 0.1, t + 0.1, 0, 0.62, [0.12, 0.12, 0.13], [0, 1, 0, 0]);
   });
   const CAR = [[0.92, 0.92, 0.90], [0.70, 0.72, 0.75], [0.16, 0.17, 0.19], [0.72, 0.16, 0.14], [0.20, 0.32, 0.62], [0.38, 0.40, 0.43], [0.24, 0.42, 0.30], [0.80, 0.74, 0.60]];
-  inst(carG, scene.cars, ([x, y, z, a]) => [x, y, z, a], (it) => CAR[it[4]]);
+  // auta na střeše (parkovací dům) nad budovou nahrazenou vlastním modelem památky nekreslit – model má svá
+  const pamAuto = ([x, y, z]) => z > pamVyska(x, y) + 3 && PAM.some((q) => q.kus.length && q.rings.some((rg) => pointInPoly(x, y, rg)));
+  inst(carG, PAM.length ? scene.cars.filter((c) => !pamAuto(c)) : scene.cars, ([x, y, z, a]) => [x, y, z, a], (it) => CAR[it[4]]);
   CUSTOM.buildProps?.(P, { make, inst, F, id, pushBox, pushQuad, pushTri });
 
   // stáda zvířat na pastvinách (krávy, koně, srnky) podle sezóny a denní doby
@@ -1287,6 +1372,56 @@ function roofDeco(b, X, eave, rc) {
     for (const [x, y, z, a, t] of scene.play || []) if (M[t]) M[t](frameAt(x, y, z, a));
     if (PL.p.length) world.add(new THREE.Mesh(geom(PL), solidMat));
   }
+  // vánoční výzdoba (assets/vanoce.json): jen ve vrstvě mode=xmas (zimní varianta se sněhem, podzimní bez);
+  // blikající světýlka, bruslaře a noční osvětlení kreslí prohlížeč (web/app.html)
+  if (XMAS) {
+    const ROOF = SEASON_ID === 3 ? [0.93, 0.95, 0.97] : [0.52, 0.20, 0.15];
+    const V = newBuf(), W0 = [0, 1, 0, 0];
+    for (const [x, y, g] of scene.xmas || []) {
+      const f = frameAt(x, y, g, 0);
+      pushBox(V, f, -0.3, 0.3, -0.3, 0.3, -0.3, 1.6, [0.36, 0.24, 0.16], W0);
+      const greens = [[0.10, 0.27, 0.16], [0.12, 0.31, 0.18], [0.11, 0.29, 0.17]];
+      for (let i = 0; i < 6; i++) {                 // patra jehličí: osmiboké kužely, každý menší a výš
+        const z0 = 1.2 + i * 1.75, z1 = z0 + 3.0, r = 3.7 - i * 0.56, n = 8, top = f(0, 0, z1);
+        for (let k = 0; k < n; k++) {
+          const a0 = (k / n) * 2 * Math.PI + i * 0.2, a1 = ((k + 1) / n) * 2 * Math.PI + i * 0.2;
+          pushTri(V, f(Math.cos(a0) * r, Math.sin(a0) * r, z0), f(Math.cos(a1) * r, Math.sin(a1) * r, z0), top, greens[(i + k) % 3], W0);
+        }
+        for (let k = 0; k < 4; k++) {               // ozdoby: červené a zlaté koule na spodním okraji patra
+          const a = (k / 4) * 2 * Math.PI + i * 0.9, rr = r * 0.82, s = Math.cos(a) * rr, t = Math.sin(a) * rr, zz = z0 + 0.35;
+          pushBox(V, f, s - 0.2, s + 0.2, t - 0.2, t + 0.2, zz - 0.2, zz + 0.2, (i + k) % 2 ? [0.80, 0.16, 0.14] : [0.93, 0.74, 0.22], W0);
+        }
+      }
+      pushBox(V, f, -0.35, 0.35, -0.35, 0.35, 13.9, 14.7, [1.0, 0.86, 0.30], W0);     // hvězda na špičce
+    }
+    for (const [x, y, z0, z1, a, Lr, Wr] of scene.rinks || []) {
+      const f = frameAt(x, y, 0, a), ice = z1 + 0.12, l = Lr / 2, w = Wr / 2, T = 0.15;
+      pushBox(V, f, -l, l, -w, w, z0 - 0.4, ice, [0.82, 0.92, 0.97], W0);          // led
+      const white = [0.95, 0.95, 0.94], blue = [0.24, 0.50, 0.76];               // mantinel s modrou horní hranou
+      pushBox(V, f, -l - T, l + T, -w - T, -w, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, -l - T, l + T, w, w + T, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, -l - T, -l, -w, w, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, l, l + T, -w, w, z0 - 0.4, ice + 1.0, white, W0, blue);
+    }
+    // vánoční stánky: dřevěná bouda, zasněžená sedlová střecha, otevřený pult na straně −t, světýlka pod okapem
+    for (const [x, y, g, a, wS, i] of scene.stalls || []) {
+      const f = frameAt(x, y, g, a), l = wS / 2, w = 1.2, E = 2.2, Rg = 3.0, o = 0.3;
+      const wood = i % 2 ? [0.50, 0.33, 0.19] : [0.44, 0.28, 0.16], snow = ROOF;
+      pushBox(V, f, -l, l, -w, w, -0.3, E, wood, W0);
+      pushTri(V, f(l, -w, E), f(l, w, E), f(l, 0, Rg), wood, W0);                        // štíty
+      pushTri(V, f(-l, w, E), f(-l, -w, E), f(-l, 0, Rg), wood, W0);
+      const L = l + 0.15, e = E - 0.12;
+      pushQuad(V, f(-L, -w - o, e), f(L, -w - o, e), f(L, 0, Rg + 0.1), f(-L, 0, Rg + 0.1), snow, W0);   // střecha se sněhem
+      pushQuad(V, f(L, w + o, e), f(-L, w + o, e), f(-L, 0, Rg + 0.1), f(L, 0, Rg + 0.1), snow, W0);
+      pushBox(V, f, -l + 0.25, l - 0.25, -w - 0.02, -w + 0.1, 0.95, 1.95, [0.98, 0.78, 0.42], W0);        // osvětlené okno pultu
+      pushBox(V, f, -l + 0.15, l - 0.15, -w - 0.35, -w, 0.85, 0.95, [0.62, 0.43, 0.25], W0);              // pult
+      for (let k = 0; k < 6; k++) {                                                                   // světýlka
+        const s = -l + 0.25 + k * (wS - 0.5) / 5;
+        pushBox(V, f, s - 0.07, s + 0.07, -w - o + 0.05, -w - o + 0.19, e - 0.22, e - 0.08, k % 2 ? [1.0, 0.85, 0.35] : [0.90, 0.20, 0.16], W0);
+      }
+    }
+    if (V.p.length) { const m = new THREE.Mesh(geom(V), ovMat); m.userData.ov = true; world.add(m); }
+  }
   // lana lanovek a vleků – tenké tmavé čáry (elektrické vedení se nekreslí)
   const wires = [];
   for (const pl of scene.lines.lift || []) for (let i = 0; i < pl.length - 1; i++) {          // jen lanovky a vleky
@@ -1476,11 +1611,11 @@ function roofDeco(b, X, eave, rc) {
   const n = T.length;
   const aTile = new Float32Array(n * 2);
   const bb = new THREE.InstancedMesh(plane, new THREE.ShaderMaterial({
-    uniforms: { uAtlas: { value: tex }, uCell: { value: new THREE.Vector2(CW / atlas.width, CH / atlas.height) }, uShadow: { value: shadowRT.depthTexture }, uLightVP: { value: new THREE.Matrix4() }, uLights: { value: LIGHTS ? 1 : 0 } },
+    uniforms: { uAtlas: { value: tex }, uCell: { value: new THREE.Vector2(CW / atlas.width, CH / atlas.height) }, uShadow: { value: shadowRT.depthTexture }, uLightVP: { value: new THREE.Matrix4() }, uLights: { value: LIGHTS ? 1 : 0 }, uClip: CLIP },
     vertexShader: /* glsl */`
       attribute vec2 aTile; varying vec2 vUv; varying vec3 vW;
       void main(){ vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0); vW = w.xyz; vUv = aTile + uv * vec2(${(CW / atlas.width).toFixed(6)}, ${(CH / atlas.height).toFixed(6)}); gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: /* glsl */`
+    fragmentShader: CLIPF(/* glsl */`
       uniform sampler2D uAtlas, uShadow; uniform mat4 uLightVP; uniform float uLights; varying vec2 vUv; varying vec3 vW;
       void main(){
         vec4 c = texture2D(uAtlas, vUv);
@@ -1490,7 +1625,7 @@ function roofDeco(b, X, eave, rc) {
         float sh = (s.x > 0.0 && s.x < 1.0 && s.y > 0.0 && s.y < 1.0 && s.z - 0.0012 > texture2D(uShadow, s.xy).r) ? 0.78 : 1.0;
         vec3 col = c.rgb * sh; if (sh < 1.0) col *= vec3(0.86, 0.9, 1.0);
         gl_FragColor = vec4(col, 1.0);
-      }`,
+      }`),
   }), n);
   allMats.push(bb.material);
   const m4 = new THREE.Matrix4(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -1525,7 +1660,7 @@ function roofDeco(b, X, eave, rc) {
   }
   crowns.count = kc; cones.count = kk;
   for (const m of [crowns, cones]) { m.frustumCulled = false; m.layers.set(2); world.add(m); }
-  window.TREE_ATLAS = atlas;
+  window.TREE_ATLAS = atlas; window.TREE_BB = bb;
 }
 
 // ---------- stínová mapa ----------
@@ -1575,6 +1710,9 @@ const ext = (x, h, y) => {
     for (const [x, y] of b.p) ext(x, btop, y);
   }
   for (const t of scene.trees) ext(t[0], t[2] + t[3], t[1]);
+  for (const st of Object.values(window.PAM_STATS)) if (st.vrsek > -1e8) {   // vlastní modely památek (věž může být vyšší než budova v datech)
+    const [a, b, c, d] = st.obalka; for (const [x, y] of [[a, b], [c, b], [c, d], [a, d]]) ext(x - OFFX, st.vrsek + 2, y - OFFY);
+  }
 }
 X0 -= 20; Y0 -= 20; X1 += 20; Y1 += 60;     // nahoře rezerva na věže (ručně stavěné dominanty)
 // přichytit k mřížce pixelů společné mapy (gx0/gy1 = počátek celé mapy v souřadnicích kamery)
@@ -1613,13 +1751,52 @@ const post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMater
 const postScene = new THREE.Scene(); postScene.add(post);
 const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-window.INFO = { width: IW, height: IH, tile: TILE, cols: Math.ceil(IW / TILE), rows: Math.ceil(IH / TILE), x0: GX0, y1: GY1, mpp: MPP, chunk: scene.chunk || [0, 0], season: SEASON, mode: LIGHTS ? 'lights' : 'day' };
+// vrstva xmas: všechno ostatní jen do hloubky; renderují se jen dlaždice, kde výzdoba něco má
+let NEED = null;
+if (XMAS) {
+  world.traverse((o) => { if (o.material && !o.userData.ov) for (const m of [].concat(o.material)) m.colorWrite = false; });
+  NEED = new Set();
+  const mark = (x, y, h, r) => {
+    for (const [dx, dy] of [[-r, -r], [r, -r], [r, r], [-r, r]]) for (const dh of [-1, h]) {
+      const v = new THREE.Vector3(x + dx, dh, -(y + dy)).applyMatrix4(inv);
+      const px = (v.x - X0) / MPP, py = (Y1 - v.y) / MPP;
+      for (const ox of [-8, 8]) for (const oy of [-8, 8]) NEED.add(`${Math.floor((px + ox) / TILE)}_${Math.floor((py + oy) / TILE)}`);
+    }
+  };
+  for (const [x, y, g] of scene.xmas || []) mark(x, y, g + 16, 5);
+  for (const [x, y, z0, z1, a, L, W] of scene.rinks || []) mark(x, y, z1 + 2, Math.max(L, W) / 2 + 1);
+  for (const [x, y, g] of scene.stalls || []) mark(x, y, g + 4, 3);
+}
+window.INFO = { width: IW, height: IH, tile: TILE, cols: Math.ceil(IW / TILE), rows: Math.ceil(IH / TILE), x0: GX0, y1: GY1, mpp: MPP, chunk: scene.chunk || [0, 0], season: SEASON, mode: XMAS ? 'xmas' : LIGHTS ? 'lights' : 'day', need: NEED ? [...NEED] : null };
 const out = document.createElement('canvas'); out.width = TILE; out.height = TILE;
 const octx = out.getContext('2d');
 window.renderTile = (i, j) => {
   const l = X0 + (i * TILE - PAD) * MPP, t = Y1 - (j * TILE - PAD) * MPP;
   Object.assign(cam, { left: l, right: l + S * MPP, top: t, bottom: t - S * MPP, near: 500, far: 7500 });
   cam.updateProjectionMatrix();
+  post.material.uniforms.range.value = cam.far - cam.near;
+  renderer.setClearColor(new THREE.Color(...BG), ALPHA ? 0 : 1);
+  renderer.setRenderTarget(rt); renderer.clear(); renderer.render(world, cam);
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  octx.clearRect(0, 0, TILE, TILE);
+  octx.drawImage(renderer.domElement, PAD, PAD, TILE, TILE, 0, 0, TILE, TILE);
+  return out.toDataURL('image/png');
+};
+// pohled na jednu stavbu z libovolné strany (náhledy a dashboard památek): az = odkud se díváme (225 = JZ jako mapa), střed (fx, fy, fz)
+// v místních souřadnicích, okolí dál než R od středu se ořízne (0 = bez ořezu), span = šířka záběru v m, trees = kreslit stromy
+window.renderView = (az, fx, fy, fz, R, span, trees = false) => {
+  if (trees) cam.layers.enable(1); else cam.layers.disable(1);
+  const A = THREE.MathUtils.degToRad(az);
+  camDir.set(Math.sin(A) * Math.cos(EL), Math.sin(EL), -Math.cos(A) * Math.cos(EL));
+  const F = new THREE.Vector3(fx, fz, -fy);
+  cam.position.copy(F).addScaledVector(camDir, 4000); cam.lookAt(F); cam.updateMatrixWorld();
+  Object.assign(cam, { left: -span / 2, right: span / 2, top: span / 2, bottom: -span / 2, near: 3000, far: 5000 });
+  cam.updateProjectionMatrix();
+  CLIP.value.set(fx, -fy, R);
+  const bb = window.TREE_BB;                                           // billboardy stromů natočit k nové kameře
+  if (bb) { const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    for (let i = 0; i < bb.count; i++) { bb.getMatrixAt(i, m); m.decompose(p, q, s); m.compose(p, cam.quaternion, s); bb.setMatrixAt(i, m); }
+    bb.instanceMatrix.needsUpdate = true; }
   post.material.uniforms.range.value = cam.far - cam.near;
   renderer.setClearColor(new THREE.Color(...BG), ALPHA ? 0 : 1);
   renderer.setRenderTarget(rt); renderer.clear(); renderer.render(world, cam);

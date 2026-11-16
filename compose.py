@@ -1,6 +1,7 @@
 """Náhled složené mapy z dlaždic rendereru (build/.../tiles_<varianta>) – kontrola švů bez DZI a webu.
 
 python compose.py [varianta] [měřítko] [výstup.png] [i,j ...]   např. python compose.py autumn 8 build/nahled.png
+(měřítko = kolikrát zmenšit oproti 0,2 m/px, platí stejně pro základní i detailní rozlišení)
 Čtverce se skládají od nejvzdálenějšího (pohled od JZ: větší i + j = dál), stejně jako v prohlížeči.
 """
 import json, os, sys
@@ -22,6 +23,7 @@ chunks = [c for c in CHUNKS if os.path.exists(f'{src(c)}/info.json') and (not on
 chunks.sort(key=lambda c: -(c[0] + c[1]))
 infos = {c: json.load(open(f'{src(c)}/info.json')) for c in chunks}
 mpp = infos[chunks[0]]['mpp']
+scale *= max(1, round(0.2 / mpp))      # měřítko je vůči 0,2 m/px: u detailního rozlišení (0,1) stejně velký náhled
 gx0 = min(i['x0'] for i in infos.values()); gy1 = max(i['y1'] for i in infos.values())
 W = max(round((i['x0'] - gx0) / mpp) + i['width'] for i in infos.values())
 H = max(round((gy1 - i['y1']) / mpp) + i['height'] for i in infos.values())
