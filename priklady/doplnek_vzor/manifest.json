@@ -1,0 +1,10 @@
+{
+  "id": "vzor_doplnku",
+  "name": "Vzorový doplněk",
+  "version": "2.0.0",
+  "description": "Minimální klientský vzor doplňku s onFrame kreslením a volitelnými knihovnami.",
+  "hook": "overlay_hook.py",
+  "libs": ["profanity", "server_client"],
+  "scripts": ["vzor.js"],
+  "styles": ["vzor.css"]
+}

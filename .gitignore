@@ -35,6 +35,8 @@ assets/custom_models.js
 assets/upresneni.json
 assets/dominanty.json
 assets/oblasti.json
+assets/doplnky.json
+assets/doplnky/
 
 # hlášení: vlastní konfigurace a hesla serveru
 /wrangler.jsonc

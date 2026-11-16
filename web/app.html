@@ -205,7 +205,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   transition: transform .1s ease, background .1s ease;
 }
 .card-neighbor-btn:hover, .card-neighbor-btn:focus-visible { background: #ffe08a; transform: translateY(-1px); }
-.nolabels .pin, .far .pin:not(.need):not(.neighbor) { display: none !important; }
+.nolabels .pin, .far .pin:not(.need):not(.neighbor), body.plugins-hide-pins .pin { display: none !important; }
+#pluginLayers { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; pointer-events: none; z-index: 2; }
+.izomapa-slot-tabs { position: fixed; z-index: 3; top: calc(env(safe-area-inset-top, 0px) + 88px); left: calc(max(16px, env(safe-area-inset-left, 0px)) + var(--pw, 356px)); transition: left .2s ease; display: flex; flex-direction: column; gap: 6px; }
+.folded .izomapa-slot-tabs { left: 0; }
+.izomapa-slot-tabs:empty { display: none; }
 .loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: var(--display); color: var(--muted); z-index: 1; pointer-events: none; }
 .mbar { display: none; }
 
@@ -218,6 +222,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   .panel.closed .sub { display: none; }
   h1 { font-size: 1.2rem; }
   .minimap, .fold { display: none; }
+  .izomapa-slot-tabs { left: auto; right: 0; top: calc(env(safe-area-inset-top, 0px) + 84px); align-items: flex-end; }
+  .folded .izomapa-slot-tabs { left: auto; }
   .controls { right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); flex-direction: column; gap: 6px; }
   .controls #zin, .controls #share { display: none; }
   .controls .px-btn { width: 44px; height: 44px; opacity: .92; }
@@ -248,10 +254,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 }
 </style>
 
-<div id="map" aria-label="Izometrická pixel-art mapa {{MESTO}}"><div id="osd"></div><canvas id="fx"></canvas></div>
+<div id="map" aria-label="Izometrická pixel-art mapa {{MESTO}}"><div id="osd"></div><div id="pluginLayers"></div><canvas id="fx"></canvas></div>
 <div class="loading" id="loading">Načítám mapu…</div>
 
 <button class="fold" id="fold" type="button" aria-controls="panel" aria-expanded="true" aria-label="Zasunout panel" title="Zasunout panel">‹</button>
+<div class="izomapa-slot-tabs" id="pluginTabsSlot"></div>
 <aside class="panel" id="panel">
   <div class="head">
     <div>
@@ -661,7 +668,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     $('osd').addEventListener('gesturestart', (e) => { e.preventDefault(); gs = 1; });
     $('osd').addEventListener('gesturechange', (e) => { e.preventDefault(); viewer.viewport.zoomBy(e.scale / gs); viewer.viewport.applyConstraints(); gs = e.scale; });
   }
-  initLayers();
+  const layersReady = initLayers();
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // stupně nočních světel: vždy se kreslí jen jedna vrstva, výměna je párkrát za noc (noční režim je nejnáročnější)
   // časy jsou odhad tvaru dne, ne měření; mapa bez stupňů má jen 'lights'
@@ -992,8 +999,25 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
 
   const vpToImg = (pos) => { const p = viewer.viewport.viewerElementToViewportCoordinates(pos); return [p.x * W, p.y * W]; };
+  const pluginRegistry = {}, pluginLibs = {}, pluginClicks = [], pluginFrames = [];
+  let pluginCapture = false, pluginCursor = '';
+  const runFrameLayer = (layerName, view, t) => {
+    if (!view) return;
+    for (const h of [...pluginFrames]) {
+      if (h.layer !== layerName) continue;
+      ctx.save();
+      try { h.fn(ctx, view, t); } catch (err) { console.error(err); } finally { ctx.restore(); }
+    }
+  };
   viewer.addHandler('canvas-click', (e) => {
     if (!e.quick) return;
+    if (pluginClicks.length || pluginCapture) {
+      const [ix, iy] = vpToImg(e.position);
+      const evt = { x: ix, y: iy, screenX: e.position.x, screenY: e.position.y, originalEvent: e };
+      let handled = false;
+      for (const h of pluginClicks) if (h.fn(evt) === true) { handled = true; break; }
+      if (handled || pluginCapture) return;
+    }
     if (typeof PLANES !== 'undefined') {
       const pl = PLANES.drawn.find((q) => Math.hypot(q[0] - e.position.x, q[1] - e.position.y) < 26);
       if (pl) { planeFollow(pl[2]); return; }
@@ -1007,6 +1031,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (b) showBuilding(b); else showPoint(ix, iy);
   });
   $('osd').addEventListener('pointermove', (e) => {
+    if (pluginCursor || pluginCapture) { state.hover = null; $('osd').style.cursor = pluginCursor; return; }
     const r = $('osd').getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
     if (typeof PLANES !== 'undefined') {
@@ -1943,7 +1968,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   // ---- chodci: pixeloví lidé (postava 16 bodů po 10 cm) po pěších cestách a náměstích (overlay walk) a po chodnících podél ulic (roads).
   // Oblečení podle ročního období, počet podle hodiny (realTime), kreslí se jen zblízka; obrázek každé postavy se kreslí jednou do cache.
   const PEOPLE = [], PWK = new Map();                         // PWK: konce pěších čar -> [čára, směr]
-  const PDENS = { p: 3, f: 0.9, s: 0.5, t: 0.2, k: 0.2 };     // lidí na 100 m podle druhu cesty (p pěší zóna, f chodník, s schody, t cesta, k cyklostezka)
+  const PDENS = { p: 3, f: 0.9, s: 0.5, t: 0.2, k: 0.2, c: 0, d: 0 };   // lidí na 100 m podle druhu cesty (p pěší zóna, f chodník, s schody, t cesta, k cyklostezka, c / d cyklotrasa po silnici / po cestě)
+  const BDENS = { k: 0.9, t: 0.06, c: 0.25, d: 0.25 };      // cyklistů na 100 m: cyklostezky, cyklotrasy, v lese a v parku občas
+  const BIKE_SEASON = { spring: 0.35, summer: 1, autumn: 0.25, winter: 0.06 };   // na jaře a na podzim jen pár, v létě víc
+  const BIKE_COL = ['#c23a2a', '#2a2c31', '#2f6fd1', '#e8e4da', '#2aa36b', '#f2c230', '#7a7f88', '#e86a2a', '#5a3a7a', '#1d6f8a'];
   const PSIDE = { residential: 0.22, living_street: 0.5, tertiary: 0.35, secondary: 0.35, primary: 0.3, unclassified: 0.1 };   // chodníky podél ulic
   const pWalk = (r) => PSIDE[r.c] && !r.tunnel && !r.rb;     // prstenec kruhového objezdu (r.rb) chodník nemá, chodci přejdou po vjezdech
   const PSIDE_OFF = { residential: 3.8, living_street: 2.6, tertiary: 5, secondary: 5.6, primary: 6.2, unclassified: 3.6 };
@@ -1959,8 +1987,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const len = [0]; for (let m = 1; m < w.length; m++) len.push(len[m - 1] + Math.hypot(w[m][0] - w[m - 1][0], w[m][1] - w[m - 1][1]));
       const r = { w, len, L: len[len.length - 1], c: kinds[j] || 'f', k };
       for (const [e, dir] of [[w[0], 1], [w[w.length - 1], -1]]) { const q = pEk(e); if (!PWK.has(q)) PWK.set(q, []); PWK.get(q).push([r, dir]); }
-      const n = r.L / 100 * (PDENS[r.c] || 0.5), cnt = Math.floor(n) + (rnd(i + j) < n % 1 ? 1 : 0);
+      const n = r.L / 100 * (PDENS[r.c] ?? 0.5), cnt = Math.floor(n) + (rnd(i + j) < n % 1 ? 1 : 0);
       for (let m = 0; m < cnt; m++) add({ m: 'l', r, s: rnd(i + m * 3) * r.L, dir: rnd(i + m) < 0.5 ? 1 : -1, side: (rnd(i + m * 5) - 0.5) * 1.4 });
+      const nb = r.L / 100 * (BDENS[r.c] || 0), cb = Math.floor(nb) + (rnd(i + j * 13 + 777) < nb % 1 ? 1 : 0);   // cyklisti
+      for (let m = 0; m < cb; m++) { const z = i + j * 17 + m * 41 + 999;
+        add({ m: 'l', r, s: rnd(z) * r.L, dir: rnd(z + 1) < 0.5 ? 1 : -1, side: (rnd(z + 2) - 0.5) * 0.8, v: 4 + rnd(z + 3) * 2.6, kid: false, pair: false, dog: null,
+          bike: { col: BIKE_COL[Math.floor(rnd(z + 4) * BIKE_COL.length)], helm: rnd(z + 5) < 0.55 ? P_ACC[Math.floor(rnd(z + 6) * P_ACC.length)] : null } }); }
     });
     for (const P of W.a || []) {                             // náměstí a pěší plochy: chodí mezi náhodnými body uvnitř
       let A = 0; for (let a = 0, b = P.length - 1; a < P.length; b = a++) A += (P[b][0] + P[a][0]) * (P[b][1] - P[a][1]); A = Math.abs(A / 2);
@@ -1982,11 +2014,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     const r = p.r, Ls = r.len; let i = 1; while (i < Ls.length - 1 && Ls[i] < p.s) i++;
     const a = r.w[i - 1], b = r.w[i], t = Math.max(0, Math.min(1, (p.s - Ls[i - 1]) / ((Ls[i] - Ls[i - 1]) || 1))), dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
-    const x = a[0] + dx * t + dy / L * p.side, y = a[1] + dy * t - dx / L * p.side; return [x, y, gz(x, y), dx * p.dir, dy * p.dir];
+    const sd = r.c === 'c' ? p.dir * 2.3 : p.side;            // po silnici u pravého okraje
+    const x = a[0] + dx * t + dy / L * sd, y = a[1] + dy * t - dx / L * sd; return [x, y, gz(x, y), dx * p.dir, dy * p.dir];
   }
   function stepPerson(p, dt) {
     if (p.wait > 0) { p.wait -= dt; p.moving = false; return; }
-    p.moving = true; p.ph += dt * 7.5 * p.v;
+    p.moving = true; p.ph += p.bike ? dt * 5 : dt * 7.5 * p.v;
     if (p.m === 'a') {
       const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
       if (d < 0.5) { if (Math.random() < 0.3) p.wait = 1 + Math.random() * 5; for (let t = 0; t < 12; t++) { const a = p.ar, x = p.x + (Math.random() - 0.5) * 40, y = p.y + (Math.random() - 0.5) * 40; if (pinPoly(a.P, x, y)) { p.tx = x; p.ty = y; break; } } return; }
@@ -1996,11 +2029,16 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     p.s += p.v * dt * p.dir;
     if (p.s >= 0 && p.s <= r.L) return;
     const endPt = p.s < 0 ? r.w[0] : r.w[r.w.length - 1];
-    if (Math.random() < 0.15) p.wait = 1 + Math.random() * 4;                 // zastaví se (výloha, telefon)
+    if (Math.random() < (p.bike ? 0.02 : 0.15)) p.wait = 1 + Math.random() * 4;   // zastaví se (výloha, telefon)
     let opts;
-    if (p.m === 'l') opts = (PWK.get(pEk(endPt)) || []).filter(([q]) => q !== r);
+    if (p.m === 'l') opts = (PWK.get(pEk(endPt)) || []).filter(([q]) => q !== r && (p.bike ? q.c !== 's' : q.c !== 'c' && q.c !== 'd'));
     else opts = (ends.get(ek(endPt)) || []).filter(([j]) => j !== p.ri && pWalk(roads[j]));
-    if (opts.length && Math.random() < 0.85) {
+    if (p.bike && opts.length) {                                                // cyklista se drží cyklostezky nebo cyklotrasy
+      const G = (c) => c === 'k' ? 'k' : c === 'c' || c === 'd' ? 'r' : 'o', g = G(r.c);
+      let ok = opts.filter(([q]) => G(q.c) === g); if (!ok.length) ok = opts.filter(([q]) => G(q.c) !== 'o');
+      if (ok.length) opts = ok; else if (g === 'r' || (g === 'k' && Math.random() < 0.6)) opts = [];
+    }
+    if (opts.length && Math.random() < (p.bike ? 0.97 : 0.85)) {
       const [q, dir] = opts[Math.floor(Math.random() * opts.length)];
       if (p.m === 'l') { p.r = q; } else { p.ri = q; } p.dir = dir; p.s = dir > 0 ? 0 : (p.m === 'l' ? q : roads[q]).L;
     } else { p.dir *= -1; p.s = Math.max(0, Math.min(r.L, p.s)); }               // sem tam: otočí se
@@ -2100,6 +2138,53 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (!at(x + 1, y)) { q.fillStyle = 'rgba(0,0,0,0.16)'; q.fillRect(x + 1, y + 1, 1, 1); }
     }
     PSPR.set(id, c); return c;
+  }
+  // cyklista: mřížka 19 × 20 bodů po 10 cm (kola 0,7 m), z boku čelem doprava (mir = zrcadlově), nebo zepředu / zezadu
+  const BGW = 19, BGH = 20, BCX = 9, BBASE = 19;
+  function bikeGrid(o, b, view, frame) {
+    const g = Array.from({ length: BGH }, () => Array(BGW).fill(null));
+    const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < BGW && y >= 0 && y < BGH && (c || c === 0)) g[y][x] = c; };
+    const line = (x0, y0, x1, y1, c) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1); for (let k = 0; k <= n; k++) set(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, c); };
+    const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
+    const TY = '#26272b', shin = o.bot === 'shorts' || o.bot === 'skirt' || o.top === 'dress' ? o.skin : o.botC, arm = { tee: 'short', tank: 'none', dress: 'short' }[o.top] ? o.skin : o.topC;
+    const head = b.helm || o.hair;
+    if (view === 's') {
+      const a = frame * Math.PI / 2, BB = [9, 15], P1 = [BB[0] + 2 * Math.cos(a), BB[1] + 2 * Math.sin(a)], P2 = [BB[0] - 2 * Math.cos(a), BB[1] - 2 * Math.sin(a)];
+      const leg = (P, c, cs) => { const H = [7, 9], K = [(H[0] + P[0]) / 2 + 1.5, (H[1] + P[1]) / 2 - 1]; line(H[0], H[1], K[0], K[1], c); line(K[0], K[1], P[0], P[1], cs); set(P[0], P[1], o.shoes); set(P[0] + 1, P[1], o.shoes); };
+      for (const cx of [4, 14]) for (let y = 12; y <= 19; y++) for (let x = cx - 4; x <= cx + 4; x++) { const d = Math.hypot(x - cx, y - 16); if (d >= 2.6 && d < 3.4) set(x, y, TY); else if (d < 2.6) set(x, y, 0); }
+      leg(P2, pShade(o.botC, 0.7), pShade(shin, 0.7));
+      set(4, 16, '#9aa0a8'); set(14, 16, '#9aa0a8');
+      line(4, 16, 7, 11, b.col); line(7, 11, 9, 15, b.col); line(4, 16, 9, 15, b.col); line(7, 11, 12, 11, b.col); line(9, 15, 12, 11, b.col); line(12, 10, 14, 16, b.col);
+      rect(6, 10, 8, 10, TY); set(12, 9, TY); rect(12, 8, 13, 8, TY);
+      leg(P1, o.botC, shin);
+      rect(6, 8, 8, 8, o.topC); rect(7, 7, 9, 7, o.topC); rect(8, 6, 10, 6, o.topC); rect(9, 5, 10, 5, o.topC);   // trup v předklonu
+      set(11, 6, arm); set(12, 7, arm); set(13, 8, o.skin);
+      rect(10, 2, 12, 4, o.skin); set(12, 3, pShade(o.skin, 0.8));
+      if (b.helm) { rect(9, 1, 12, 1, head); set(9, 2, head); set(10, 2, head); }
+      else { rect(10, 1, 12, 1, o.hair); set(10, 2, o.hair); set(10, 3, o.hair); }
+    } else {
+      const up = frame % 2 ? 1 : 0, L = frame < 2;
+      rect(9, 12, 9, 19, TY); rect(9, 10, 9, 11, b.col);
+      if (view === 'b') { rect(8, 9, 10, 10, TY); }
+      rect(5, 9, 13, 9, TY);
+      for (const [x, lift] of [[8, L ? up : 0], [10, L ? 0 : up]]) { rect(x, 10, x, 12 - lift, o.botC); rect(x, 13 - lift, x, 15 - lift, shin); set(x, 16 - lift, o.shoes); }
+      rect(7, 5, 11, 8, o.topC); line(6, 6, 6, 8, arm); line(12, 6, 12, 8, arm); set(6, 9, o.skin); set(12, 9, o.skin);
+      rect(8, 1, 10, 4, view === 'b' ? o.hair : o.skin); rect(8, 0, 10, 0, head); if (b.helm) { rect(7, 1, 11, 1, head); }
+      else if (view === 'f') { rect(8, 1, 10, 1, o.hair); }
+    }
+    return g;
+  }
+  const BSPR = new Map();
+  function bikeSprite(o, key, b, view, mir, frame, nb) {
+    const id = key + b.col + (b.helm || '') + view + (mir ? 'm' : '') + frame + nb;
+    let c = BSPR.get(id); if (c) return c;
+    if (BSPR.size > 3000) BSPR.clear();
+    const g = bikeGrid(o, b, view, view === 's' ? frame : frame), f = 1 - nb * 0.12, at = (x, y) => y >= 0 && y < BGH && x >= 0 && x < BGW ? g[y][mir ? BGW - 1 - x : x] : null;
+    c = document.createElement('canvas'); c.width = BGW + 2; c.height = BGH + 2; const q = c.getContext('2d');
+    q.fillStyle = 'rgba(24,26,32,0.85)';
+    for (let y = -1; y <= BGH; y++) for (let x = -1; x <= BGW; x++) if (at(x, y) == null && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) q.fillRect(x + 1, y + 1, 1, 1);   // 0 = průhledné bez obrysu (vnitřek kola)
+    for (let y = 0; y < BGH; y++) for (let x = 0; x < BGW; x++) { const col = at(x, y); if (col) { q.fillStyle = col[0] === '#' ? pShade(col, f) : col; q.fillRect(x + 1, y + 1, 1, 1); } }
+    BSPR.set(id, c); return c;
   }
   function drawDogAt(X, Y, u, mir, frame, col) {
     const rows = [[0, 0, 0, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 0], frame % 2 ? [1, 0, 0, 1, 0] : [0, 1, 0, 0, 1]], ox = X - 2.5 * u, oy = Y - 4 * u;
@@ -3094,8 +3179,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const vp = viewer.viewport;
     const p0 = vp.pixelFromPoint(new OpenSeadragon.Point(0, 0), true), p1 = vp.pixelFromPoint(new OpenSeadragon.Point(1, 0), true);
     const sx = (p1.x - p0.x) / W, ox = p0.x, oy = p0.y;
+    if ($('pluginLayers').childElementCount) $('pluginLayers').style.transform = `translate(${ox}px,${oy}px) scale(${sx})`;
     const vis = (ix, iy, m = 40) => { const x = ox + ix * sx, y = oy + iy * sx; return x > -m && y > -m && x < cw + m && y < ch + m; };
     const night = state.night, t = now / 1000, snowy = state.season === 'winter';
+    const frameView = pluginFrames.length ? {
+      sx, ox, oy, cw, ch, dpr, dt, now, moving,
+      night, season: state.season, weather: state.weather, snowy, wind: realWind, eco: eco || SLOW,
+      toScreen: (ix, iy) => [ox + ix * sx, oy + iy * sx],
+      vis,
+    } : null;
     $('map').classList.toggle('far', sx < 0.3);
 
     // třpyt vody (ve dne)
@@ -3209,8 +3301,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (state.weather === 'rain') share *= 0.45; else if (state.weather === 'snow') share *= 0.75;
         if (eco || SLOW) share *= 0.5;
         const nb = Math.min(4, Math.round(night * 5)), list = [];
+        const bikeF = (BIKE_SEASON[state.season] ?? 0.5) * (state.weather === 'rain' ? 0.3 : state.weather === 'snow' ? 0.15 : 1);
         for (const p of PEOPLE) {
-          if (p.q > share || !shown(p.k)) continue;
+          if (p.q > (p.bike ? share * bikeF : share) || !shown(p.k)) continue;
           const P = pPos(p), ip = toImg(P[0], P[1], P[2]);
           if (!vis(ip[0], ip[1], 30)) continue;
           stepPerson(p, dt); list.push([p, P, ip]);
@@ -3231,6 +3324,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         for (const [p, P, ip] of list) {
           if (hidden(P[0], P[1], P[2], ip)) continue;
           const s1 = toImg(P[0] + P[3] * 0.05, P[1] + P[4] * 0.05, P[2]), back = s1[1] - ip[1] < 0, mir = s1[0] - ip[0] < 0, fr = p.moving ? Math.floor(p.ph) % 4 : 0;
+          if (p.bike) {                                      // cyklista: z boku, nebo zepředu / zezadu, když jede po obrazovce svisle
+            const sdx = s1[0] - ip[0], sdy = s1[1] - ip[1], view = Math.abs(sdx) > Math.abs(sdy) * 0.5 ? 's' : back ? 'b' : 'f';
+            const o = outfitOf(state.season, p.oi, false), X = ox + ip[0] * sx, Y = oy + ip[1] * sx, w = view === 's' ? 7 : 2;
+            ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(X - w * u, Y - 0.6 * u, 2 * w * u, Math.max(1, u));
+            ctx.drawImage(bikeSprite(o, state.season + p.oi, p.bike, view, sdx < 0, p.moving ? Math.floor(p.ph) % 4 : 0, nb), X - (BCX + 1) * u, Y - (BBASE + 2) * u, (BGW + 2) * u, (BGH + 2) * u);
+            continue;
+          }
           const L = Math.hypot(P[3], P[4]) || 1, nx = -P[4] / L, ny = P[3] / L;   // kolmo ke směru chůze
           const near = (off, fwd) => { const x = P[0] + nx * off + P[3] / L * fwd, y = P[1] + ny * off + P[4] / L * fwd, h = gz(x, y); return [x, y, h, toImg(x, y, h)]; };
           const comp = [];
@@ -3307,6 +3407,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         ctx.globalAlpha = on; ctx.fillRect(X0 + Math.round(lx * k), Y0 + Math.round(ly * k), k, k); ctx.globalAlpha = 1;
       });
     }
+    runFrameLayer('world', frameView, t);
     // svíčky na hřbitovech: večer; kolem Dušiček (30. 10.–10. 11.) skoro na každém hrobě, na Štědrý den na většině, jinak jen tu a tam.
     // Hřbitovní lampy jsou červené, žluté a bílé; plamen se mihotá, při přiblížení kolem něj malá záře
     if (night > 0.3 && sx > 0.1 && svicky.length) {
@@ -3364,6 +3465,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       stepPlanes(dt, now);
       drawPlanes(sx, ox, oy, night, now, cw, ch);
     }
+    runFrameLayer('sky', frameView, t);
     // názvy čtvrtí: jako mraky – vidět při oddálení, s přiblížením plynule mizí
     {
       const fadeD = Math.max(0, Math.min(1, (0.22 - sx) / 0.14));
@@ -3412,6 +3514,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       ctx.fillStyle = `rgba(176,170,152,${Math.min(1, (realPm - 25) / 50) * (night > 0.5 ? 0.12 : 0.24)})`;
       ctx.fillRect(0, 0, cw, ch);
     }
+    runFrameLayer('top', frameView, t);
     if (mini.offsetParent) {                               // na mobilu je minimapa skrytá; jinak kreslit jen při změně
       const b = viewer.viewport.getBounds(true), mk = [b.x.toFixed(4), b.y.toFixed(4), b.width.toFixed(4), state.season, state.night > 0.35 ? state.night.toFixed(2) : 0, state.wip, Object.keys(miniImgs).length, cw].join('|');
       if (mk !== miniKey) { miniKey = mk; drawMini(); }
@@ -3420,5 +3523,95 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
   }
   requestAnimationFrame(frame);
+
+  window.Izomapa = {
+    libs: pluginLibs,
+    registerLib(id, api) { if (id) pluginLibs[id] = api; },
+    getLib: (id) => pluginLibs[id] ?? null,
+    getPluginData: (id) => OV.doplnky?.[id]?.data ?? null,
+    getPluginConfig: (id) => OV.doplnky?.[id]?.config ?? {},
+    registerPlugin(id, inst) {
+      if (pluginRegistry[id]?.onDestroy) try { pluginRegistry[id].onDestroy(); } catch {}
+      pluginRegistry[id] = inst || {};
+      if (inst?.onInit) { if (ready) inst.onInit(window.Izomapa); else layersReady.then(() => inst.onInit(window.Izomapa)); }
+    },
+    onMapClick(fn, options = { priority: 0 }) {
+      const entry = { fn, priority: options?.priority ?? 0 };
+      pluginClicks.push(entry); pluginClicks.sort((a, b) => b.priority - a.priority);
+      return () => { const i = pluginClicks.indexOf(entry); if (i >= 0) pluginClicks.splice(i, 1); };
+    },
+    onFrame(fn, options = {}) {
+      if (typeof fn !== 'function') return () => {};
+      const layer = options?.layer === 'world' || options?.layer === 'top' ? options.layer : 'sky';
+      const entry = { fn, layer, priority: options?.priority ?? 0 };
+      pluginFrames.push(entry); pluginFrames.sort((a, b) => b.priority - a.priority);
+      return () => { const i = pluginFrames.indexOf(entry); if (i >= 0) pluginFrames.splice(i, 1); };
+    },
+    setClickCapture(en) { pluginCapture = Boolean(en); },
+    setCursor(cur) { pluginCursor = cur || ''; $('osd').style.cursor = pluginCursor; },
+    setPinsVisible(vis) { document.body.classList.toggle('plugins-hide-pins', !vis); },
+    getPluginLayer(id) {
+      let el = $('pluginLayers').querySelector(`[data-plugin="${id}"]`);
+      if (!el) { el = document.createElement('div'); el.dataset.plugin = id; el.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;'; $('pluginLayers').appendChild(el); }
+      return el;
+    },
+    getView() { const c = viewer.viewport.getCenter(true); return { x: c.x * W, y: c.y * W, zoom: viewer.viewport.getZoom(true) }; },
+    getCam: () => ({ ...cam, w: W, h: Hh }),
+    toImg: (x, y, h = 0) => toImg(x, y, h),
+    imgToWorld: (ix, iy) => imgToWorld(ix, iy),
+    gz: (x, y) => gz(x, y),
+    latLonToWorld: (lat, lon) => [(lon - cam.lon0) * cam.kx, (lat - cam.lat0) * cam.ky],
+    worldToLatLon: (x, y) => { const [lon, lat] = lonlat(x, y); return [lat, lon]; },
+    latLonToImg: (lat, lon, hOffset = 0) => { const x = (lon - cam.lon0) * cam.kx, y = (lat - cam.lat0) * cam.ky; return toImg(x, y, gz(x, y) + hOffset); },
+    panTo(x, y, zoom, animated = true) {
+      if (Number.isFinite(x) && Number.isFinite(y)) viewer.viewport.panTo(new OpenSeadragon.Point(x / W, y / W), !animated);
+      if (Number.isFinite(zoom)) viewer.viewport.zoomTo(zoom, null, !animated);
+    },
+    getEnvironment: () => ({ night: state.night, rain: state.weather === 'rain', weather: state.weather, season: state.season, realTime: $('realTime').checked, realWeather: $('realWeather').checked }),
+    setEnvironment(env = {}) {
+      if (env.season) setSeason(env.season);
+      if (env.realWeather !== undefined) { $('realWeather').checked = Boolean(env.realWeather); if (env.realWeather) applyRealWeather(); }
+      else if (env.weather !== undefined || env.rain !== undefined) $('realWeather').checked = false;
+      const w = env.weather !== undefined ? env.weather : (env.rain !== undefined ? (env.rain ? 'rain' : 'clear') : undefined);
+      if (w !== undefined) setWeather(w);
+      if (env.realTime !== undefined) { $('realTime').checked = Boolean(env.realTime); if (env.realTime) tickReal(); }
+      else if (typeof env.night === 'number') $('realTime').checked = false;
+      if (typeof env.night === 'number') { state.night = Math.max(0, Math.min(1, env.night)); $('night').value = Math.round(state.night * 100); applyTime(); }
+    },
+    getUiSlot(slotName = 'sidebar-tabs') { return slotName === 'sidebar-tabs' ? $('pluginTabsSlot') : null; },
+  };
+  if (OV.doplnky && Object.keys(OV.doplnky).length) {
+    const loadedStyles = new Set(), loadedScripts = new Map();
+    const loadStyle = (href) => {
+      if (!href || loadedStyles.has(href)) return;
+      loadedStyles.add(href);
+      const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
+    };
+    const loadScript = (src) => {
+      if (!src) return Promise.resolve();
+      if (loadedScripts.has(src)) return loadedScripts.get(src);
+      const p = new Promise((resolve) => {
+        const s = document.createElement('script'); s.src = src; s.async = false;
+        s.onload = () => resolve(true);
+        s.onerror = () => { console.warn('Nepodařilo se načíst skript doplňku:', src); resolve(false); };
+        document.body.appendChild(s);
+      });
+      loadedScripts.set(src, p);
+      return p;
+    };
+    layersReady.then(async () => {
+      const list = Object.values(OV.doplnky);
+      const libUrls = [];
+      for (const p of list) {
+        for (const href of p.lib_styles || []) loadStyle(href);
+        for (const src of p.lib_scripts || []) if (!libUrls.includes(src)) libUrls.push(src);
+      }
+      if (libUrls.length) await Promise.all(libUrls.map(loadScript));
+      for (const p of list) {
+        for (const href of p.styles || []) loadStyle(href);
+        for (const src of p.scripts || []) loadScript(src);
+      }
+    });
+  }
 })();
 </script>
