@@ -1902,6 +1902,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const PEOPLE = [], PWK = new Map();                         // PWK: konce pěších čar -> [čára, směr]
   const PDENS = { p: 3, f: 0.9, s: 0.5, t: 0.2, k: 0.2 };     // lidí na 100 m podle druhu cesty (p pěší zóna, f chodník, s schody, t cesta, k cyklostezka)
   const PSIDE = { residential: 0.22, living_street: 0.5, tertiary: 0.35, secondary: 0.35, primary: 0.3, unclassified: 0.1 };   // chodníky podél ulic
+  const pWalk = (r) => PSIDE[r.c] && !r.tunnel && !r.rb;     // prstenec kruhového objezdu (r.rb) chodník nemá, chodci přejdou po vjezdech
   const PSIDE_OFF = { residential: 3.8, living_street: 2.6, tertiary: 5, secondary: 5.6, primary: 6.2, unclassified: 3.6 };
   const PEOPLE_SHARE = [.06, .04, .03, .03, .04, .12, .35, .7, .75, .7, .75, .85, .9, .85, .85, .95, 1, 1, .85, .65, .45, .3, .18, .1];
   const pinPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
@@ -1925,7 +1926,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       for (let m = 0; m < cnt; m++) for (let t = 0; t < 30; t++) { const x = x0 + rnd(i + m * 31 + t) * (x1 - x0), y = y0 + rnd(i + m * 37 + t + 5) * (y1 - y0); if (pinPoly(P, x, y)) { add({ m: 'a', ar, x, y, tx: x, ty: y }); break; } }
     }
     for (let j = 0; j < roads.length; j++) {                 // chodníky podél ulic tohoto čtverce
-      const r = roads[j]; if (r.k !== k || r.tunnel || !PSIDE[r.c]) continue;
+      const r = roads[j]; if (r.k !== k || !pWalk(r)) continue;
       const n = r.L / 100 * PSIDE[r.c] * (r.v ? Math.min(2, 0.6 + r.v / 12000) : 1), cnt = Math.floor(n) + (rnd(i + j * 3) < n % 1 ? 1 : 0);
       for (let m = 0; m < cnt; m++) add({ m: 'r', ri: j, s: rnd(i + m * 7 + j) * r.L, dir: rnd(i + m + j) < 0.5 ? 1 : -1, side: rnd(i + m * 11 + j) < 0.5 ? 1 : -1 });
     }
@@ -1955,7 +1956,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (Math.random() < 0.15) p.wait = 1 + Math.random() * 4;                 // zastaví se (výloha, telefon)
     let opts;
     if (p.m === 'l') opts = (PWK.get(pEk(endPt)) || []).filter(([q]) => q !== r);
-    else opts = (ends.get(ek(endPt)) || []).filter(([j]) => j !== p.ri && PSIDE[roads[j].c] && !roads[j].tunnel);
+    else opts = (ends.get(ek(endPt)) || []).filter(([j]) => j !== p.ri && pWalk(roads[j]));
     if (opts.length && Math.random() < 0.85) {
       const [q, dir] = opts[Math.floor(Math.random() * opts.length)];
       if (p.m === 'l') { p.r = q; } else { p.ri = q; } p.dir = dir; p.s = dir > 0 ? 0 : (p.m === 'l' ? q : roads[q]).L;
