@@ -1,0 +1,25 @@
+.vzor-tab {
+  background: var(--panel, #232d42);
+  color: var(--ink, #eef1e6);
+  border: 2px solid var(--edge, #3a4762);
+  border-left: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: var(--display, monospace);
+}
+.vzor-panel {
+  position: fixed;
+  z-index: 4;
+  top: 90px;
+  right: 16px;
+  width: min(270px, calc(100vw - 32px));
+  background: var(--panel, #232d42);
+  color: var(--ink, #eef1e6);
+  border: 2px solid var(--edge, #3a4762);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.vzor-panel[hidden] { display: none; }
+.vzor-input { padding: 6px 8px; border: 1px solid var(--edge, #3a4762); background: rgba(0,0,0,.25); color: inherit; }
+.vzor-status { margin: 0; font-size: .85rem; opacity: .9; }

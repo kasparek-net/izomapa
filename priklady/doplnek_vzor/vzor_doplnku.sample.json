@@ -1,0 +1,7 @@
+{
+  "title": "Vzorové body na mapě",
+  "points": [
+    { "id": "radnice", "label": "Náměstí", "lat": 50.7697, "lon": 15.0585 },
+    { "id": "park", "label": "Park", "lat": 50.7685, "lon": 15.0572 }
+  ]
+}
