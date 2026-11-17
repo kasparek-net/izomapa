@@ -1,0 +1,31 @@
+{
+  "status": "ok",
+  "overall": [
+    {
+      "nickname": "Jan Novák",
+      "totalTimeMs": 42000,
+      "difficulty": "easy",
+      "season": "summer",
+      "createdAt": "2026-11-11"
+    },
+    {
+      "nickname": "Petra Svobodová",
+      "totalTimeMs": 58000,
+      "difficulty": "medium",
+      "season": "autumn",
+      "createdAt": "2026-11-11"
+    }
+  ],
+  "levels": {
+    "1": [
+      {
+        "lvl": "1",
+        "nickname": "Jan Novák",
+        "timeMs": 14000,
+        "difficulty": "easy",
+        "season": "summer",
+        "createdAt": "2026-11-11"
+      }
+    ]
+  }
+}

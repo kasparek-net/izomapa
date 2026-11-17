@@ -1,0 +1,8 @@
+{
+  "id": "letiste",
+  "name": "Letiště",
+  "version": "1.0.0",
+  "description": "Malá letadla létají okruhy na travnatém letišti, An-2 vysazuje parašutisty (ilustrační provoz, jen ve dne).",
+  "hook": "overlay_hook.py",
+  "scripts": ["letiste.js"]
+}
