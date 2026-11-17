@@ -1489,6 +1489,19 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     ctx.fillStyle = lamp[1]; ctx.fillRect(lamp[0] - q * 0.6, y - h + q * 0.05, q * 1.2, q * 1.1);
   }
+  // fronta před semaforem nebo přejezdem sahá za začátek dalšího kusu silnice: auto zastaví ve frontě ještě na svém kusu
+  // (jinak by všechna stála na sobě na začátku dalšího kusu) a po rozjezdu pokračuje na kus, který si vybralo (c.nx)
+  function queueBack(c, r, i, dir) {
+    const q = roads[i], s0 = dir > 0 ? 0 : q.L, qi = dir > 0 ? 0 : 1;
+    for (const zs of [q.jy, q.sg]) if (zs) for (const z of zs) {
+      if (!blocked(z) || (z.t && z.t !== dir)) continue;
+      const over = dir * (s0 - (z[0] - dir * ((z.d ?? 6) + ((z.q && z.q[qi]) || 0))));
+      if (over <= 0) continue;
+      c.s = Math.max(0, Math.min(r.L, (c.dir > 0 ? r.L : 0) - c.dir * over)); c.hold = z; (z.q = z.q || [0, 0])[qi] += c.T.gap; c.nx = [i, dir];
+      return true;
+    }
+    return false;
+  }
   function stepCar(c, dt) {
     if (c.hold) { if (blocked(c.hold)) return; c.hold.q = null; c.hold = null; }
     const r = roads[c.r], next = c.s + carSpeed(c, r) * dt * c.dir;
@@ -1501,9 +1514,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     c.s = next;
     if (c.s < 0 || c.s > r.L) {
       const endPt = c.s < 0 ? r.w[0] : r.w[r.w.length - 1];
+      const pr0 = c.pr, pd0 = c.pdir;
       c.pr = c.r; c.pdir = c.dir;                           // návěs kamionu ještě chvíli jede po předchozí silnici
       const opts = (ends.get(ek(endPt)) || []).filter(([i, dir]) => i !== c.r && roads[i].c !== 'service' && (!roads[i].o || roads[i].o === dir));
-      if (opts.length) { const [i, dir] = pickExit(opts, c); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L; }
+      if (opts.length) {
+        const nx = c.nx && opts.find(([i, dir]) => i === c.nx[0] && dir === c.nx[1]); c.nx = null;
+        const [i, dir] = nx || pickExit(opts, c);
+        if (queueBack(c, r, i, dir)) { c.pr = pr0; c.pdir = pd0; return; }
+        c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L;
+      }
       else if (r.o && (ends.get(ek(endPt)) || []).some(([i]) => i !== c.r && roads[i].c !== 'service')) {   // data mají navazující kus opačně: radši pokračovat než zmizet
         const [i, dir] = pickExit((ends.get(ek(endPt)) || []).filter(([i]) => i !== c.r && roads[i].c !== 'service'), c); c.r = i; c.dir = dir; c.s = dir > 0 ? 0 : roads[i].L;
       }
