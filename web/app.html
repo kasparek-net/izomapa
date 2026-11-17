@@ -2067,11 +2067,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const b = R();
     if (!kid) o.bag = b < 0.22 ? { t: 'backpack', c: pick(['#2a2a2e', '#2f4a6b', '#8a2f2f', '#6b7a3a', '#d6a12a']) } : b < 0.4 ? { t: 'handbag', c: pick(['#6b4a30', '#1d1f24', '#c23a2a', '#e8e2d2']) } : b < 0.5 ? { t: 'shopper', c: pick(['#e8e4da', '#f2c230', '#2aa36b']) } : null;
     else if (b < 0.4) o.bag = { t: 'backpack', c: pick(P_ACC) };
+    o.umb = ch(kid ? 0.3 : 0.8) ? pick(['#1d1f24', '#1d1f24', '#2f4a6b', '#c23a2a', '#2aa36b', '#f2c230', '#e0629a', '#6b3a6b']) : null;   // deštník, když prší
     return (OUTF[key] = o);
   }
-  const PGW = 9, PGH = 20, PCX = 4, PBASE = 18;               // mřížka postavy (body), nohy uprostřed dole
+  const PGW = 9, PGH = 23, PCX = 4, PBASE = 21;               // mřížka postavy (body), nohy uprostřed dole
   const pShade = (hex, f) => { const v = parseInt(hex.slice(1), 16); return `rgb(${[v >> 16, (v >> 8) & 255, v & 255].map((c) => Math.max(0, Math.min(255, Math.round(c * f))))})`; };
-  function personGrid(o, back, frame) {
+  function personGrid(o, back, frame, umb) {
     const g = Array.from({ length: PGH }, () => Array(PGW).fill(null)), CX = PCX;
     const set = (x, y, c) => { if (x >= 0 && x < PGW && y >= 0 && y < PGH && c) g[y][x] = c; };
     const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
@@ -2094,6 +2095,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     else if (o.top !== 'dress' && o.top !== 'coat') rect(CX - 2, B(hip), CX + 2, B(hip), pShade(legC, 0.85));
     const sw = frame === 1 ? 1 : frame === 3 ? -1 : 0;
     for (const [x, s] of [[CX - 3 - (wide ? 1 : 0), sw], [CX + 3 + (wide ? 1 : 0), -sw]]) {
+      if (umb && x > CX) continue;                          // ruka zvednutá k deštníku (kreslí se u deštníku)
       const y1 = hip + (s < 0 ? -1 : 0);
       for (let y = tTop; y <= y1; y++) set(x, B(y), arm === 'none' ? o.skin : arm === 'long' || y <= tTop + 1 ? pShade(o.topC, 0.9) : o.skin);
       set(x, B(y1 + 1), o.gloves || o.skin);
@@ -2114,6 +2116,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (o.hat.t === 'bobble') set(CX, B(headT - 2), o.hat.c2 || '#f2f0ea');
       if (o.hat.t === 'beret') { rect(CX - 2, B(headT - 1), CX + 1, B(headT - 1), c); rect(CX - 1, B(headT), CX + 1, B(headT), c); }
     }
+    if (umb) {                                               // deštník: stříška nad hlavou, tyč do zvednuté ruky
+      const c = umb, rim = headT - 3, hx = CX + 3 + (wide ? 1 : 0);
+      set(CX, rim - 3, '#3a3a40'); rect(CX - 1, rim - 2, CX + 1, rim - 2, c); rect(CX - 3, rim - 1, CX + 3, rim - 1, c);
+      rect(CX - 4, rim, CX + 4, rim, pShade(c, 0.72)); set(CX - 2, rim - 1, pShade(c, 1.35));
+      for (let y = rim + 1; y <= B(headB); y++) set(CX + 2, y, '#3a3a40');
+      set(CX + 2, B(headB + 1), o.gloves || o.skin); set(hx, B(tTop), pShade(o.topC, 0.9)); set(hx - 1 , B(neck), pShade(o.topC, 0.9));
+    }
     if (o.bag) {
       const c = o.bag.c;
       if (o.bag.t === 'backpack') { if (back) { rect(CX - 2, B(tTop + 1), CX + 2, B(hip - 1), c); rect(CX - 2, B(tTop + 1), CX + 2, B(tTop + 1), pShade(c, 0.75)); } else { set(CX - 2, B(tTop), pShade(c, 0.8)); set(CX + 2, B(tTop), pShade(c, 0.8)); } }
@@ -2124,11 +2133,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
   // obrázek postavy s obrysem (1 bod = 1 px, okraj 1 px), v noci ztmavený; cache podle oblečení, směru, kroku a tmy
   const PSPR = new Map();
-  function personSprite(o, key, back, mir, frame, nb) {
-    const id = key + (back ? 'b' : 'f') + (mir ? 'm' : '') + frame + nb;
+  function personSprite(o, key, back, mir, frame, nb, umb) {
+    const id = key + (back ? 'b' : 'f') + (mir ? 'm' : '') + frame + nb + (umb ? 'u' : '');
     let c = PSPR.get(id); if (c) return c;
     if (PSPR.size > 6000) PSPR.clear();
-    const g = personGrid(o, back, frame), f = 1 - nb * 0.12, at = (x, y) => y >= 0 && y < PGH && x >= 0 && x < PGW ? g[y][mir ? PGW - 1 - x : x] : null;
+    const g = personGrid(o, back, frame, umb), f = 1 - nb * 0.12, at = (x, y) => y >= 0 && y < PGH && x >= 0 && x < PGW ? g[y][mir ? PGW - 1 - x : x] : null;
     c = document.createElement('canvas'); c.width = PGW + 2; c.height = PGH + 2; const q = c.getContext('2d');
     q.fillStyle = 'rgba(24,26,32,0.85)';
     for (let y = -1; y <= PGH; y++) for (let x = -1; x <= PGW; x++) if (!at(x, y) && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) q.fillRect(x + 1, y + 1, 1, 1);
@@ -3300,7 +3309,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         let share = $('realTime').checked ? PEOPLE_SHARE[window.__pH] : 1 - 0.85 * night;
         if (state.weather === 'rain') share *= 0.45; else if (state.weather === 'snow') share *= 0.75;
         if (eco || SLOW) share *= 0.5;
-        const nb = Math.min(4, Math.round(night * 5)), list = [];
+        const nb = Math.min(4, Math.round(night * 5)), list = [], rain = state.weather === 'rain';
         const bikeF = (BIKE_SEASON[state.season] ?? 0.5) * (state.weather === 'rain' ? 0.3 : state.weather === 'snow' ? 0.15 : 1);
         for (const p of PEOPLE) {
           if (p.q > (p.bike ? share * bikeF : share) || !shown(p.k)) continue;
@@ -3319,7 +3328,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         const put = (o, key, ip, back, mir, fr) => {
           const X = ox + ip[0] * sx, Y = oy + ip[1] * sx;
           ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(X - 2.5 * u, Y - 0.6 * u, 5 * u, Math.max(1, u));
-          ctx.drawImage(personSprite(o, key, back, mir, fr, nb), X - (PCX + 1.5) * u, Y - (PBASE + 2) * u, (PGW + 2) * u, (PGH + 2) * u);
+          ctx.drawImage(personSprite(o, key, back, mir, fr, nb, rain && o.umb), X - (PCX + 1.5) * u, Y - (PBASE + 2) * u, (PGW + 2) * u, (PGH + 2) * u);
         };
         for (const [p, P, ip] of list) {
           if (hidden(P[0], P[1], P[2], ip)) continue;
