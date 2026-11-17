@@ -1,0 +1,47 @@
+{
+  "_pozn": "Ukázka hry Najdeš to? (zkopírovat do assets/doplnky/najdi_to.json a doplnit souřadnice [lat, lon] míst ve vlastním městě). Volitelně lze přidat leaderboard_url se statickým JSON žebříčkem.",
+  "enabled": true,
+  "title": "Najdeš to?",
+  "difficulties": {
+    "easy": {
+      "name": "Lehká (Den)",
+      "time": 0.0,
+      "weather": "clear"
+    },
+    "medium": {
+      "name": "Střední (Déšť a šero)",
+      "time": 0.5,
+      "weather": "rain"
+    },
+    "hard": {
+      "name": "Těžká (Noc)",
+      "time": 1.0,
+      "weather": "clear"
+    }
+  },
+  "levels": [
+    {
+      "lvl": 1,
+      "text": "Najdi v centru města.",
+      "camera": [50.0, 15.0, 1.2],
+      "questions": [
+        {
+          "id": "radnice",
+          "text": "Najdeš radnici?",
+          "lat": 50.0005,
+          "lon": 15.001,
+          "radius": 35,
+          "answer": "Radnice na náměstí (ukázka)"
+        },
+        {
+          "id": "kostel",
+          "text": "Najdeš hlavní kostel?",
+          "lat": 50.0,
+          "lon": 15.0,
+          "radius": 35,
+          "answer": "Kostel na náměstí (ukázka)"
+        }
+      ]
+    }
+  ]
+}

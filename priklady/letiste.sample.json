@@ -1,0 +1,14 @@
+{
+ "pozn": "Ukázka pro doplněk letiste: zkopírovat do assets/doplnky/letiste.json (tím se doplněk zapne). Body jsou [lat, lon]. Ukázkové hodnoty: letiště Mladá Boleslav (LKMB), dráhy podle OSM, stání a plocha podle ortofota ČÚZK.",
+ "drahy": [
+  {"ref": "05/23", "a": [50.3952702, 14.8931922], "b": [50.4000228, 14.9002772], "sirka": 24},
+  {"ref": "16/34", "a": [50.4005896, 14.8940911], "b": [50.3928371, 14.8978429], "sirka": 24}
+ ],
+ "aktivni": {"draha": "05/23", "od": "b", "okruh": "levy"},
+ "odstavna": [[50.400818, 14.897451], [50.400575, 14.898111], [50.400418, 14.898292], [50.400263, 14.898069], [50.400507, 14.897353]],
+ "pojizdeni": [[50.400360, 14.898037], [50.400000, 14.898233], [50.399603, 14.898429]],
+ "stani": [[50.400454, 14.897647], [50.400328, 14.897818], [50.400218, 14.897524], [50.400233, 14.896864]],
+ "dz": [50.3990, 14.8955],
+ "letadla": [{"typ": "c172", "stani": 0}, {"typ": "ul", "stani": 1}, {"typ": "an2", "stani": 2}, {"typ": "ul", "stani": 3, "leta": false}],
+ "vyska_okruhu": 110
+}

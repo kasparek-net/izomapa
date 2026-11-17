@@ -1,0 +1,15 @@
+{
+  "id": "najdi_to",
+  "name": "Najdeš to?",
+  "version": "2.0.0",
+  "description": "Hledací minihra na izometrické mapě s úrovněmi, obtížnostmi, certifikátem a anti-cheat HMAC backendem.",
+  "hook": "overlay_hook.py",
+  "libs": ["profanity", "server_client"],
+  "scripts": ["najdi_to.js"],
+  "styles": ["najdi_to.css"],
+  "defaults": {
+    "mode": "client",
+    "profanity_filter": true,
+    "one_attempt_only": true
+  }
+}
