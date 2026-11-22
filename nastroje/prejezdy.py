@@ -1,5 +1,5 @@
 # železniční přejezdy z OpenStreetMap (Overpass, ODbL, bez registrace) -> assets/prejezdy.json: [[lat, lon], ...]
-# auta před nimi čekají, když jede vlak (prep.py je přiřadí kusům silnic, web/app.html je zavírá podle jízdních řádů)
+# auta před nimi čekají, když jede vlak (prep.py je přiřadí kusům silnic, prohlížeč (web/js/70-animace.js) je zavírá podle jízdních řádů)
 # spouštět z kořene repa: python nastroje/prejezdy.py
 import json, math, subprocess, sys; sys.path.insert(0, '.')
 

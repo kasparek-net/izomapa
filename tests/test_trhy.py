@@ -1,3 +1,4 @@
+import shutil
 import json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
@@ -8,7 +9,7 @@ def postav(trhy):
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         (d / 'web').mkdir(); (d / 'site').mkdir(); (d / 'assets').mkdir()
-        (d / 'web/app.html').write_text((ROOT / 'web/app.html').read_text(encoding='utf-8'), encoding='utf-8')
+        shutil.copytree(ROOT / 'web', d / 'web', dirs_exist_ok=True)
         m = json.loads((ROOT / 'priklady/mesto.json').read_text(encoding='utf-8'))
         if trhy: m['trhy'] = trhy
         (d / 'mesto.json').write_text(json.dumps(m, ensure_ascii=False), encoding='utf-8')

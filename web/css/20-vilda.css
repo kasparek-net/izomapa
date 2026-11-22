@@ -1,0 +1,9 @@
+.follow { position: fixed; left: 50%; width: max-content; max-width: calc(100vw - 32px); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
+  background: var(--panel); border: 2px solid var(--edge); box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); font-size: .9rem; max-width: calc(100vw - 32px); }
+.follow b { font-family: var(--display); font-weight: 500; }
+.follow .px-btn { width: 32px; height: 32px; padding: 0; flex: none; }
+@media (max-width: 640px) { .follow { bottom: 72px; } }
+dialog.help .vd-hero { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+dialog.help .vd-hero img { width: 56px; height: 132px; image-rendering: pixelated; }
+dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin: 2px 0; } ol.vd-list span { color: var(--muted); font-size: .8rem; }
+#vdFoundMsg.ok { color: var(--grass); } #vdFoundMsg.err { color: #ff9a6a; }

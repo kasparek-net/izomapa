@@ -1,4 +1,4 @@
-import json, os, subprocess, sys, tempfile, unittest
+import json, os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +46,8 @@ class TestSousedi(unittest.TestCase):
         self.assertEqual(normalized[2]['target'], '_blank')
 
     def test_app_html_contains_neighbor_components(self):
-        html = (ROOT / 'web/app.html').read_text(encoding='utf-8')
+        sys.path.insert(0, str(ROOT / 'web')); import sestav
+        html = sestav.app()   # web/app.html + web/css + web/js
         self.assertIn('.pin.neighbor', html)
         self.assertIn('.card-neighbor-btn', html)
         self.assertIn('for (const n of OV.neighbors || [])', html)
@@ -61,7 +62,7 @@ class TestSousedi(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
             (d / 'web').mkdir(); (d / 'site').mkdir(); (d / 'assets').mkdir()
-            (d / 'web/app.html').write_text((ROOT / 'web/app.html').read_text(encoding='utf-8'), encoding='utf-8')
+            shutil.copytree(ROOT / 'web', d / 'web', dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))   # šablona + css + js
             m = json.loads((ROOT / 'priklady/mesto.json').read_text(encoding='utf-8'))
             m['sousedi'] = [{"nazev": "Liberec", "url": "https://izomapa.fun", "lat": 50.81, "lon": 15.03}]
             (d / 'mesto.json').write_text(json.dumps(m, ensure_ascii=False), encoding='utf-8')

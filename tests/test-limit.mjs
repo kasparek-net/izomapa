@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const html=fs.readFileSync('web/app.html','utf8');
+// funkce limitCars je ve web/js (prohlížeč rozdělený na soubory, slepí web/sestav.py)
+const html=fs.readdirSync('web/js').filter(f=>f.endsWith('.js')).sort().map(f=>fs.readFileSync('web/js/'+f,'utf8')).join('');
 const f=html.match(/function limitCars\(all, share, slow\) \{[\s\S]*?\n  \}/)?.[0];assert.ok(f);
 const choose=Function('const SLOW_SHARE=.35,MAX_CARS=1000,MAX_CARS_SLOW=300; '+f+'; return limitCars;')();
 const active=(items,share,slow)=>{const x=choose(items,share,slow);return items.filter(c=>c.q<=x.threshold&&(!x.allowed||x.allowed.has(c))).length};

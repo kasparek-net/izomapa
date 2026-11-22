@@ -1,3 +1,4 @@
+import shutil
 import json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
@@ -9,7 +10,7 @@ class ZapasyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
             (d / 'web').mkdir(); (d / 'site').mkdir(); (d / 'assets').mkdir()
-            (d / 'web/app.html').write_text((ROOT / 'web/app.html').read_text(encoding='utf-8'), encoding='utf-8')
+            shutil.copytree(ROOT / 'web', d / 'web', dirs_exist_ok=True)
             m = json.loads((ROOT / 'priklady/mesto.json').read_text(encoding='utf-8'))
             m['zapasy'] = {'mista': {'z': {'sport': 'hokej', 'cesty': [[[50, 15], [50.001, 15.001]]]}},
                            'rozpis': [{'misto': 'z', 'kdy': '2027-04-03T17:00', 'domaci': 'A', 'hoste': 'C'}, {'misto': 'z', 'kdy': '2026-12-02T18:00', 'domaci': 'A', 'hoste': 'B'}],

@@ -1,3 +1,4 @@
+import shutil
 import json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
@@ -8,7 +9,7 @@ def postav(m):
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         (d / 'web').mkdir(); (d / 'site').mkdir(); (d / 'assets').mkdir()
-        (d / 'web/app.html').write_text((ROOT / 'web/app.html').read_text(encoding='utf-8'), encoding='utf-8')
+        shutil.copytree(ROOT / 'web', d / 'web', dirs_exist_ok=True)
         (d / 'mesto.json').write_text(json.dumps(m, ensure_ascii=False), encoding='utf-8')
         subprocess.run([sys.executable, str(ROOT / 'build_html.py')], cwd=d, env={**os.environ, 'PYTHONPATH': str(ROOT)}, check=True, capture_output=True)
         return (d / 'site/index.html').read_text(encoding='utf-8')

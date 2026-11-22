@@ -1,6 +1,6 @@
 # semafory na křižovatkách a přechodech (Overture infrastructure, třída traffic_signals = OSM highway=traffic_signals)
 # -> assets/semafory.json: [[lat, lon, křižovatka], ...]; body do SHLUK_M od sebe patří k jedné křižovatce (jeden cyklus)
-# overlay.py je předá prohlížeči, web/app.html je přiřadí silnicím, auta před červenou stojí ve frontě
+# overlay.py je předá prohlížeči, prohlížeč (web/js/70-animace.js) je přiřadí silnicím, auta před červenou stojí ve frontě
 # spouštět z kořene repa: python nastroje/semafory.py (stačí pak overlay.py a build_html.py, render není potřeba)
 import json, math, sys; sys.path.insert(0, '.')
 import pyarrow.parquet as pq, shapely

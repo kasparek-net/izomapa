@@ -68,7 +68,7 @@ for f in sorted(glob.glob('data*/land_use.parquet')):
 AREA_TREE = shapely.STRtree([a[2] for a in AREAS]) if AREAS else None
 PL_TREE = shapely.STRtree([shapely.geometry.Point(p[0], p[1]) for p in PLACES_DB]) if PLACES_DB else None
 
-# chodci (web/app.html): pěší cesty z Overture po čtvercích, společné souřadnice [x, y] po 0,1 m.
+# chodci (web/js/75-chodci.js): pěší cesty z Overture po čtvercích, společné souřadnice [x, y] po 0,1 m.
 # l = čáry, c = druh (p pěší zóna, f chodník, s schody, t cesta v parku/lese, k cyklostezka, c / d cyklotrasa po silnici / po cestě), a = pěší plochy a náměstí (polygony).
 # Chodníky podél ulic, které v datech nejsou, si prohlížeč dopočítá ze silnic (roads). Vypnout: "chodci": false v mesto.json.
 WALK_K = {'pedestrian': 'p', 'footway': 'f', 'steps': 's', 'path': 't', 'cycleway': 'k', 'living_street': 'p', 'bridleway': 't'}

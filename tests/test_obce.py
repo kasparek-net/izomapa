@@ -1,4 +1,4 @@
-import json, os, re, subprocess, sys, tempfile, unittest
+import json, os, re, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,7 +8,7 @@ class ObceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
             (d/'web').mkdir(); (d/'site').mkdir(); (d/'assets').mkdir()
-            (d/'web/app.html').write_text((ROOT/'web/app.html').read_text())
+            shutil.copytree(ROOT / 'web', d / 'web', dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))   # šablona + css + js
             m = json.loads((ROOT/'priklady/mesto.json').read_text())
             m['url'] = 'https://example.cz/mapa'
             (d/'mesto.json').write_text(json.dumps(m))

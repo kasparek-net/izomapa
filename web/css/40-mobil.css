@@ -1,0 +1,39 @@
+@media (max-width: 640px) {
+  .menu-btn { display: inline-block; min-width: 56px; min-height: 44px; }
+  .head-btns { gap: 4px; }
+  .help-btn { width: 40px; height: 44px; }
+  .panel.closed > :not(.head) { display: none; }
+  .panel { padding: 10px 12px; gap: 12px; max-height: calc(100% - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  .panel.closed .sub { display: none; }
+  h1 { font-size: 1.2rem; }
+  .minimap, .fold { display: none; }
+  .izomapa-slot-tabs { left: auto; right: 0; top: calc(env(safe-area-inset-top, 0px) + 84px); align-items: flex-end; }
+  .folded .izomapa-slot-tabs { left: auto; }
+  .controls { right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); flex-direction: column; gap: 6px; }
+  .controls #zin, .controls #share { display: none; }
+  .controls .px-btn { width: 44px; height: 44px; opacity: .92; }
+  details summary, .realtime, .layers label { min-height: 44px; display: flex; align-items: center; }
+  .results button, .places button { min-height: 44px; }
+  dialog.help .close { width: 44px; height: 44px; }
+  .folded .panel { transform: none; }
+  .mbar {
+    display: grid; grid-template-columns: repeat(4, 1fr) 1fr 0.8fr; gap: 6px;
+    position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
+    padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+    background: var(--panel); border-top: 2px solid var(--edge);
+  }
+  .mbar .px-btn { min-height: 48px; font-size: .85rem; padding: 4px 2px; }
+  .card {
+    left: 0; right: 0; width: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); max-height: 55%;
+    border-width: 2px 0 0; box-shadow: 0 -4px 0 rgba(0, 0, 0, .3);
+    padding: 6px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
+    transition: transform .2s ease;
+  }
+  .card .grab { display: block; width: 44px; height: 5px; background: var(--edge); margin: 4px auto 6px; touch-action: none; }
+  .card .close { top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-height: 500px) {                /* telefon na šířku: minimapa by zabrala polovinu výšky a panel by neměl místo */
+  .minimap { display: none; }
+  .panel { max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+}
