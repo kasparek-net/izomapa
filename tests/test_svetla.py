@@ -3,7 +3,10 @@ import json
 import re
 import subprocess
 
-app = open('web/app.html', encoding='utf-8').read()
+import sys
+sys.path.insert(0, 'web')
+import sestav
+app = sestav.app('web')
 fn = re.search(r'const lightStage = .*', app).group(0)
 cases = {'út 03:00': (1, 3, 'lights_noc'), 'út 06:30': (1, 6.5, 'lights_prace'), 'út 16:30': (1, 16.5, 'lights_prace'), 'út 17:00': (1, 17, 'lights'),
          'út 20:00': (1, 20, 'lights'), 'út 23:30': (1, 23.5, 'lights_noc'), 'so 06:00': (5, 6, 'lights_noc'),

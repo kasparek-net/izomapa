@@ -34,7 +34,8 @@ class TestNajdiToBuildAndClient(unittest.TestCase):
         self.assertTrue(manifest.get('defaults', {}).get('one_attempt_only'))
 
         # Ověření, že web/app.html definuje layersReady před jeho použitím v zavaděči doplňků
-        app_html = (ROOT / 'web/app.html').read_text(encoding='utf-8')
+        sys.path.insert(0, str(ROOT / 'web')); import sestav
+        app_html = sestav.app()   # web/app.html + web/css + web/js
         self.assertIn('const layersReady = initLayers();', app_html)
 
         js = (PLUGIN_DIR / 'najdi_to.js').read_text(encoding='utf-8')

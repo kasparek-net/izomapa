@@ -5,6 +5,15 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// celá stránka jako web/sestav.py: šablona web/app.html, za <!-- @css --> a <!-- @js --> soubory z web/css a web/js podle abecedy
+function appCela() {
+  let t = fs.readFileSync(path.join(ROOT, 'web/app.html'), 'utf8');
+  for (const [z, d, p] of [['<!-- @css -->\n', 'css', '.css'], ['<!-- @js -->\n', 'js', '.js']]) {
+    const f = fs.readdirSync(path.join(ROOT, 'web', d)).filter((x) => x.endsWith(p)).sort();
+    t = t.replace(z, () => f.map((x) => fs.readFileSync(path.join(ROOT, 'web', d, x), 'utf8')).join(''));
+  }
+  return t;
+}
 
 function runScriptInContext(relPath, ctx) {
   const code = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
@@ -51,12 +60,12 @@ function makeMockElement(tag) {
 
 // 1. Kontrola syntaxe celého <script> v web/app.html (po dosazení {{...}} zástupných hodnot)
 {
-  const html = fs.readFileSync(path.join(ROOT, 'web/app.html'), 'utf8');
+  const html = appCela();
   const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>\s*$/);
   assert.ok(scriptMatch, 'web/app.html musí obsahovat hlavní <script>');
   const filled = scriptMatch[1].replace(/\{\{(\w+)\}\}/g, (_, key) => {
     if (key === 'VLAK') return JSON.stringify({ vychozi: 'regionova', linky: {} });
-    if (['HLASENI', 'VITR', 'POCASI', 'LETADLA', 'DOMU_CELEK', 'MHD', 'VANOCE'].includes(key)) return 'false';
+    if (['HLASENI', 'VITR', 'POCASI', 'LETADLA', 'PLUHY', 'NASTUPISTE', 'DOMU_CELEK', 'MHD', 'VANOCE'].includes(key)) return 'false';
     return 'null';
   });
   new vm.Script(filled, { filename: 'web/app.html' });
@@ -243,7 +252,7 @@ function makeMockElement(tag) {
 
 // 5. Test skutečného zavaděče z web/app.html: knihovny se načtou jen 1× a před skripty pluginů
 {
-  const html = fs.readFileSync(path.join(ROOT, 'web/app.html'), 'utf8');
+  const html = appCela();
   const startIdx = html.indexOf('if (OV.doplnky && Object.keys(OV.doplnky).length)');
   const endIdx = html.indexOf('})();', startIdx);
   assert.ok(startIdx > 0 && endIdx > startIdx);
@@ -300,7 +309,7 @@ function makeMockElement(tag) {
 
 // 6. Test Izomapa.onFrame, vrstev (world/sky/top), izolace ctx.save/restore a souřadných metod
 {
-  const html = fs.readFileSync(path.join(ROOT, 'web/app.html'), 'utf8');
+  const html = appCela();
   const winStart = html.indexOf('window.Izomapa = {');
   const winEnd = html.indexOf('if (OV.doplnky && Object.keys(OV.doplnky).length)');
   assert.ok(winStart > 0 && winEnd > winStart);

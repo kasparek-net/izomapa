@@ -3,6 +3,7 @@
 // /admin a /api/admin/* chrání heslo (HTTP Basic, secret ADMIN_PASSWORD: `npx wrangler secret put ADMIN_PASSWORD`).
 // Uživatelské jméno se nekontroluje. Ukládá se jen text hlášení a hash IP adresy (kvůli limitu), ne IP samotná.
 import { onRequest as flights } from '../functions/api/flights.js';
+import { onRequest as pluhy } from '../functions/api/pluhy.js';
 const json = (d, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
 
 async function sha(s) {
@@ -73,6 +74,7 @@ export default {
   async fetch(req, env) {
     const p = new URL(req.url).pathname;
     if (p === '/api/flights') return flights({ request: req });
+    if (p === '/api/pluhy') return pluhy({ request: req });
     if (p === '/api/report' && req.method === 'POST') return report(req, env);
     if (p.startsWith('/api/admin/') || p === '/admin' || p === '/admin.html') {
       if (!isAdmin(req, env)) return new Response('Přihlášení do administrace', { status: 401, headers: { 'www-authenticate': 'Basic realm="izomapa admin", charset="UTF-8"' } });

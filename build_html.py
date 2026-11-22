@@ -1,4 +1,4 @@
-"""Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap).
+"""Z web/app.html + web/css + web/js (složí web/sestav.py) a mesto.json vyrobí site/index.html (texty, meta, sitemap).
 Pokud existuje složka obce/*.json, vyrobí pro každou obec i site/index_<obec>.html a site/obce/<obec>/og.jpg."""
 import hashlib, html, json, math, os, re
 from urllib.parse import urljoin
@@ -33,7 +33,10 @@ def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=None, latlon=None):
     img.save(out, quality=85)
 
 
-SABLONA = open('web/app.html', encoding='utf-8').read()
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web'))
+import sestav
+SABLONA = sestav.app('web')   # šablona web/app.html s vloženými web/css/*.css a web/js/*.js (ze složky města)
 
 
 def ikony_a_manifest(M):
@@ -78,6 +81,8 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
         'LETADLA': 'true' if M.get('letadla', False) else 'false',
+        'PLUHY': 'true' if M.get('pluhy', False) else 'false',
+        'NASTUPISTE': 'true' if M.get('nastupiste', False) else 'false',
         'MHD': 'true' if mhd.get('gtfs') or os.path.exists('site/mhd.json') else 'false',   # mhd.json vyrábí mhd.py jen s GTFS
         'POHLED': json.dumps(pohled if isinstance(pohled, list) and len(pohled) >= 2 else None),
         'DOMU_CELEK': 'true' if M.get('domu_celek') else 'false',
@@ -94,6 +99,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
                         if M.get('zdrojovy_kod') else '',
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
+        'PLUHY_ZDROJ': ', sypače zimní údržby © <a href="https://udrzba.rsd.cz/" target="_blank" rel="noopener">ŘSD ČR</a>' if M.get('pluhy', False) else '',
         'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', False) else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                      if mhd.get('gtfs') and mhd.get('zdroj') else '',

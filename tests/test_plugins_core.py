@@ -51,7 +51,8 @@ class TestPluginsCore(unittest.TestCase):
         self.assertIn('load_and_run_plugins', overlay_py)
         self.assertIn("**({'doplnky': _doplnky} if _doplnky else {})", overlay_py)
 
-        app_html = (ROOT / 'web/app.html').read_text(encoding='utf-8')
+        sys.path.insert(0, str(ROOT / 'web')); import sestav
+        app_html = sestav.app()   # web/app.html + web/css + web/js
         for method in (
             'registerLib',
             'getLib',
