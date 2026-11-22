@@ -319,6 +319,10 @@
    ]
   }
  ],
+ "custom_bld": [
+  {"id": "stavba-nadrazi-bunka", "name": "Stavební buňka (rekonstrukce nádraží)", "h": 2.6, "r": "flat", "wc": [222, 206, 150], "rc": [200, 200, 196],
+   "poly": [[49.595573, 18.146849], [49.595624, 18.146879], [49.595631, 18.146848], [49.595581, 18.146818]]}
+ ],
  "sousedi": [
   {"nazev": "Ženklava", "url": "https://izomapa.zenklava.cz", "lat": 49.567311, "lon": 18.12148, "cil": [49.56617, 18.108728],
    "text": "Sousední izometrická mapa. Ženklava leží 4 km na jihozápad."}

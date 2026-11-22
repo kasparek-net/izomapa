@@ -134,17 +134,17 @@
  {
   "name": "Nádraží Kopřivnice",
   "lat": 49.595544, "lon": 18.147063,
-  "text": "Podle fotky z Wikimedia Commons (Dahoralka, CC BY-SA 3.0) a ortofota ČÚZK: okrové cihlové zdi, šedá střecha. Vyšší odbavovací hala model nemá.",
+  "text": "Podle fotky z Wikimedia Commons (Dahoralka, CC BY-SA 3.0) a ortofota ČÚZK: okrové cihlové zdi, šedá střecha. Vyšší odbavovací hala model nemá. Od dubna 2025 se budova rekonstruuje (Správa železnic, otevření v lednu 2027): podle fotky Města Kopřivnice ze září 2026 holé zdivo bez fasády a stavební oplocení. Po dokončení vrátit okrovou barvu wc [204, 150, 72] a smazat oplocení v assets/custom_prep.py a buňku v custom_bld.",
   "spec": {
-   "wc": [204, 150, 72], "rc": [150, 150, 150], "r": "flat", "h": 7
+   "wc": [184, 128, 100], "rc": [150, 150, 150], "r": "flat", "h": 7
   }
  },
  {
   "name": "Nádraží Kopřivnice, jižní křídlo",
   "lat": 49.595091, "lon": 18.146916,
-  "text": "Stejné podklady jako hlavní budova nádraží.",
+  "text": "Stejné podklady jako hlavní budova nádraží. Při rekonstrukci holé cihlové zdivo, po dokončení vrátit wc [204, 150, 72].",
   "spec": {
-   "wc": [204, 150, 72], "rc": [150, 150, 150], "r": "flat"
+   "wc": [176, 104, 82], "rc": [150, 150, 150], "r": "flat"
   }
  },
   {"name": "Výstavní pavilon", "lat": 49.5987, "lon": 18.145053, "text": "Skleněný pavilon s vozem Tatra. Podle článku ebeton.cz (Revitalizace centra města Kopřivnice) a ortofota ČÚZK.", "spec": {"model": "pavilon", "wc": [150, 178, 192], "rc": [128, 124, 92], "r": "flat", "h": 4, "win": 5}},
