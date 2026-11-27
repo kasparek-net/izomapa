@@ -14,7 +14,7 @@ if [ "$1" != render ]; then
   python fetch_data.py --vse                                  # Overture (OSM) + terén, místa, části obce
   [ -f assets/dmp_vysky.json ] || { python dmp_fetch.py && python dmp_vysky.py; }          # výšky budov z laseru ČÚZK
   [ -f build/les_maska.png ] || python nastroje/les.py                                     # les podle ortofota
-  [ -f assets/zabaged.json ] || { python nastroje/zabaged.py && python nastroje/pole.py; } # pole a louky
+  [ -f assets/zabaged.json ] || { python nastroje/zabaged.py && python nastroje/pole.py && python nastroje/pole_cesty.py; } # pole a louky, pole podle cest a ortofota
   [ -f assets/hriste.json ] || python nastroje/hriste.py || true                          # dětská a workoutová hřiště z OSM
 fi
 if [ "$1" != render ]; then rm -rf site/tiles site/tiles.json; fi   # celá stavba kreslí vše znovu; ./postav.sh render kreslí jen změněné čtverce

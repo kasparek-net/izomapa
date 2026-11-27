@@ -45,6 +45,7 @@
 }
 .pin.neighbor:hover::after, .pin.neighbor:focus-visible::after { background: var(--grass); }
 .pin.neighbor .pin-ico { font-size: .85em; color: var(--lamp); }
+.pin.neighbor.edge { transform: rotate(var(--rot, 0deg)) translateY(var(--ven, -62%)); transform-origin: 50% 50%; } .pin.neighbor.edge::after { display: none; }   /* cedule na hraně mapy (10-vrstvy.js) */
 .pin.neighbor:hover .pin-ico { color: var(--grass); }
 .card-neighbor-btn {
   display: block; text-align: center; font-family: var(--display); font-size: .95rem; font-weight: bold;

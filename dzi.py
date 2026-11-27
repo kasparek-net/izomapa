@@ -14,6 +14,8 @@ FMT = 'webp'        # bezztrátové WebP (o ~14 % menší než paletové PNG); '
 WORKERS = int(os.environ.get('IZO_DZI_VLAKNA', min(8, os.cpu_count() or 4)))   # souběžné kódování dlaždic
 
 
+VARIANTY = ('autumn', 'winter', 'spring', 'summer', 'lights', 'xmas_winter', 'xmas_autumn')
+
 def save(im, path):
     if FMT == 'webp': im.convert('RGBA' if im.mode in ('P', 'RGBA', 'LA') else 'RGB').save(path[:-4] + '.webp', 'WEBP', lossless=True, quality=50, method=4, exact=False)   # u bezztrátového WebP je quality jen úsilí komprese: pixely stejné, poloviční čas, soubory o ~1 % větší
     else: im.save(path, optimize=True)
@@ -171,7 +173,15 @@ if __name__ == '__main__':
             info = json.load(open('build/tiles_autumn/info.json'))
             out['base'] = {'x0': info['x0'], 'y1': info['y1'], 'mpp': info['mpp'], 'status': CHUNKS[(0, 0)]}
             out.update(built)
-        out['ver'] = time.strftime('%Y%m%d%H%M')              # verze dlaždic pro cache prohlížeče: mění se jen tady, když vzniknou nové dlaždice
+        # verze dlaždic pro cache prohlížeče: mění se jen tady, když vzniknou nové dlaždice. Každý čtverec a období má svou (d['ver']):
+        # po dílčím renderu si lidé stáhnou znovu jen změněný čtverec. Společná out['ver'] je pro náhled celé mapy a jízdní řády;
+        # vrstvy, které vlastní verzi ještě nemají, dostanou dosavadní společnou, aby jim nová společná verze nezahodila cache.
+        ver, stara = time.strftime('%Y%m%d%H%M'), out.get('ver')
+        for d in built.values(): d['ver'] = ver
+        if stara:
+            for d in [out.get(v) for v in VARIANTY] + [c.get(v) for c in out.get('chunks', {}).values() for v in VARIANTY]:
+                if isinstance(d, dict) and 'Image' in d: d.setdefault('ver', stara)
+        out['ver'] = ver
         json.dump(out, open(path + '.tmp', 'w')); os.replace(path + '.tmp', path)
     finally:
         os.close(fd); os.remove(lock)

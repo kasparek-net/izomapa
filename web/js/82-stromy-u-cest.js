@@ -64,7 +64,32 @@
         out.push([3, b.hull]);
       }
   }
-  function treeShapes(x, y, z, bb) {
+  const alfa = (A) => {                                         // pixely kresby stromů (jednou na roční období)
+    if (!A.alfa) { try { const c = document.createElement('canvas'); c.width = A.im.width; c.height = A.im.height; const g = c.getContext('2d'); g.drawImage(A.im, 0, 0); A.alfa = g.getImageData(0, 0, c.width, c.height); } catch { A.alfa = { width: 0 }; } }
+    return A.alfa;
+  };
+  // těsný obrys kresby v buňce [u0, v0, u1, v1] (pixely s alfou > 0; prázdná kresba null): buňka je kolem kresby hodně prázdná
+  // a test celé buňky posílal přes pomocné plátno i auta, kterých se strom nedotkne (v Liberci 74 % aut, s obrysem 57–62 %)
+  function obrys(A, slot) {
+    const a = alfa(A), ob = A.ob || (A.ob = []);
+    if (!a.width) return [0, 0, A.CW - 1, A.CH - 1];
+    if (ob[slot] === undefined) {
+      let u0 = A.CW, v0 = A.CH, u1 = -1, v1 = -1; const x0 = (slot % 16) * A.CW, y0 = Math.floor(slot / 16) * A.CH;
+      for (let v = 0; v < A.CH; v++) for (let u = 0; u < A.CW; u++) if (a.data[((y0 + v) * a.width + x0 + u) * 4 + 3]) { if (u < u0) u0 = u; if (u > u1) u1 = u; if (v < v0) v0 = v; if (v > v1) v1 = v; }
+      ob[slot] = u1 < 0 ? null : [u0, v0, u1, v1];
+    }
+    return ob[slot];
+  }
+  // je v bodě obrázku (ix, iy) neprůhledný pixel přesné kresby stromu q = [2, slot, L, T, k]? (kmen i koruna; chodec za ním zmizí)
+  function stromPixel(q, ix, iy) {
+    const A = STROMY[state.season]; if (!A || !A.ok) return false;
+    alfa(A);
+    const [, slot, L, T, k] = q, u = Math.floor((ix - L) / k), v = Math.floor((iy - T) / k);
+    if (u < 0 || v < 0 || u >= A.CW || v >= A.CH || !A.alfa.width) return false;
+    const px = (slot % 16) * A.CW + u, py = Math.floor(slot / 16) * A.CH + v;
+    return A.alfa.data[(py * A.alfa.width + px) * 4 + 3] > 100;
+  }
+  function treeShapes(x, y, z, bb, m = 0) {                     // m = okraj v pixelech obrázku (zaokrouhlení při kreslení)
     const dv = depth(x, y, z), out = [], cx = Math.floor(x / 16), cy = Math.floor(y / 16), A = stromy(), k0 = 0.2 / cam.mpp;
     for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const t of TG.get(i + ',' + j) || []) {   // stromy před vozidlem (k jihozápadu) až ~60 m
       const [tx, ty, tz, h, con] = t;
@@ -73,6 +98,8 @@
         const [slot, s] = treeSprite(A, t), k = k0 * s, b = toImg(tx, ty, tz);
         const L = b[0] - A.CW / 2 * k, T = b[1] - (A.CH - 3) * k;
         if (L > bb[2] || L + A.CW * k < bb[0] || T > bb[3] || T + A.CH * k < bb[1]) continue;
+        const o = obrys(A, slot);
+        if (!o || L + o[0] * k > bb[2] + m || L + (o[2] + 1) * k < bb[0] - m || T + o[1] * k > bb[3] + m || T + (o[3] + 1) * k < bb[1] - m) continue;
         out.push([2, slot, L, T, k]); continue;
       }
       if (con) {                                                                  // kresby se ještě načítají: odhad tvaru
@@ -92,7 +119,7 @@
   const occC = document.createElement('canvas'), occX = occC.getContext('2d');
   function drawBehindTrees(img, ix, iy, iw, ih, x, y, z, sx, ox, oy) {
     const X0 = Math.round(ox + ix * sx), Y0 = Math.round(oy + iy * sx), w = Math.round(iw * sx), h = Math.round(ih * sx);
-    const sh = treeShapes(x, y, z, [ix, iy, ix + iw, iy + ih]);
+    const sh = treeShapes(x, y, z, [ix, iy, ix + iw, iy + ih], 2 / sx);   // pomocné plátno je v pixelech CSS, kraje se zaokrouhlují: 2 px rezerva
     if (!sh.length) { ctx.drawImage(img, X0, Y0, w, h); return; }
     if (occC.width < w || occC.height < h) { occC.width = Math.max(occC.width, w); occC.height = Math.max(occC.height, h); }
     occX.clearRect(0, 0, w, h); occX.imageSmoothingEnabled = false; occX.globalCompositeOperation = 'source-over';

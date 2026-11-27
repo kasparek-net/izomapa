@@ -48,6 +48,7 @@ Bez AI to jde taky:
 ```sh
 ./setup.sh                          # první spuštění: Python prostředí, Node, Chromium
 .venv/bin/python novy_mesto.py "Chrastava"   # najde hranici obce a zapíše mesto.json (na Windows .venv\Scripts\python)
+.venv/bin/python novy_mesto.py "Název" --bbox 50.175,15.785,50.245,15.885 --stred 50.2054,15.8301   # obdélník místo hranice obce; (0, 0) leží ve --stred
 ./postav.sh                         # stáhne data a postaví celé město do složky site/
 npm run nahled                      # náhled na http://localhost:8000
 ```
@@ -109,12 +110,16 @@ nestahují).
 | skutečné výšky budov a tvar střech (laser ČÚZK) | příběhy míst (`mista.json`), jen když o ně požádáte |
 | les jen tam, kde opravdu je (ortofoto ČÚZK) | oprava chyb v OpenStreetMap |
 | pole s plodinou podle ročního období, louky (ZABAGED) | vlastní modely zvláštních staveb |
-| terén, voda, silnice, koleje, sjezdovky | vlastní 3D modely památek s dashboardem Před / po (`pamatky/`) |
-| mosty a lávky ve 3D s pozvolnými nájezdy, krátké podjezdy | |
-| 4 roční období, noc, déšť, sníh, mlha | |
-| auta, MHD podle jízdních řádů (GTFS), lyžaři, chodci | |
-| klikací budovy s adresou, hledání, názvy částí obce | |
+| terén, voda, silnice, koleje, sjezdovky, parkoviště podle OSM | vlastní 3D modely památek s dashboardem Před / po (`pamatky/`) |
+| mosty a lávky ve 3D s pozvolnými nájezdy, krátké podjezdy | skrytí zdvojených budov z dat (`"skryt_budovy"`) |
+| 4 roční období, noc, déšť, sníh, mlha | sousední mapy: cedule s odkazem na hraně mapy (`"sousedi"`) |
+| auta s přednostmi na kruhových objezdech, MHD podle jízdních řádů (GTFS) | |
+| chodci (v dešti s deštníky), cyklisti, lyžaři, dětská hřiště | |
+| klikací budovy s adresou, hledání, názvy částí obce a ulic | |
+| | semafory a železniční přejezdy (`nastroje/semafory.py`, `nastroje/prejezdy.py`) |
+| | skutečná letadla a živé sypače ŘSD (jen na Cloudflare, `"letadla"`, `"pluhy"`) |
 | | vánoční výzdoba: strom, kluziště, stánky, zapnutá podle data (`assets/vanoce.json`, `./vanoce.sh`) |
+| | doplňky: hra Najdeš to?, letiště s provozem malých letadel (`doplnky/`) |
 | | hlášení nepřesností od lidí s administrací (volitelný server, `hlaseni/`) |
 
 **Mosty a lávky** jsou skutečné 3D mostovky: nad silnicí nebo tratí mají podjezdnou výšku a nájezdy na ně vedou

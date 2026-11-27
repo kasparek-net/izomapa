@@ -41,6 +41,7 @@
     });
   }
   function pick(r) { r.go(); $('q').value = r.label; res = []; cur = -1; renderResults(); }
+  $('qClear').addEventListener('click', () => { const q = $('q'); q.value = ''; q.dispatchEvent(new Event('input')); q.focus(); });   // křížek v poli
   $('q').addEventListener('input', (e) => {
     const q = norm(e.target.value.trim());
     cur = -1;

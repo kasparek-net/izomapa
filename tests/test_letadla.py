@@ -32,5 +32,20 @@ class LetadlaTest(unittest.TestCase):
             self.assertIn('if (false) {', html)
             self.assertNotIn('letadla ©', html)
 
+    def test_databaze_typu_letadel(self):
+        js = (ROOT / 'web/js/87-letadla-typy.js').read_text(encoding='utf-8')
+        kat = {}
+        for radek in js.splitlines():
+            r = radek.strip()
+            if r.endswith('",') and ': "' in r:
+                k, seznam = r.rstrip(',').split(': ', 1)
+                for it in json.loads(seznam).split(','):
+                    kat[it.split(':', 1)[0]] = k
+        self.assertEqual(kat.get('G2CA'), 'heli')       # vrtulník Guimbal Cabri
+        self.assertEqual(kat.get('B738'), 'jet')
+        self.assertEqual(kat.get('C172'), 'light')
+        self.assertEqual(kat.get('AT72'), 'turbo')
+        self.assertGreater(len(kat), 2000)
+
 if __name__ == '__main__':
     unittest.main()

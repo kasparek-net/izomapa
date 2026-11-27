@@ -32,5 +32,7 @@ LIST=${2:-$(python -c "import geo; print(' '.join(f'{i},{j}' for i, j in sorted(
 mkdir -p build; : > build/render_par.log
 echo "souběžně $PAR čtverců"
 T0=$(date +%s)
+# vlákna kódování dlaždic (dzi.py): jádra se dělí mezi souběžné čtverce, ať se procesy navzájem nebrzdí (jinak 4 × 8 vláken na 12 jádrech)
+[ -n "$IZO_DZI_VLAKNA" ] || [ "$PAR" -lt 1 ] || export IZO_DZI_VLAKNA=$(python -c "import os; print(max(2, (os.cpu_count() or 4) // $PAR))")
 echo $LIST | tr ' ' '\n' | xargs -P "$PAR" -n 1 ./render_ctverec.sh
 echo "render hotov za $(( ($(date +%s) - T0) / 60 )) min" | tee -a build/render_par.log

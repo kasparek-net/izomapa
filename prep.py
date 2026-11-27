@@ -311,11 +311,14 @@ ZAB = json.load(open('assets/zabaged.json')) if os.path.exists('assets/zabaged.j
 _zb = box(-HE, -HE, HE, HE)
 _pole = set(ZAB.get('pole', []))                # travní porost, který je na ortofotu žlutohnědý = pole (tuning/pole.py)
 ZTTP = [g for i, r in enumerate(ZAB['ttp']) if i not in _pole for g in [_zpoly(r)] if g.intersects(_zb)]
-ZORNA = [g for r in ZAB['orna'] + [ZAB['ttp'][i] for i in sorted(_pole)] for g in [_zpoly(r)] if g.intersects(_zb)]
+# orna_dil: bloky rozdělené podle cest a ortofota (nastroje/pole_cesty.py), orna_plodina: plodina podle barvy na ortofotu
+_orna = ZAB['orna_dil'] if 'orna_dil' in ZAB else ZAB['orna'] + [ZAB['ttp'][i] for i in sorted(_pole)]
+_plod = ZAB.get('orna_plodina') if 'orna_dil' in ZAB else None
+ZORNA = [(g, _plod[i] if _plod else None) for i, r in enumerate(_orna) for g in [_zpoly(r)] if g.intersects(_zb)]
 ZSAD = [g for g in map(_zpoly, ZAB['sad']) if g.intersects(_zb)]
 for g in ZTTP: fill(g, C['meadow'])
 CROPS = ['wheat'] * 4 + ['rape'] * 2 + ['maize'] * 2 + ['soil'] * 2
-for g in ZORNA:
+for g, cr in ZORNA:
     # plodina a směr řádků podle celého pole (ne podle kusu v tomto čtverci), aby pole na švu čtverců navazovalo
     o = g.minimum_rotated_rectangle; oc = list(o.exterior.coords)[:4]
     e1 = np.subtract(oc[1], oc[0]); e2 = np.subtract(oc[2], oc[1])
@@ -323,7 +326,7 @@ for g in ZORNA:
     u = e1 / np.linalg.norm(e1)
     if u[0] < 0 or (u[0] == 0 and u[1] < 0): u = -u              # stejná orientace ve všech čtvercích
     v = np.array([-u[1], u[0]]); c0 = np.array(g.centroid.coords[0])
-    cr = CROPS[int(h01(wkey(c0[0] + CX, c0[1] + CY) + 'pole') * len(CROPS))]
+    cr = cr or CROPS[int(h01(wkey(c0[0], c0[1]) + 'pole') * len(CROPS))]   # wkey sám přičte CX, CY (světové souřadnice)
     for p in polys(g.intersection(DRAWBOX)):
         if p.area < 400: continue
         fill(p, C[cr])
@@ -349,12 +352,26 @@ for q in UP['paved']: fill(Polygon([to_local(lo, la) for la, lo in q]), C['paved
 
 wat = load('water')
 POTOKY = bool(geo.MESTO.get('potoky'))           # potoky (waterway=stream) jen na přání: v datech často vedou pod zemí (zatrubněné)
+def podzemni(r):                                 # zatrubněný / podzemní úsek vodního toku (OSM tunnel=culvert|yes, layer < 0)
+    st = dict(r['source_tags']) if r.get('source_tags') is not None else {}
+    try: lay = float(st.get('layer', 0))
+    except ValueError: lay = 0
+    return st.get('tunnel') in ('yes', 'culvert', 'flooded') or lay < 0
+def carkovane(g, c, w, on=3.0, off=3.0):          # přerušovaná čára (zatrubněný potok): úseky po délce celé čáry, na švech navazují
+    for l in lines(g):
+        s = 0.0
+        while s < l.length:
+            q = shapely.ops.substring(l, s, min(s + on, l.length))
+            if q.length > 0.3: line(q, c, w)
+            s += on + off
 _bld_stream_excl = shapely.unary_union([p.buffer(1.2) for g in load('building').geom for p in polys(g) if p.intersects(DRAWBOX)]) if POTOKY else shapely.geometry.GeometryCollection()
 for _, r in wat.iterrows():
     g = r.geom
     if g.geom_type in ('Polygon', 'MultiPolygon'):
         if r['class'] == 'swimming_pool': fill(g, C['pool'], outline=C['pool_edge'], block=True)
         else: fill(g, C['water'], block=True)
+    elif r['class'] in ('river', 'stream') and podzemni(r):          # pod zemí: jen tenká přerušovaná čára
+        if r['class'] == 'river' or POTOKY: carkovane(g, C['stream'], 1.6 if r['class'] == 'stream' else 2.4)
     elif r['class'] == 'river':
         line(g, C['stream'], 6, block=True)
     elif r['class'] == 'stream' and POTOKY:   # potoky (mimo půdorysy budov, kde bývají zatrubněné)
@@ -833,6 +850,7 @@ for l, w, c, n in drive_lines:
 bld = load('building')
 # jen budovy z OpenStreetMap (nebo ručně potvrzené v upresneni.json)
 bld = bld[[(s is not None and any(x['dataset'] == 'OpenStreetMap' for x in s)) or i_ in UP['b'] for s, i_ in zip(bld.sources, bld.id)]].reset_index(drop=True)
+bld = bld[~bld.id.isin(UP.get('skryt_budovy', []))].reset_index(drop=True)   # duplicitní budovy v datech (např. části kostela přes celý obrys)
 for i, r in bld.iterrows():                             # výšky z upřesnění mají přednost před daty
     if 'h' in UP['b'].get(r.id, {}): bld.at[i, 'height'] = UP['b'][r.id]['h']
     if 'floors' in UP['b'].get(r.id, {}): bld.at[i, 'num_floors'] = UP['b'][r.id]['floors']
@@ -1672,11 +1690,11 @@ for _, r in lu.iterrows():
     if s: scatter(r.geom.difference(_zopen), s, 0.25, 6, 15)
 # řídké stromy všude kromě luk, polí a pastvin (tam ve skutečnosti stromy nejsou)
 OPEN = shapely.unary_union([g for c, g in zip(lu['class'], lu.geom) if c in ('meadow', 'farmland', 'grass', 'village_green', 'downhill', 'pitch')]
-                           + [g for c, g in zip(land['class'], land.geom) if c in ('grassland', 'meadow') and g.geom_type != 'Point'] + ZTTP + ZORNA)
+                           + [g for c, g in zip(land['class'], land.geom) if c in ('grassland', 'meadow') and g.geom_type != 'Point'] + ZTTP + [g for g, _ in ZORNA])
 scatter(EXT.difference(OPEN.buffer(0)) if not OPEN.is_empty else EXT, 26, 0.3, 6, 14)
 if LESM is not None:                         # strom jen tam, kde je na ortofotu koruna; v zahradách a zástavbě pár řídkých i bez ní
     _sp = shapely.prepared.prep(shapely.unary_union(ZSAD + [r.geom for _, r in lu.iterrows() if r['class'] in ('residential', 'garden', 'allotments')]).buffer(0)
-                                  .difference(shapely.unary_union(ZORNA + ZTTP).buffer(0)))
+                                  .difference(shapely.unary_union([g for g, _ in ZORNA] + ZTTP).buffer(0)))
     def _ok(t):
         px_, py_ = pix(t[0], t[1])
         if not (0 <= px_ < TWE and 0 <= py_ < TWE) or LESM[py_, px_]: return True
@@ -2176,7 +2194,7 @@ for _, r in wat.iterrows():
     if g.geom_type in ('Polygon', 'MultiPolygon'):
         for p in polys(g):
             if p.area > 15: water_out['ponds'].append(zline(p.exterior) + ([] if r['class'] != 'swimming_pool' else []))
-    elif r['class'] == 'river' or (r['class'] == 'stream' and POTOKY):
+    elif (r['class'] == 'river' or (r['class'] == 'stream' and POTOKY)) and not podzemni(r):
         water_out['streams'] += [zline(l) for l in lines(g)]
 piste_out = []                                 # pro lyžaře v prohlížeči: vždy shora dolů
 for l in PISTE:

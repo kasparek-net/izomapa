@@ -29,8 +29,13 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(0, '127.0.0.1');   // jen z tohoto počítače, ne z celé sítě
-await new Promise((r) => server.once('listening', r));
+});
+// jen z tohoto počítače, ne z celé sítě; Chromium odmítá „nebezpečné“ porty (ERR_UNSAFE_PORT, např. 5060, 6000, 6665–6669), proto náhodný port s opakováním
+for (let pokus = 0; ; pokus++) {
+  const p = 20000 + Math.floor(Math.random() * 30000);
+  try { await new Promise((ok, ko) => { server.once('error', ko); server.listen(p, '127.0.0.1', ok); }); server.removeAllListeners('error'); break; }
+  catch (e) { if (pokus > 50) throw e; }
+}
 const port = server.address().port;
 
 // Mac: Metal, Windows: Direct3D 11, Linux: HW GPU přes EGL (pokud je v /dev/dri a WebGL není jen SW rasterizer), jinak SwiftShader
