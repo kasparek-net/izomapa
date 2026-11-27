@@ -1684,7 +1684,7 @@ for _, r in land.iterrows():
                 d += 7
 DENS = {'park': 11, 'cemetery': 9, 'residential': 16, 'garden': 12, 'grass': 20, 'village_green': 18,
         'recreation_ground': 20, 'allotments': 14, 'kindergarten': 14}
-_zopen = shapely.unary_union(ZORNA + ZTTP).buffer(0)      # residential polygons often span real fields; dark crops pass the canopy mask
+_zopen = shapely.unary_union([g for g, _ in ZORNA] + ZTTP).buffer(0)      # residential polygons often span real fields; dark crops pass the canopy mask
 for _, r in lu.iterrows():
     s = DENS.get(r['class']) or (DENS['park'] if r.id in _PARK_Z else None)
     if s: scatter(r.geom.difference(_zopen), s, 0.25, 6, 15)
