@@ -15,6 +15,7 @@
   // vjezd na kruhový objezd: auto dá přednost autům na okruhu (25 m před vjezdem nebo právě v něm)
   function yieldZ(r, y) {
     const e = y[0] < 1 ? r.w[0] : r.w[r.w.length - 1], z = [y[0]];
+    z.t = y[0] < 1 ? -1 : 1;                // jen pro směr k okruhu: auto vyjíždějící z okruhu by jinak čekalo samo na sebe a zablokovalo okruh
     z.rb = { k: y[1].toFixed(0) + ',' + y[2].toFixed(0), cx: y[1], cy: y[2], R: y[3], an: Math.atan2(e[1] - y[2], e[0] - y[1]) };
     return z;
   }
@@ -383,8 +384,16 @@
       }
     }
     const fronta = {};                                     // víc vozů na téže konečné: kdo odjíždí později, stojí za ním (a[3] = pořadí)
+    // autobus na konečné jen poslední 3 minuty před odjezdem a nejvýš jeden na stanovišti (jinak na velké konečné vzniklo „hnízdo
+    // autobusů“); ostatní čekají mimo mapu (odstavná plocha, pauza řidiče). Tramvaje beze změny, mají vlastní odstavné koleje.
+    const BUS_CEKA = 180, stan = new Set();
+    for (let k = out.length - 1; k >= 0; k--) { const a = out[k]; if (a[2] && MHD.routes[MHD.trips[a[0]][0]][1] === 3 && a[2] > BUS_CEKA) out.splice(k, 1); }
+    for (const a of out.filter((q) => q[2] && MHD.routes[MHD.trips[q[0]][0]][1] === 3).sort((p, q) => p[2] - q[2])) {
+      const w0 = MHD.shapes[MHD.trips[a[0]][1]].w[0], k = `${Math.round(w0[0] / 4)}_${Math.round(w0[1] / 4)}`;
+      if (stan.has(k)) out.splice(out.indexOf(a), 1); else stan.add(k);
+    }
     for (const a of out.filter((q) => q[2]).sort((p, q) => p[2] - q[2])) {
-      const t = MHD.trips[a[0]], k = `${MHD.routes[t[0]][1]}_${t[6][0]}`;
+      const t = MHD.trips[a[0]], w0 = MHD.shapes[t[1]].w[0], k = `${MHD.routes[t[0]][1]}_${Math.round(w0[0] / 4)}_${Math.round(w0[1] / 4)}`;   // fronta po stanovištích (začátek trasy), ne po názvu zastávky
       a[3] = fronta[k] = (fronta[k] ?? -1) + 1;
     }
     return out;
@@ -464,17 +473,41 @@
   function mhdPos(trip, el, T = 0, off = 0) {                              // kde na trase je spoj el sekund po výjezdu
     const q = trip[4]; let i = 2; while (i < q.length - 2 && q[i] < el) i += 2;
     const f = Math.max(0, Math.min(1, (el - q[i - 2]) / ((q[i] - q[i - 2]) || 1)));
-    const sh = MHD.shapes[trip[1]], L = sh.len, s0 = Math.min(sh.L, q[i - 1] + (q[i + 1] - q[i - 1]) * f), s = Math.max(0, Math.min(sh.L, Math.max(T / 2, Math.min(sh.L - T / 2, s0)) + off));   // T: délka vlaku, off: článek od středu
+    const sh = MHD.shapes[trip[1]], s0 = Math.min(sh.L, q[i - 1] + (q[i + 1] - q[i - 1]) * f), s = Math.max(0, Math.min(sh.L, Math.max(T / 2, Math.min(sh.L - T / 2, s0)) + off));   // T: délka vlaku, off: článek od středu
+    return shapePos(sh, s);
+  }
+  // poloha a směr vozu v metru s trasy. Směr z bodů před a za vozidlem: trasy z GTFS mívají u zastávek krátké zalomené úseky
+  // a „ostruhy“ k označníku (pár metrů tam a zpět). Na ostruze leží oba body ±4 m na ní a vůz by se stočil napříč, proto když body
+  // nejsou aspoň na 80 % délky úseku od sebe (ostrý obrat), okno se zvětší na ±13 m a ±22 m – za kořen ostruhy. Na začátku a konci
+  // trasy se počítá jen skutečná délka úseku (jinak by na konečné stál vůz šejdrem). Na rovné trase zůstane ±4 m.
+  function shapePos(sh, s) {
+    const L = sh.len;
     const at = (s) => {
       let k = 1; while (k < L.length - 1 && L[k] < s) k++;
       const a = sh.w[k - 1], b = sh.w[k], u = Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));
       return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
     };
-    // směr z bodů 4 m před a za vozidlem: trasy z GTFS mívají u zastávek krátké zalomené úseky, podle kterých by se vůz stočil napříč
-    const [x, y] = at(s), p0 = at(Math.max(0, s - 4)), p1 = at(Math.min(sh.L, s + 4)), dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+    const [x, y] = at(s);
+    let p0, p1, dx, dy;
+    for (const w of [4, 13, 22]) {
+      const sa = Math.max(0, s - w), sb = Math.min(sh.L, s + w);
+      p0 = at(sa); p1 = at(sb); dx = p1[0] - p0[0]; dy = p1[1] - p0[1];
+      if (dx * dx + dy * dy > (0.8 * (sb - sa)) ** 2) break;
+    }
     const h = deckZ(x, y, dx, dy) ?? gz(x, y), [ix, iy] = toImg(x, y, h);
     return { x, y, z: h, ix, iy, dx, dy, dirSign: 1 };   // z: autobus, tramvaj a vlak na mostě ve výšce mostovky
   }
+  // fronta na konečné: trasa, po které vozy linky na konečnou přijíždějí (spoj stejné linky, který končí v první zastávce tohoto spoje)
+  const PRIJEZD = new Map();
+  function prijezdSh(trip) {
+    const z0 = trip[6][0], key = trip[0] + '|' + z0;
+    if (PRIJEZD.has(key)) return PRIJEZD.get(key);
+    let sh = null;
+    for (const t of MHD.trips) { const z = t[6]; if (z[z.length - 2] === z0 && t[0] === trip[0]) { sh = MHD.shapes[t[1]]; break; } }
+    if (!sh) for (const t of MHD.trips) { const z = t[6]; if (z[z.length - 2] === z0) { sh = MHD.shapes[t[1]]; break; } }
+    PRIJEZD.set(key, sh); return sh;
+  }
+
   function stepShuttle(b, dt, stopWait, endWait) {
     if (b.wait > 0) { b.wait -= dt; return; }
     const prev = b.s; b.s += b.v * dt * b.dir;

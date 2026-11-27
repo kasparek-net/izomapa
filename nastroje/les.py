@@ -14,7 +14,7 @@ for ty in range(0, H, T):
     for tx in range(0, W, T):
         w, h = min(T, W - tx), min(T, H - ty)
         lo0, la1 = geo.to_lonlat(X0 + tx * M, Y1 - ty * M); lo1, la0 = geo.to_lonlat(X0 + (tx + w) * M, Y1 - (ty + h) * M)
-        f = f'{D}{tx}_{ty}.jpg'
+        f = f'{D}{round(X0 + tx * M)}_{round(Y1 - ty * M)}_{w}x{h}.jpg'   # podle polohy: po změně rozsahu mapy se nevezme stará dlaždice
         if not os.path.exists(f):
             subprocess.run(['curl', '-s', '-m', '120', '-o', f, 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0'
                             f'&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:4326&BBOX={la0},{lo0},{la1},{lo1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/jpeg'], check=True)

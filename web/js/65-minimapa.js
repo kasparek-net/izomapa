@@ -6,7 +6,7 @@
       const d = l.src(state.season); if (!d) continue;
       const w = +d.Image.Size.Width, h = +d.Image.Size.Height;
       const maxl = Math.ceil(Math.log2(Math.max(w, h))), k = Math.ceil(Math.log2(w / 440));
-      const img = new Image(); img.onload = () => { miniImgs[l.key] = img; }; img.src = d.Image.Url + `${maxl - k}/0_0.${d.Image.Format || "png"}${VER}`;
+      const img = new Image(); img.onload = () => { miniImgs[l.key] = img; }; img.src = d.Image.Url + `${maxl - k}/0_0.${d.Image.Format || "png"}${verOf(d.Image.Url)}`;
       l.hrel = h / w;
     }
   }

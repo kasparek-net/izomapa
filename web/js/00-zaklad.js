@@ -1,4 +1,8 @@
 (async () => {
+  // zelený rámeček fokusu jen při ovládání klávesnicí (iPhone ho jinak ukazuje na × každého otevřeného okna)
+  document.documentElement.classList.add('ukazatel');
+  addEventListener('pointerdown', () => document.documentElement.classList.add('ukazatel'), { capture: true, passive: true });
+  addEventListener('keydown', (e) => { if (e.key === 'Tab') document.documentElement.classList.remove('ukazatel'); }, { capture: true });
 
   const [TILES, OV] = await Promise.all([fetch('tiles.json').then((r) => r.json()), fetch('overlay.json').then((r) => r.json())]);
   // real wind for chimney smoke; the map camera looks from the south-west, so east is right and up, north is left and up

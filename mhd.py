@@ -40,11 +40,18 @@ if 'shapes.txt' in zf.namelist():
     pts = {}
     for r in T('shapes'):
         if r['shape_id'] in used: pts.setdefault(r['shape_id'], []).append((int(r['shape_pt_sequence']), float(r['shape_pt_lon']), float(r['shape_pt_lat']), float(r['shape_dist_traveled'] or 0)))
+    # autobusové trasy na silnici (nastroje/trasy_na_silnici.py): tvary dopravce vedou k zastávkám na chodník a kousek vedle osy
+    BUS = {t['shape_id'] for t in trips if KIND(int(RT[t['route_id']]['route_type'] or 3)) == 3}
+    SIL = None
+    if BUS and os.path.exists('data_all/segment.parquet'):
+        from nastroje.trasy_na_silnici import ze_segmentu
+        SIL = ze_segmentu('data_all/segment.parquet')
     for k, v in pts.items():
         if len(v) < 2: continue
         v.sort(); x, y = to_local([p[1] for p in v], [p[2] for p in v])
         l = shapely.LineString(list(zip(x, y)))
         if not l.intersects(AREA): continue                      # trasa mimo mapu
+        if SIL and k in BUS: l = shapely.LineString(SIL.uprav(list(l.coords)))
         SI[k] = len(shapes); SLEN[k] = (l.length, v[-1][3] or 1.0)
         shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(l, 1.0).coords])
     trips = [t for t in trips if t['shape_id'] in SI]

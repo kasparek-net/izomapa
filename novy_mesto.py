@@ -3,6 +3,8 @@
 python novy_mesto.py "Chrastava"                 # hranice obce z OpenStreetMap (Nominatim)
 python novy_mesto.py "Chrastava" --max 4         # jen 4 čtverce nejblíž středu (rychlý první pokus)
 python novy_mesto.py "Praha 6" --dotaz "Praha 6, Česko"
+python novy_mesto.py "Hradec Králové" --bbox 50.175,15.785,50.245,15.885 --stred 50.20539,15.83009 [--max 1]
+                                                 # obdélník místo hranice obce, (0, 0) se středem --stred
 python novy_mesto.py "Chrastava" --detailni      # detailní rozlišení 0,1 m/px (jinak základní 0,2 m/px), viz README
 
 Vypíše počet čtverců a odhad velikosti webu pro základní i detailní rozlišení. Rozlišení jde změnit i později
@@ -32,50 +34,68 @@ def get(url):
     return subprocess.run(['curl', '-sSfL', '--retry', '5', '--retry-all-errors', '-m', '120', '-A', UA['User-Agent'], url], check=True, capture_output=True).stdout
 
 
-# 1) hranice obce
-q = urllib.parse.urlencode({'q': DOTAZ, 'format': 'json', 'polygon_geojson': 1, 'limit': 8, 'countrycodes': 'cz'})
-res = json.loads(get('https://nominatim.openstreetmap.org/search?' + q))
-res = [r for r in res if r.get('geojson', {}).get('type') in ('Polygon', 'MultiPolygon')]
-if not res: sys.exit(f'Hranici „{DOTAZ}“ jsem nenašel. Zkus --dotaz s přesnějším názvem obce.')
-res.sort(key=lambda r: (r.get('class') != 'boundary', -float(r.get('importance') or 0)))
-hit = res[0]
-area_ll = shapely.geometry.shape(hit['geojson'])
-print('obec:', hit['display_name'])
-
-# 2) lokální metry kolem těžiště
-c = area_ll.centroid
-KX, KY = math.cos(math.radians(c.y)) * 111320.0, 110574.0
-loc = shapely.transform(area_ll, lambda p: np.column_stack(((p[:, 0] - c.x) * KX, (p[:, 1] - c.y) * KY)))
-print(f'rozloha {loc.area / 1e6:.1f} km²')
-
-
-def grid(ox, oy):
-    """čtverce (i, j) s posunem mřížky (ox, oy), které pokrývají obec aspoň z 5 % své plochy"""
-    x0, y0, x1, y1 = loc.bounds; S = 2 * HALF; out = []
-    for i in range(math.floor((x0 - ox + HALF) / S), math.floor((x1 - ox + HALF) / S) + 1):
-        for j in range(math.floor((y0 - oy + HALF) / S), math.floor((y1 - oy + HALF) / S) + 1):
-            sq = shapely.box(ox + i * S - HALF, oy + j * S - HALF, ox + i * S + HALF, oy + j * S + HALF)
-            if loc.intersection(sq).area >= 0.05 * S * S: out.append((i, j))
-    return out
-
-
-best = None
-for ox in np.linspace(-HALF, HALF, 9)[:-1]:
-    for oy in np.linspace(-HALF, HALF, 9)[:-1]:
-        g = grid(ox, oy)
-        if g and (best is None or len(g) < len(best[2])): best = (ox, oy, g)
-ox, oy, cells = best
-# čtverec (0, 0) = ten se středem obce (bod obce z OpenStreetMap, obvykle náměstí), jinak ten s největším územím
 S = 2 * HALF
-cover = lambda ij: loc.intersection(shapely.box(ox + ij[0] * S - HALF, oy + ij[1] * S - HALF, ox + ij[0] * S + HALF, oy + ij[1] * S + HALF)).area
-px_, py_ = (float(hit['lon']) - c.x) * KX, (float(hit['lat']) - c.y) * KY
-home = (math.floor((px_ - ox + HALF) / S), math.floor((py_ - oy + HALF) / S))
-i0, j0 = home if home in cells else max(cells, key=cover)
-cells = [(i - i0, j - j0) for i, j in cells]
-cx, cy = ox + i0 * S, oy + j0 * S
-if MAX: cells = sorted(cells, key=lambda ij: (ij[0] ** 2 + ij[1] ** 2, ij))[:MAX]
-lon0, lat0 = c.x + cx / KX, c.y + cy / KY
-print('čtverců', len(cells), cells)
+BBOX = opt('--bbox')            # lat0,lon0,lat1,lon1: mapa z obdélníku místo hranice obce
+if BBOX:
+    # Střed čtverce (0, 0) je --stred lat,lon (výchozí: střed obdélníku). Mřížka se nehledá, do mapy patří každý čtverec,
+    # který obdélník protíná. Hodí se, když má pilotní výřez ležet v (0, 0) a celé město později na stejné mřížce.
+    la0_, lo0_, la1_, lo1_ = map(float, BBOX.split(','))
+    st_ = opt('--stred')
+    sla, slo = map(float, st_.split(',')) if st_ else ((la0_ + la1_) / 2, (lo0_ + lo1_) / 2)
+    c = shapely.Point(slo, sla)
+    KX, KY = math.cos(math.radians(c.y)) * 111320.0, 110574.0
+    bx0, by0, bx1, by1 = (lo0_ - c.x) * KX, (la0_ - c.y) * KY, (lo1_ - c.x) * KX, (la1_ - c.y) * KY
+    cells = [(i, j) for i in range(math.floor((bx0 + HALF) / S), math.floor((bx1 + HALF) / S) + 1)
+             for j in range(math.floor((by0 + HALF) / S), math.floor((by1 + HALF) / S) + 1)]
+    if not (la0_ <= sla <= la1_ and lo0_ <= slo <= lo1_): sys.exit('--stred musí ležet uvnitř --bbox')
+    cx = cy = 0.0
+    if MAX: cells = sorted(cells, key=lambda ij: (ij[0] ** 2 + ij[1] ** 2, ij))[:MAX]
+    lon0, lat0 = c.x, c.y
+    print(f'obdélník {bx1 - bx0:.0f} × {by1 - by0:.0f} m, čtverců', len(cells), cells)
+else:
+    # 1) hranice obce
+    q = urllib.parse.urlencode({'q': DOTAZ, 'format': 'json', 'polygon_geojson': 1, 'limit': 8, 'countrycodes': 'cz'})
+    res = json.loads(get('https://nominatim.openstreetmap.org/search?' + q))
+    res = [r for r in res if r.get('geojson', {}).get('type') in ('Polygon', 'MultiPolygon')]
+    if not res: sys.exit(f'Hranici „{DOTAZ}“ jsem nenašel. Zkus --dotaz s přesnějším názvem obce.')
+    res.sort(key=lambda r: (r.get('class') != 'boundary', -float(r.get('importance') or 0)))
+    hit = res[0]
+    area_ll = shapely.geometry.shape(hit['geojson'])
+    print('obec:', hit['display_name'])
+
+    # 2) lokální metry kolem těžiště
+    c = area_ll.centroid
+    KX, KY = math.cos(math.radians(c.y)) * 111320.0, 110574.0
+    loc = shapely.transform(area_ll, lambda p: np.column_stack(((p[:, 0] - c.x) * KX, (p[:, 1] - c.y) * KY)))
+    print(f'rozloha {loc.area / 1e6:.1f} km²')
+
+
+    def grid(ox, oy):
+        """čtverce (i, j) s posunem mřížky (ox, oy), které pokrývají obec aspoň z 5 % své plochy"""
+        x0, y0, x1, y1 = loc.bounds; S = 2 * HALF; out = []
+        for i in range(math.floor((x0 - ox + HALF) / S), math.floor((x1 - ox + HALF) / S) + 1):
+            for j in range(math.floor((y0 - oy + HALF) / S), math.floor((y1 - oy + HALF) / S) + 1):
+                sq = shapely.box(ox + i * S - HALF, oy + j * S - HALF, ox + i * S + HALF, oy + j * S + HALF)
+                if loc.intersection(sq).area >= 0.05 * S * S: out.append((i, j))
+        return out
+
+
+    best = None
+    for ox in np.linspace(-HALF, HALF, 9)[:-1]:
+        for oy in np.linspace(-HALF, HALF, 9)[:-1]:
+            g = grid(ox, oy)
+            if g and (best is None or len(g) < len(best[2])): best = (ox, oy, g)
+    ox, oy, cells = best
+    # čtverec (0, 0) = ten se středem obce (bod obce z OpenStreetMap, obvykle náměstí), jinak ten s největším územím
+    cover = lambda ij: loc.intersection(shapely.box(ox + ij[0] * S - HALF, oy + ij[1] * S - HALF, ox + ij[0] * S + HALF, oy + ij[1] * S + HALF)).area
+    px_, py_ = (float(hit['lon']) - c.x) * KX, (float(hit['lat']) - c.y) * KY
+    home = (math.floor((px_ - ox + HALF) / S), math.floor((py_ - oy + HALF) / S))
+    i0, j0 = home if home in cells else max(cells, key=cover)
+    cells = [(i - i0, j - j0) for i, j in cells]
+    cx, cy = ox + i0 * S, oy + j0 * S
+    if MAX: cells = sorted(cells, key=lambda ij: (ij[0] ** 2 + ij[1] ** 2, ij))[:MAX]
+    lon0, lat0 = c.x + cx / KX, c.y + cy / KY
+    print('čtverců', len(cells), cells)
 # odhad velikosti webu (site/) podle vyzkoušených map: čtverec v 0,2 m/px má se všemi obdobími a nocí 80 MB (venkov)
 # až 230 MB (hustá zástavba) a ~450 souborů; detailní 0,1 m/px je ~2,7× větší a má ~3× víc souborů
 n = len(cells); gb = lambda mb: f'{mb / 1000:.1f} GB'.replace('.', ',') if mb >= 1000 else f'{mb:.0f} MB'

@@ -62,12 +62,21 @@ button { font: inherit; color: inherit; }
 .px-btn[aria-pressed="true"] { background: var(--tile); border-color: #e27a5c; }
 .px-btn:disabled { opacity: .4; cursor: not-allowed; }
 :focus-visible { outline: 2px solid var(--grass); outline-offset: 2px; }
+html.ukazatel :focus-visible { outline: none; }   /* prst nebo myš: bez zeleného rámečku (okno po otevření zaměří ×); po Tabu se vrátí */
 
 .search input {
   width: 100%; box-sizing: border-box; padding: 8px 10px; background: var(--panel-2); color: var(--ink);
   border: 2px solid var(--edge); font: inherit; font-size: .95rem;
 }
 .search input::placeholder { color: var(--muted); }
+/* křížek na vymazání hledání: vidět, kdykoli je v poli text (i po výběru výsledku); systémový křížek Safari/Chrome schovaný, ať nejsou dva */
+.q-wrap { position: relative; }
+.search input { padding-right: 36px; }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.q-x { all: unset; box-sizing: border-box; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px;
+  display: grid; place-items: center; cursor: pointer; color: var(--muted); font-size: 1.15rem; line-height: 1; }
+.q-x:hover, .q-x:focus-visible { color: var(--ink); }
+#q:placeholder-shown + .q-x { display: none; }
 .results { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 1px; }
 .results button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 6px 8px; display: flex; justify-content: space-between; gap: 8px; font-size: .9rem; }
 .results button:hover, .results button.on, .results button:focus-visible { background: var(--panel-2); outline: 1px solid var(--edge); }

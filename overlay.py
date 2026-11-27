@@ -24,6 +24,10 @@ def px(x, y, h):
     return round(float(a), 1), round(float(b), 1), round(float(d), 1)
 
 
+# ulice s popiskem na mapě: třída OSM -> přednost (0 hlavní silnice, 1 třídy, 2 sběrné, 3 obytné: jen víc zblízka); evidenční čísla silnic („14H-009..2“) ne
+ULICE_TRIDY = {'trunk': 0, 'primary': 0, 'secondary': 1, 'tertiary': 2, 'residential': 3, 'unclassified': 3, 'living_street': 3}
+import re
+ULICE_KOD = re.compile(r'\d-\d|\.\.')
 def chunk_of(x, y):
     """index čtverce pro bod ve společných souřadnicích"""
     return (int(np.floor((x + HALF) / (2 * HALF))), int(np.floor((y + HALF) / (2 * HALF))))
@@ -228,6 +232,20 @@ for chunk in chunks:
                        **({'o': r['o']} if r.get('o') else {}), **({'l': r['l']} if r.get('l') else {}), **({'z': r['z']} if r.get('z') else {}), **({'j': [[q[0], q[1] + OFF[0], q[2] + OFF[1]] for q in r['j']]} if r.get('j') else {}), **({'v': r['v']} if r.get('v') else {}), **({'t': r['t']} if r.get('t') else {}), **({'x': 1} if r.get('x') else {}),
                        **({'rb': [r['rb'][0] + OFF[0], r['rb'][1] + OFF[1], r['rb'][2]]} if r.get('rb') else {}), **({'y': [[q[0], q[1] + OFF[0], q[2] + OFF[1], q[3]] for q in r['y']]} if r.get('y') else {})})
 
+    # názvy ulic na mapě (web/js/87-nazvy-ulic.js): úseky se stejným názvem spojené do os, svět [x, y] po metrech
+    _ul = {}
+    for r in src['roads']:
+        n_ = r.get('n')
+        if r['c'] in ULICE_TRIDY and n_ and not ULICE_KOD.search(n_) and len(r['p']) > 1:
+            u_ = _ul.setdefault(n_, [9, []]); u_[0] = min(u_[0], ULICE_TRIDY[r['c']])
+            u_[1].append(shapely.geometry.LineString([(x, y) for x, y, _ in r['p']]))
+    ulice = []
+    for n_, (pr_, ls_) in sorted(_ul.items()):
+        g_ = shapely.ops.linemerge(shapely.geometry.MultiLineString(ls_))
+        for l_ in getattr(g_, 'geoms', [g_]):
+            if l_.length >= 60:                    # krátké kousky (konec ulice u hranice čtverce) popisek neunesou
+                ulice.append([n_, pr_, [v for x, y in l_.simplify(2).coords for v in (round(x + OFF[0]), round(y + OFF[1]))]])
+
     gs = np.array(src['ground_small'])[::2, ::2]     # 41 × 41 stačí na dopravu a klikání
     grounds.append({'cx': OFF[0], 'cy': OFF[1], 'g': [[round(v, 1) for v in row] for row in gs.tolist()]})
     streets += [{'name': s['name'], 'k': K, 'xy': list(px(s['x'], s['y'], s['z'])[:2])} for s in src['streets']]
@@ -272,7 +290,7 @@ for chunk in chunks:
                     ta, tb, _ = px(t[0], t[1], t[2] + h_ * 0.62); ra, rb, _ = px(t[0] + r_, t[1], t[2] + h_ * 0.62)
                     if (a_ - ta) ** 2 + (b_ - tb) ** 2 < (ra - ta) ** 2 + (rb - tb) ** 2: skryta = True; break
             if not skryta: svicky.append([round(a_), round(b_), round(u, 3)])
-    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees, 'svicky': svicky, **walk_of(chunk)}
+    per_chunk[K] = {'buildings': buildings, 'chimneys': chimneys, 'roads': roads, 'water': water.pop(K), 'pistes': pistes, 'trees': vtrees, 'svicky': svicky, 'ulice': ulice, **walk_of(chunk)}
 
 
 
@@ -295,6 +313,7 @@ elif os.path.exists('sousedi.json'):
 for o in OBCE:
     for s in (o.get('sousedi') or o.get('neighbors') or []):
         SOUS_RAW.append({**s, 'obec': s.get('obec') or o.get('nazev')})
+OFF = (0.0, 0.0)        # dál už společné souřadnice (místa, sousedé, čtvrti, strom): bez posunu posledního čtverce
 def gz(x, y):
     for gr in grounds:
         lx, ly = x - gr['cx'], y - gr['cy']

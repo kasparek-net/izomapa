@@ -23,9 +23,14 @@
     ...(SLOW ? { minPixelRatio: 1.2, immediateRender: true, imageLoaderLimit: 4 } : { minPixelRatio: 0.6 }),
     gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true }, gestureSettingsTouch: { pinchRotate: false }, gestureSettingsPen: { clickToZoom: false, dblClickToZoom: true },
   });
-  // verze dlaždic v adrese: dlaždice se cachují na rok, nové nasazení změní verzi (tiles.json se ověřuje vždy)
+  // verze dlaždic v adrese: dlaždice se cachují na rok, nový render změní verzi svého čtverce (tiles.json se ověřuje vždy).
+  // Každý čtverec a období má vlastní verzi (d.ver, zapisuje dzi.py): po přerenderu jednoho čtverce si lidé stáhnou znovu jen ten.
+  // VER = společná verze (náhled celé mapy, jízdní řády, starší tiles.json bez verzí po čtvercích)
   const VER = TILES.ver ? `?v=${TILES.ver}` : '';
-  viewer.world.addHandler('add-item', (e) => { if (e.item.source && e.item.source.tilesUrl !== undefined) e.item.source.queryParams = VER; });
+  const verDl = new Map();                               // adresa vrstvy (Image.Url) -> verze
+  for (const d of [TILES, ...Object.values(TILES.chunks || {})].flatMap((c) => Object.values(c))) if (d && d.Image && d.ver) verDl.set(d.Image.Url, `?v=${d.ver}`);
+  const verOf = (url) => verDl.get(url) || VER;
+  viewer.world.addHandler('add-item', (e) => { const s = e.item.source; if (s && s.tilesUrl !== undefined) s.queryParams = verOf(s.tilesUrl); });
   const solid = (r, g, b) => { const c = document.createElement('canvas'); c.width = c.height = 2; const x = c.getContext('2d'); x.fillStyle = `rgb(${r},${g},${b})`; x.fillRect(0, 0, 2, 2); return c.toDataURL(); };
   let warmItem = null, darkItem = null, ready = false;
   const add = (opts) => new Promise((res) => viewer.addTiledImage({ ...opts, success: (e) => res(e.item), error: () => res(null) }));
@@ -153,7 +158,27 @@
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); upd(); });
       el.addEventListener('click', (e) => { e.stopPropagation(); upd(); });
       n.el = el;
-      viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(n.xy[0] / W, n.xy[1] / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
+      // cedule na nejbližší vnější hraně mapy, natočená podél ní a vysunutá ven do prázdné plochy (nezakryje názvy obcí při žádném přiblížení)
+      let [ix, iy] = n.xy;
+      if (Number.isFinite(n.lat) && Number.isFinite(n.lon) && cam.grounds.length) {
+        const G = cam.grounds, H_ = cam.half, cl = (v, a, b) => Math.min(b, Math.max(a, v));
+        let x = (n.lon - cam.lon0) * cam.kx, y = (n.lat - cam.lat0) * cam.ky;
+        const g = G.reduce((a, q) => (Math.hypot(x - q.cx, y - q.cy) < Math.hypot(x - a.cx, y - a.cy) ? q : a));   // čtverec nejblíž bodu
+        const has = (dx, dy) => G.some((q) => Math.abs(q.cx - g.cx - dx * 2 * H_) < 1 && Math.abs(q.cy - g.cy - dy * 2 * H_) < 1);
+        x = cl(x, g.cx - H_, g.cx + H_); y = cl(y, g.cy - H_, g.cy + H_);
+        const hrany = [[g.cy + H_ - y, 'n', has(0, 1)], [y - g.cy + H_, 's', has(0, -1)], [x - g.cx + H_, 'w', has(-1, 0)], [g.cx + H_ - x, 'e', has(1, 0)]]
+          .filter((h) => !h[2]).sort((a, b) => a[0] - b[0]);   // jen hrany, za kterými už mapa není
+        if (hrany.length) {
+          const hr = hrany[0][1]; if (hr === 'n') y = g.cy + H_; else if (hr === 's') y = g.cy - H_; else if (hr === 'w') x = g.cx - H_; else x = g.cx + H_;
+          const z = gz(x, y), dirx = hr === 'n' || hr === 's', [jx, jy] = toImg(x + (dirx ? 50 : 0), y + (dirx ? 0 : 50), z);
+          [ix, iy] = toImg(x, y, z);
+          let rot = Math.atan2(jy - iy, jx - ix) * 180 / Math.PI; if (rot > 90) rot -= 180; if (rot < -90) rot += 180;   // text vždy zleva doprava
+          const ven = toImg(x + (hr === 'e' ? 50 : hr === 'w' ? -50 : 0), y + (hr === 'n' ? 50 : hr === 's' ? -50 : 0), z);
+          const nahoru = ((ven[0] - ix) * Math.sin(rot * Math.PI / 180) - (ven[1] - iy) * Math.cos(rot * Math.PI / 180)) > 0;   // je „ven“ nad textem?
+          el.classList.add('edge'); el.style.setProperty('--rot', rot.toFixed(1) + 'deg'); el.style.setProperty('--ven', nahoru ? '-62%' : '62%');
+        }
+      }
+      viewer.addOverlay({ element: el, location: new OpenSeadragon.Point(ix / W, iy / W), placement: OpenSeadragon.Placement.CENTER, checkResize: false });
     }
     ready = true; applyVisibility(); applyTime(); loadMini(); tickReal();
     viewer.viewport.fitBounds(homeBounds(), true);
