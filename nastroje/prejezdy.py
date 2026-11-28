@@ -29,7 +29,7 @@ if __name__ == '__main__':
     lo0, la0 = geo.to_lonlat(x0, y0); lo1, la1 = geo.to_lonlat(x1, y1); b = f'{la0},{lo0},{la1},{lo1}'
     q = f'[out:json][timeout:60];node["railway"="level_crossing"]({b});out;'
     t = subprocess.run(['curl', '-s', '-f', '-m', '120', '-A', 'izomapa-tools/1.0', '--data-urlencode', f'data={q}', 'https://overpass-api.de/api/interpreter'],
-                       check=True, capture_output=True, text=True).stdout
+                       check=True, capture_output=True, text=True, encoding='utf-8').stdout
     uzly = sorted({(e['lat'], e['lon']) for e in json.loads(t)['elements']})
     json.dump([[la, lo] for la, lo in uzly], open('assets/prejezdy.json', 'w'))
     print('přejezdů', len(uzly))

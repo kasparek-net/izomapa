@@ -49,7 +49,7 @@
     if (!addrLoad) { loadAddr().then(() => e.target.dispatchEvent(new Event('input'))); }
     const pool = index.filter((r) => shown(r.k)), seenL = new Set();
     const starts = pool.filter((r) => r.n.startsWith(q)), inside = pool.filter((r) => !r.n.startsWith(q) && r.n.includes(q));
-    const order = { 'místo': 0, 'zastávka': 0.5, budova: 1, ulice: 2, adresa: 3 };
+    const order = { 'místo': 0, soused: 0.2, 'zastávka': 0.5, budova: 1, ulice: 2, adresa: 3 };
     res = [...starts, ...inside].filter((r) => !seenL.has(r.kind + r.label) && seenL.add(r.kind + r.label)).sort((a, b) => (a.n.startsWith(q) === b.n.startsWith(q) ? order[a.kind] - order[b.kind] : 0)).slice(0, 8);
     renderResults();
   });

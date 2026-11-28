@@ -158,13 +158,13 @@ if __name__ == '__main__':
     built = {v: build(v, chunk) if chunk else build(v) for v in variants}
     # souběžný render (render_par.sh): tiles.json se načte a zapíše až pod zámkem, ať si čtverce nepřepíšou záznamy.
     # Zámek je soubor vytvořený s O_EXCL (funguje i na Windows); po pádu jiného běhu se starý zámek po 2 minutách smaže.
-    os.makedirs('build', exist_ok=True); lock = 'build/tiles_json.lock'; t0 = time.time()
+    os.makedirs('build', exist_ok=True); lock = 'build/tiles_json.lock'
     while True:
         try: fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY); break
         except FileExistsError:
-            if time.time() - t0 > 120:
-                try: os.remove(lock)
-                except FileNotFoundError: pass
+            try:   # stáří podle souboru zámku, ne podle začátku čekání (jinak by se mazal i zámek, který mezitím vzal jiný běh)
+                if time.time() - os.path.getmtime(lock) > 120: os.remove(lock)
+            except FileNotFoundError: pass
             time.sleep(0.2)
     try:
         out = json.load(open(path)) if os.path.exists(path) else {}

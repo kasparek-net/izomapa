@@ -1,9 +1,10 @@
 # barvy střech z ortofota ČÚZK (CC BY 4.0): stáhne snímky po 0,4 m/px a pro každou budovu spočítá barvu střechy
 # -> build/orto04/ (dlaždice), assets/strechy_orto.json (id budovy -> [r, g, b]); prep.py ji použije místo náhodné barvy
 # spouštět z kořene repa: python nastroje/strechy.py   (stahuje se jednou, po přerušení pokračuje)
-import glob, json, os, subprocess, sys; sys.path.insert(0, '.')
+import glob, json, os, sys; sys.path.insert(0, '.')
 import numpy as np, geo, pyarrow.parquet as pq, shapely
 from PIL import Image, ImageDraw
+from nastroje.orto import ortofoto
 Image.MAX_IMAGE_PIXELS = None
 D = 'build/orto04/'; os.makedirs(D, exist_ok=True)
 M, T = 0.4, 1500
@@ -14,13 +15,12 @@ W, H = int((X1 - X0) / M), int((Y1 - Y0) / M)
 def tile(tx, ty):
     w, h = min(T, W - tx), min(T, H - ty)
     f = f'{D}{round(X0 + tx * M)}_{round(Y1 - ty * M)}_{w}x{h}.jpg'   # podle polohy: po změně rozsahu mapy se nevezme stará dlaždice
+    lo0, la1 = geo.to_lonlat(X0 + tx * M, Y1 - ty * M); lo1, la0 = geo.to_lonlat(X0 + (tx + w) * M, Y1 - (ty + h) * M)
     for _ in range(3):
-        try:
+        if ortofoto(f, 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0'
+                    f'&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:4326&BBOX={la0},{lo0},{la1},{lo1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/jpeg'):
             return np.asarray(Image.open(f).convert('RGB'))
-        except OSError:
-            lo0, la1 = geo.to_lonlat(X0 + tx * M, Y1 - ty * M); lo1, la0 = geo.to_lonlat(X0 + (tx + w) * M, Y1 - (ty + h) * M)
-            subprocess.run(['curl', '-s', '-m', '120', '-o', f, 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0'
-                            f'&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:4326&BBOX={la0},{lo0},{la1},{lo1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/jpeg'])
+    print(f'CHYBA: ortofoto {f} se nestáhlo, budovy v něm nedostanou barvu střechy (povrchy.py ho vynechá); spusť znovu', file=sys.stderr, flush=True)
     return None
 
 

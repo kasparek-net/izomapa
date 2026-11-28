@@ -9,6 +9,13 @@ URL = 'https://ags.cuzk.gov.cz/arcgis/services/ZABAGED_POLOHOPIS/MapServer/WFSSe
 T = Transformer.from_crs(4326, 5514, always_xy=True); B = Transformer.from_crs(5514, 4326, always_xy=True)
 _a, _b, _c, _d = geo.bbox_lonlat(100); xs, ys = T.transform([_a, _b, _a, _b], [_c, _c, _d, _d])
 X0, Y0, X1, Y1 = min(xs), min(ys), max(xs), max(ys)
+def wfs_ok(f):
+    """platná odpověď WFS (ne chybová stránka ani ExceptionReport); jinak se soubor do cache nedostane"""
+    try: s = open(f, encoding='utf-8', errors='replace').read()
+    except OSError: return False
+    return 'FeatureCollection' in s and 'ExceptionReport' not in s
+
+
 D = 'build/zabaged/'; os.makedirs(D, exist_ok=True); os.makedirs('assets', exist_ok=True)
 out = {}
 for key, name in LAYERS.items():
@@ -18,9 +25,14 @@ for key, name in LAYERS.items():
             start = 0
             while True:
                 f = f'{D}{key}_{tx}_{ty}_{start}.xml'
-                if not os.path.exists(f):
+                if not wfs_ok(f):
                     q = f'&TYPENAMES={urllib.parse.quote("ZABAGED_POLOHOPIS:" + name)}&BBOX={tx},{ty},{tx + 2500},{ty + 2500},urn:ogc:def:crs:EPSG::5514&COUNT=500&STARTINDEX={start}'
-                    subprocess.run(['curl', '-s', '-m', '180', '-o', f, URL + q], check=True)
+                    ok = subprocess.run(['curl', '-s', '-f', '-m', '180', '-o', f + '.part', URL + q]).returncode == 0 and wfs_ok(f + '.part')
+                    if not ok:
+                        for p in (f, f + '.part'):
+                            if os.path.exists(p): os.remove(p)
+                        sys.exit(f'ZABAGED (ČÚZK WFS) nevrátil platnou odpověď pro {f}, zkus to později')
+                    os.replace(f + '.part', f)
                 s = open(f, encoding='utf-8').read()
                 members = s.split('<wfs:member>')[1:]
                 for m in members:

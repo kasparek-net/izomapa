@@ -14,15 +14,20 @@
       btn.textContent = linkText || `Přejít na mapu ${title} ↗`;
       links.append(btn);
     }
-    const a = document.createElement('a'); a.target = '_blank'; a.rel = 'noopener';
-    a.href = `https://mapy.cz/zakladni?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19&source=coor&id=${lon.toFixed(6)}%2C${lat.toFixed(6)}`;
-    a.textContent = 'Ukázat ve skutečnosti (Mapy.cz)';
-    const s = document.createElement('a'); s.target = '_blank'; s.rel = 'noopener';
-    s.href = `https://mapy.cz/letecka?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19`; s.textContent = 'Letecký snímek';
-    links.append(a, s);
+    const geo = Number.isFinite(lon) && Number.isFinite(lat);   // soused nebo místo bez souřadnic: bez odkazů na Mapy.cz a bez hlášení
+    if (geo) {
+      const a = document.createElement('a'); a.target = '_blank'; a.rel = 'noopener';
+      a.href = `https://mapy.cz/zakladni?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19&source=coor&id=${lon.toFixed(6)}%2C${lat.toFixed(6)}`;
+      a.textContent = 'Ukázat ve skutečnosti (Mapy.cz)';
+      const s = document.createElement('a'); s.target = '_blank'; s.rel = 'noopener';
+      s.href = `https://mapy.cz/letecka?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19`; s.textContent = 'Letecký snímek';
+      links.append(a, s);
+    }
     $('card').style.transform = '';
     $('card').hidden = false;
-    setReport(`pt:${lat.toFixed(5)},${lon.toFixed(5)}`, title, lon, lat);     // výchozí cíl hlášení = místo, budova ho přepíše
+    $('report').hidden = !HLASENI || !geo;
+    if (geo) setReport(`pt:${lat.toFixed(5)},${lon.toFixed(5)}`, title, lon, lat);     // výchozí cíl hlášení = místo, budova ho přepíše
+    else repTarget = null;
   }
   // hlášení nepřesností: jen když je zapnuté v mesto.json ("hlaseni": true) a běží server z hlaseni/
   const HLASENI = {{HLASENI}};

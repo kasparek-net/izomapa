@@ -27,7 +27,7 @@ opt = lambda k, d=None: args[args.index(k) + 1] if k in args else d
 DOTAZ = opt('--dotaz', f'{NAZEV}, Česko')
 MAX = int(opt('--max', 0))
 HALF = 1150.0
-UA = {'User-Agent': 'izomapa/1.0 (https://github.com/adamklatovsky/izomapa)'}
+UA = {'User-Agent': 'izomapa-novy-mesto/1.0'}   # za uživatele, ne za autora šablony (CLAUDE.md, Pravidla)
 
 
 def get(url):

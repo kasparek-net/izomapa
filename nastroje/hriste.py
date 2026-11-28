@@ -20,10 +20,12 @@ if __name__ == '__main__':
     for pokus in range(6):                      # Overpass bývá přetížený: střídat hlavní a záložní server
         try:
             t = subprocess.run(['curl', '-s', '-f', '-m', '150', '-A', 'izomapa-tools/1.0', '--data-urlencode', f'data={q}',
-                                URL[pokus % 2]], check=True, capture_output=True, text=True).stdout
+                                URL[pokus % 2]], check=True, capture_output=True, text=True, encoding='utf-8').stdout
             el = json.loads(t)['elements']; break
-        except Exception:
-            time.sleep(20)
+        except subprocess.CalledProcessError as ex:   # curl -f: HTTP chyba nebo timeout = server přetížený
+            print(URL[pokus % 2], 'nedostupný, curl', ex.returncode, flush=True); time.sleep(20)
+        except (ValueError, KeyError) as ex:           # odpověď přišla, ale není to JSON s elements
+            print(URL[pokus % 2], 'vrátil chybnou odpověď:', str(ex)[:120], t[:200], flush=True); time.sleep(20)
     else: sys.exit('Overpass nedostupný, zkus to později')
     hriste, prvky = [], []
     for e in el:
@@ -41,5 +43,5 @@ if __name__ == '__main__':
         elif e['type'] == 'node':
             t_ = PRVKY.get(tg.get('playground') or tg.get('fitness_station'))
             if t_: prvky.append({'ll': [round(e['lat'], 6), round(e['lon'], 6)], 't': t_})
-    json.dump({'hriste': hriste, 'prvky': prvky}, open('assets/hriste.json', 'w'), ensure_ascii=False, indent=0)
+    json.dump({'hriste': hriste, 'prvky': prvky}, open('assets/hriste.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
     print('dětská', sum(h['k'] == 'detske' for h in hriste), 'workout', sum(h['k'] == 'workout' for h in hriste), 'prvků', len(prvky))

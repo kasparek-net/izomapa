@@ -14,12 +14,12 @@ t = None
 for url in ('https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'):   # záložní server
     try:
         t = subprocess.run(['curl', '-s', '-f', '-m', '150', '-A', 'izomapa-tools/1.0', '--data-urlencode', f'data={q}', url],
-                           check=True, capture_output=True, text=True).stdout; json.loads(t); break
+                           check=True, capture_output=True, text=True, encoding='utf-8').stdout; json.loads(t); break
     except (subprocess.CalledProcessError, ValueError) as ex: print(url, str(ex)[:120]); t = None
 CACHE = 'build/cyklotrasy_osm.json'               # poslední odpověď Overpassu, když je server přetížený
-if t is not None: open(CACHE, 'w').write(t)
+if t is not None: open(CACHE, 'w', encoding='utf-8').write(t)
 else:
-    try: t = open(CACHE).read(); print('Overpass nedostupný, beru', CACHE)
+    try: t = open(CACHE, encoding='utf-8').read(); print('Overpass nedostupný, beru', CACHE)
     except OSError: sys.exit('Overpass nedostupný, zkus to později')
 out = []
 for e in json.loads(t)['elements']:

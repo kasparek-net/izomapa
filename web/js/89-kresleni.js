@@ -1,9 +1,9 @@
   // vrstva s vozidly se kreslí ve stejné chvíli jako dlaždice (událost update-viewport), jinak by při posouvání mapy
   // o snímek zaostávala; když se mapa nehýbe, kreslí ji vlastní smyčka
-  let osdT = -1e9, rafLast = performance.now();
+  let osdT = -1e9, rafLast = performance.now(), drawErr = false;
   function frame(now) {
     perf(now - rafLast); rafLast = now;
-    if (performance.now() - osdT > 24) draw(now, false);
+    try { if (performance.now() - osdT > 24) draw(now, false); } catch (err) { if (!drawErr) { drawErr = true; console.error(err); } }   // chyba ve snímku nezastaví smyčku, do konzole jen jednou
     requestAnimationFrame(frame);
   }
   viewer.addHandler('update-viewport', () => { osdT = performance.now(); draw(osdT, true); });
@@ -47,6 +47,11 @@
       ctx.closePath(); ctx.stroke();
     }
     drawUlice(sx, ox, oy, cw, ch, dpr);                   // názvy ulic (87-nazvy-ulic.js), pod vozidly a čísly linek
+    // jedoucí spoje MHD jednou za sekundu: pro dopravu i pro lidi na nástupišti (ti jdou i s vypnutou dopravou)
+    if (MHD.on && ($('l-traffic').checked || (PLAT.on && $('l-people').checked))) {
+      const ns = Math.floor(now / 1000);
+      if (ns !== MHD.t) { MHD.t = ns; MHD.act = mhdActive(); updateXings(); if (MHD.follow !== null) mhdFollowText(); }
+    }
     // doprava
     if ($('l-traffic').checked) {
       if (now - tShareT > 5000 || tShareCount !== cars.length || tShareSlow !== (eco || SLOW)) {
@@ -88,8 +93,7 @@
         if (q.d <= o.d) nav();
       }
       if (MHD.on) {
-        const ns = Math.floor(now / 1000);
-        if (ns !== MHD.t) { MHD.t = ns; MHD.act = mhdActive(); updateXings(); if (MHD.follow !== null) mhdFollowText(); }
+        const ns = MHD.t;
         MHD.drawn = [];
         if (MHD.follow !== null) {
           const a = MHD.act.find((q) => q[0] === MHD.follow);
@@ -132,7 +136,7 @@
     if ($('l-people').checked && PEOPLE.length) {
       const hpx = Math.abs(toImg(0, 0, 1)[1] - toImg(0, 0, 0)[1]), u = hpx * 0.1 * sx;   // velikost bodu postavy na obrazovce
       if (u >= 0.3) {
-        if (now - (window.__pHT || 0) > 30000) { window.__pHT = now; window.__pH = +new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(new Date()); }
+        if (!window.__pHT || now - window.__pHT > 30000) { window.__pHT = now; window.__pH = +new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(new Date()); }
         let share = $('realTime').checked ? PEOPLE_SHARE[window.__pH] : 1 - 0.85 * night;
         if (state.weather === 'rain') share *= 0.45; else if (state.weather === 'snow') share *= 0.75;
         if (eco || SLOW) share *= 0.5;

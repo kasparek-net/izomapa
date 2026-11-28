@@ -244,7 +244,7 @@
       if (r.status === 404) { PLANES.off = true; return; }
       if (!r.ok) return;
       const incoming = parseFlightData(await r.json());
-      if (incoming && incoming.length) applyIncomingFlights(incoming);
+      if (incoming) applyIncomingFlights(incoming);   // i prázdná odpověď: letadla bez zpráv po 45 s zmizí
     } catch {}
   }
 

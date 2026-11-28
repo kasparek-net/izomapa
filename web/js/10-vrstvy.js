@@ -96,6 +96,7 @@
   const S_REV = { spring: 'jaro', summer: 'leto', autumn: 'podzim', winter: 'zima' };
   const neighborHref = (n) => {
     let u = n.url || '';
+    try { if (!/^https?:$/.test(new URL(u, location.href).protocol)) u = ''; } catch { u = ''; }   // jen http(s), ne javascript: apod.
     if (u.includes('@')) return u;
     const lat = n.target_lat ?? (n.cil ? n.cil[0] : n.lat);
     const lon = n.target_lon ?? (n.cil ? n.cil[1] : n.lon);
@@ -152,7 +153,7 @@
       if (n.target) el.target = n.target;
       if (el.target === '_blank') el.rel = 'noopener';
       el.title = n.text || `Přejít na mapu: ${n.name}`;
-      el.innerHTML = `<span class="pin-ico">↗</span> ${n.name}`;
+      const ico = document.createElement('span'); ico.className = 'pin-ico'; ico.textContent = '↗'; el.append(ico, ' ' + n.name);
       const upd = () => { el.href = neighborHref(n); };
       el.addEventListener('pointerenter', upd);
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); upd(); });

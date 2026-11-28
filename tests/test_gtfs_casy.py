@@ -1,4 +1,5 @@
-import unittest
+import sys, unittest
+sys.path.insert(0, '.')
 from nastroje.gtfs_casy import dopln_mezicasy
 
 class MezicasyTest(unittest.TestCase):
