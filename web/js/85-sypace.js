@@ -11,7 +11,9 @@
       if (r.status === 404) { PLOW.off = true; return; }
       if (!r.ok) return;
       const d = await r.json(), now = performance.now(), seen = new Set();
-      PLOW.trasy = (d.trasy || []).map((t) => ({ a: t.a, z: t.z, w: t.l.map(([lo, la]) => { const [x, y] = llW(lo, la); return [x, y]; }) }));
+      // trasa se promítne do obrázku jednou při stažení (toImg + gz), ve snímku se jen posune a zvětší
+      PLOW.trasy = (d.trasy || []).map((t) => ({ a: t.a, z: t.z, w: t.l.map(([lo, la]) => { const [x, y] = llW(lo, la); return toImg(x, y, gz(x, y) + 0.3); }),
+        c: t.z ? 'rgba(130,130,136,0.45)' : `rgba(255,${120 + t.a * 20},20,${[0.85, 0.7, 0.55, 0.4, 0.28][t.a] || 0.25})` }));
       for (const p of d.pts || []) {
         const [x, y] = llW(p.lon, p.lat); seen.add(p.id);
         let q = PLOW.list.get(p.id);
@@ -52,9 +54,9 @@
     // projeté trasy na silnici
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (const tr of PLOW.trasy) {
-      ctx.strokeStyle = tr.z ? 'rgba(130,130,136,0.45)' : `rgba(255,${120 + tr.a * 20},20,${[0.85, 0.7, 0.55, 0.4, 0.28][tr.a] || 0.25})`;
+      ctx.strokeStyle = tr.c;
       ctx.lineWidth = Math.max(1.5, sx * (tr.z ? 3 : 5)); ctx.beginPath();
-      tr.w.forEach(([x, y], i) => { const p = toImg(x, y, gz(x, y) + 0.3), X_ = ox + p[0] * sx, Y_ = oy + p[1] * sx; i ? ctx.lineTo(X_, Y_) : ctx.moveTo(X_, Y_); });
+      tr.w.forEach((p, i) => { const X_ = ox + p[0] * sx, Y_ = oy + p[1] * sx; i ? ctx.lineTo(X_, Y_) : ctx.moveTo(X_, Y_); });
       ctx.stroke();
     }
     for (const q of PLOW.list.values()) {

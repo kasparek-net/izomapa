@@ -9,6 +9,7 @@ from shapely.ops import transform
 from PIL import Image, ImageDraw, ImageFilter
 import geo
 from geo import HALF, HREF
+from nastroje.tabulky import radky
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else 'data'
 CHUNK = tuple(int(v) for v in sys.argv[2].split(',')) if len(sys.argv) > 2 else (0, 0)
@@ -38,12 +39,12 @@ EXT_P = shapely.prepared.prep(EXT)
 
 
 # upřesnění ze satelitních snímků (build/sat/, odvozené hodnoty): barva a typ střechy, povrch hřišť, obrysy snímků
-SAT = json.load(open('assets/satelit.json')) if os.path.exists('assets/satelit.json') else {'b': {}, 'lu': {}, 'zones': []}
+SAT = json.load(open('assets/satelit.json', encoding='utf-8')) if os.path.exists('assets/satelit.json') else {'b': {}, 'lu': {}, 'zones': []}
 # ruční upřesnění podle satelitu a 3D fotek: výška/barvy budov (OSM je často nemá), přístřešky, plochy, autobusy
-UP = json.load(open('assets/upresneni.json')) if os.path.exists('assets/upresneni.json') else {'b': {}, 'roofs': [], 'paved': [], 'buses': []}
+UP = {'b': {}, 'roofs': [], 'paved': [], 'buses': [], **(json.load(open('assets/upresneni.json', encoding='utf-8')) if os.path.exists('assets/upresneni.json') else {})}   # výchozí klíče i pro částečný soubor
 # barvy střech z ortofota (nastroje/strechy.py); ruční úpravy v upresneni.json mají přednost
 if os.path.exists('assets/strechy_orto.json'):
-    for _k, _v in json.load(open('assets/strechy_orto.json')).items(): SAT['b'].setdefault(_k, {})['rc'] = _v
+    for _k, _v in json.load(open('assets/strechy_orto.json', encoding='utf-8')).items(): SAT['b'].setdefault(_k, {})['rc'] = _v
 for _k, _v in UP['b'].items(): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
 # vlastní lokální úpravy konkrétního města (assets/custom_prep.py): oddělené hooky pro terén, hřbitov, doplňky
 for _k, _v in UP.get('lu', {}).items(): SAT['lu'][_k] = _v
@@ -53,15 +54,15 @@ def _hook(phase):
         globals()['HOOK'] = phase
         exec(_CUSTOM_PREP, globals())
 # typy a podlaží z RÚIAN (nastroje/ruian.py): jen kde data typ nemají nebo je obecný
-RUIAN = json.load(open('assets/ruian_budovy.json')) if os.path.exists('assets/ruian_budovy.json') else {}
+RUIAN = json.load(open('assets/ruian_budovy.json', encoding='utf-8')) if os.path.exists('assets/ruian_budovy.json') else {}
 # oblasti podle skutečnosti (tuning/oblast.py): stromy z ortofota a DMP, barvy střech, ruční úpravy budov
-OBL = json.load(open('assets/oblasti.json')) if os.path.exists('assets/oblasti.json') else {}
+OBL = json.load(open('assets/oblasti.json', encoding='utf-8')) if os.path.exists('assets/oblasti.json') else {}
 for _o in OBL.values():
     for _k, _v in list(_o['b_auto'].items()) + list(_o['b'].items()): SAT['b'][_k] = {**SAT['b'].get(_k, {}), **_v}
-HREBENY = json.load(open('assets/hrebeny.json')) if os.path.exists('assets/hrebeny.json') else {}   # nastroje/hrebeny.py
+HREBENY = json.load(open('assets/hrebeny.json', encoding='utf-8')) if os.path.exists('assets/hrebeny.json') else {}   # nastroje/hrebeny.py
 # změřené výšky z DMP 1G (ČÚZK, CC BY 4.0): id -> [medián, p90] nad terénem. Nerozhodují o typu ani tvaru střechy, jen o výšce
-DMP = json.load(open('assets/dmp_vysky.json')) if os.path.exists('assets/dmp_vysky.json') else {}
-if os.path.exists('assets/dmp_rucne.json'): DMP.update({k: v for k, v in json.load(open('assets/dmp_rucne.json')).items() if not k.startswith('_')})   # ověřená měření z kontrolního seznamu
+DMP = json.load(open('assets/dmp_vysky.json', encoding='utf-8')) if os.path.exists('assets/dmp_vysky.json') else {}
+if os.path.exists('assets/dmp_rucne.json'): DMP.update({k: v for k, v in json.load(open('assets/dmp_rucne.json', encoding='utf-8')).items() if not k.startswith('_')})   # ověřená měření z kontrolního seznamu
 DMP.update(UP.get('dmp', {}))                                 # ruční doplnění měření
 # vlastní modely památek (pamatky/, kreslí je render.html): skutečný vršek modelu pro obrys při najetí myší
 # (pamatky/pred_po.mjs zapíše pamatky/vrsky.json; oid v seznamu stačí začátkem). Do dlaždic jdou jen modely schválené
@@ -246,7 +247,7 @@ if os.path.exists('build/zelen_maska.png'):
     if os.path.exists('build/les_maska.png'):                   # koruny stromů jsou tmavé a maska zeleně je nepočítá
         _lz = np.asarray(Image.open('build/les_maska.png')) > 0
         if _lz.shape == _gz.shape: _gz = _gz | _lz
-    _GZ = (_gz, json.load(open('build/zelen_maska.json'))['x0y1m'])
+    _GZ = (_gz, json.load(open('build/zelen_maska.json', encoding='utf-8'))['x0y1m'])
 _PARK_Z = set()
 for _, r in lu.iterrows():
     k = SAT['lu'].get(r.id) or LU.get(r['class'])
@@ -255,7 +256,7 @@ for _, r in lu.iterrows():
     if k: fill(r.geom, C[k], block=block_)
 # zpevněné plochy z dat, které jsou na ortofotu zelené, jsou tráva (nastroje/povrchy.py)
 if os.path.exists('build/zelen_maska.png'):
-    _zm = np.asarray(Image.open('build/zelen_maska.png')) > 0; _x0, _y1, _m = json.load(open('build/zelen_maska.json'))['x0y1m']
+    _zm = np.asarray(Image.open('build/zelen_maska.png')) > 0; _x0, _y1, _m = json.load(open('build/zelen_maska.json', encoding='utf-8'))['x0y1m']
     _c = (np.arange(TWE) + 0.5) * TEX_RES - HE
     _mx = np.clip(((_c + CX - _x0) / _m).astype(int), 0, _zm.shape[1] - 1); _my = np.clip(((_y1 - (-_c + CY)) / _m).astype(int), 0, _zm.shape[0] - 1)
     _a = np.array(cls); _hit = _zm[np.ix_(_my, _mx)] & np.isin(_a, [C['paved'], C['industrial']])
@@ -298,7 +299,7 @@ for l in PISTE: fill(l.buffer(22), C['piste'], block=True)
 LESM = None
 if os.environ.get('IZO_LES', '1') != '0' and os.path.exists('build/les_maska.png'):   # IZO_LES=0 vypne
     Image.MAX_IMAGE_PIXELS = None
-    _MX0, _MY1, _MM = json.load(open('build/les_maska.json'))['x0y1m']     # z nastroje/les.py
+    _MX0, _MY1, _MM = json.load(open('build/les_maska.json', encoding='utf-8'))['x0y1m']     # z nastroje/les.py
     _m = Image.open('build/les_maska.png').crop((round((CX - HE - _MX0) / _MM), round((_MY1 - CY - HE) / _MM),
                                                  round((CX + HE - _MX0) / _MM), round((_MY1 - CY + HE) / _MM))).resize((TWE, TWE), Image.NEAREST)
     LESM = np.asarray(_m) > 0
@@ -307,7 +308,7 @@ if os.environ.get('IZO_LES', '1') != '0' and os.path.exists('build/les_maska.png
 def _zpoly(rings):
     sh = [list(zip(*[np.asarray(v, float) for v in to_local([q[1] for q in r], [q[0] for q in r])])) for r in rings]
     return shapely.make_valid(Polygon(sh[0], sh[1:]))
-ZAB = json.load(open('assets/zabaged.json')) if os.path.exists('assets/zabaged.json') else {'orna': [], 'ttp': [], 'sad': []}
+ZAB = json.load(open('assets/zabaged.json', encoding='utf-8')) if os.path.exists('assets/zabaged.json') else {'orna': [], 'ttp': [], 'sad': []}
 _zb = box(-HE, -HE, HE, HE)
 _pole = set(ZAB.get('pole', []))                # travní porost, který je na ortofotu žlutohnědý = pole (tuning/pole.py)
 ZTTP = [g for i, r in enumerate(ZAB['ttp']) if i not in _pole for g in [_zpoly(r)] if g.intersects(_zb)]
@@ -382,7 +383,7 @@ for _, r in wat.iterrows():
 seg = load('segment')
 # dálnice ve výstavbě se nekreslí (staveniště je vidět ve využití území)
 _uc = lambda r: r['class'] == 'motorway' and any('is_under_construction' in list(f.get('values')) for f in (r.road_flags if r.road_flags is not None else []))
-seg = seg[[not _uc(r) for _, r in seg.iterrows()]].reset_index(drop=True)
+seg = radky(seg, [not _uc(r) for _, r in seg.iterrows()]).reset_index(drop=True)
 TUNNEL_MIN = 60.0     # kratší „tunel“ je podjezd pod silnicí nebo tratí: kreslí se jako cesta, nad ní vede most
 def seg_flags(r):
     """příznaky úseku: silnice je mají v road_flags, tratě v rail_flags"""
@@ -612,7 +613,7 @@ for pl in UP.get('plochy', []):
 # dětská a workoutová hřiště (assets/hriste.json z nastroje/hriste.py, OSM): 3D vybavení pro render.html (scene.play).
 # Zakreslené prvky (playground=*, fitness_station=*) na své místo, zbytek automaticky podle velikosti hřiště, pod
 # houpačkou, skluzavkou a prolézačkou písek. Poloha je deterministická (stejná i v pásu sousedního čtverce).
-HR = json.load(open('assets/hriste.json')) if os.path.exists('assets/hriste.json') else {'hriste': [], 'prvky': []}
+HR = json.load(open('assets/hriste.json', encoding='utf-8')) if os.path.exists('assets/hriste.json') else {'hriste': [], 'prvky': []}
 HR['hriste'] = HR['hriste'] + [{'id': f'u{_k}', 'k': _h.get('k', 'detske'), 'poly': _h['q'], 'll': _h['q'][0]}   # ruční (chybí v OSM)
                                for _k, _h in enumerate(UP.get('hriste', []))]
 play = []
@@ -849,7 +850,7 @@ for l, w, c, n in drive_lines:
 # ---------------- budovy ----------------
 bld = load('building')
 # jen budovy z OpenStreetMap (nebo ručně potvrzené v upresneni.json)
-bld = bld[[(s is not None and any(x['dataset'] == 'OpenStreetMap' for x in s)) or i_ in UP['b'] for s, i_ in zip(bld.sources, bld.id)]].reset_index(drop=True)
+bld = radky(bld, [(s is not None and any(x['dataset'] == 'OpenStreetMap' for x in s)) or i_ in UP['b'] for s, i_ in zip(bld.sources, bld.id)]).reset_index(drop=True)
 bld = bld[~bld.id.isin(UP.get('skryt_budovy', []))].reset_index(drop=True)   # duplicitní budovy v datech (např. části kostela přes celý obrys)
 for i, r in bld.iterrows():                             # výšky z upřesnění mají přednost před daty
     if 'h' in UP['b'].get(r.id, {}): bld.at[i, 'height'] = UP['b'][r.id]['h']
@@ -948,7 +949,7 @@ def roof_parts(p, ang):
 
 
 addr = load('address')
-addr = addr[addr.geom.map(lambda g: EXT_P.contains(g))]
+addr = radky(addr, addr.geom.map(lambda g: EXT_P.contains(g)))
 addr_pts = list(addr.geom)
 addr_tree = shapely.STRtree(addr_pts)
 addr_txt = [f"{s} {n}" if isinstance(s, str) else f"{c} {n}" if isinstance(c, str) else str(n) for s, n, c in zip(addr.street, addr.number, addr.postal_city)]
@@ -1465,7 +1466,7 @@ for d in DOMS:
                       'floors': None, 'h': round(float(th_), 1), 'roof': 'cone', 'addr': [], 'lon': round(float(d['lon']), 6), 'lat': round(float(d['lat']), 6),
                       'ring': ring, 'top': round(g + th_, 2), 'base': round(g - 0.6, 2)})
 # komíny a chladicí věže z OSM (nastroje/kominy.py), vzhled jednotlivých v assets/upresneni.json: "kominy": [{"lat", "lon", "wc", "pr"}]
-for k_ in (json.load(open('assets/kominy.json')) if os.path.exists('assets/kominy.json') else []):
+for k_ in (json.load(open('assets/kominy.json', encoding='utf-8')) if os.path.exists('assets/kominy.json') else []):
     x, y = to_local(k_['lon'], k_['lat'])
     if not EXT_P.contains(Point(x, y)): continue
     own = AREA.contains(Point(x, y)); g = float(ground(x, y)); h_ = float(k_['h'])
@@ -1625,7 +1626,7 @@ if os.path.exists('assets/mobiliar_mesta.json'):  # mobiliář z pasportů měst
             if (x_, y_) != (p_[0], p_[1]): p_[0], p_[1], p_[2] = x_, y_, float(ground(x_, y_))
 if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
     lines_out['pipe'] = []
-    for q in json.load(open('assets/potrubi.json')):
+    for q in json.load(open('assets/potrubi.json', encoding='utf-8')):
         for l in lines(LineString([to_local(lo, la) for la, lo in q]).intersection(EXT)):
             xy_ = shapely.get_coordinates(shapely.segmentize(l, 10.0))
             lines_out['pipe'].append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(xy_, ground(xy_[:, 0], xy_[:, 1]))])
@@ -1815,7 +1816,7 @@ for _, r in inf.iterrows():
     if r['class'] == 'artwork' and g.geom_type == 'Point' and AREA.contains(g):
         if any(r2['class'] == 'cemetery' and r2.geom.buffer(3).contains(g) for _, r2 in lu.iterrows()):
             statues.append([round(g.x, 2), round(g.y, 2), round(float(ground(g.x, g.y)), 2), 0.0])
-props['planter'] = props['slab'] = props['pavilion'] = props['shed'] = []
+props['planter'], props['slab'], props['pavilion'], props['shed'] = [], [], [], []   # samostatné seznamy: hook props přidává do jednoho
 props['grave'] = graves
 props['statue'] = statues
 props['socha'] = []                    # ruční sochy (assets/upresneni.json, "sochy"): podstavec a figura běžce
@@ -2170,7 +2171,7 @@ print('jednosměrných úseků pro auta', sum(1 for g_ in graph if g_.get('o')),
 # železniční přejezdy (nastroje/prejezdy.py, OSM railway=level_crossing): kus silnice v úrovni terénu si nese [metry od začátku, x, y]
 if os.path.exists('assets/prejezdy.json'):
     sys.path.insert(0, 'nastroje'); import prejezdy as _pj
-    _pj_pts = [tuple(float(v) for v in to_local(lo, la)) for la, lo in json.load(open('assets/prejezdy.json'))]
+    _pj_pts = [tuple(float(v) for v in to_local(lo, la)) for la, lo in json.load(open('assets/prejezdy.json', encoding='utf-8'))]
     _rails = shapely.STRtree([l for _, g_, c_, _w, _n in roads if c_ == 'rail' for l in lines(g_)] or [Point(1e9, 1e9)])
     for g_ in graph:
         if g_.get('c') == 'service' or g_.get('_deck'): continue      # mostovka nad tratí přejezd nemá
@@ -2213,5 +2214,5 @@ json.dump({'buildings': binfo, 'chimneys': chimneys, 'streets': street_out, 'roa
            'decks': [{'p': deck_line(D), 'w': D[4]} for D in DECKS if D[5] != 'foot' and AREA.intersects(D[0])],
            'lamps': props['lamp'], 'ground_small': [[round(float(ground(x, y)), 1) for x in np.linspace(-HALF, HALF, 81)]
                                                      for y in np.linspace(HALF, -HALF, 81)]},
-          open(f'{OUT}/info_src.json', 'w'), separators=(',', ':'), ensure_ascii=False)
+          open(f'{OUT}/info_src.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 print('hotovo')

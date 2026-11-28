@@ -10,7 +10,7 @@ import os
 from geo import CAM_X, CAM_Y, CHUNKS, HALF, KX, KY, LAT0, LON0, MESTO, MPP_OVERLAY, Image2D, chunk_center, chunk_dir, to_local
 
 # souřadnice obrázku = pixely čtverce (0, 0); ostatní čtverce leží mimo (záporné / větší souřadnice)
-info = json.load(open('build/tiles_autumn/info.json'))
+info = json.load(open('build/tiles_autumn/info.json', encoding='utf-8'))
 if info['mpp'] != MPP_OVERLAY:          # detailní rozlišení: dlaždice jsou jemnější, obrysy a animace prohlížeče zůstávají v pixelech 0,2 m
     k = info['mpp'] / MPP_OVERLAY
     info = {**info, 'mpp': MPP_OVERLAY, 'width': round(info['width'] * k), 'height': round(info['height'] * k)}
@@ -90,7 +90,7 @@ def _walk_src():
                 if not k or any('is_tunnel' in (q.get('values') or []) and not q.get('between') for q in fl or []): continue
                 lines.append((k, tr(shapely.from_wkb(g))))
         if os.path.exists('assets/cyklotrasy.json'):         # značené cyklotrasy (nastroje/cyklotrasy_osm.py): c po silnici, d po cestě, jen pro cyklisty
-            for druh, pts in json.load(open('assets/cyklotrasy.json')):
+            for druh, pts in json.load(open('assets/cyklotrasy.json', encoding='utf-8')):
                 if len(pts) > 1: lines.append((druh, shapely.geometry.LineString([to_local(lo, la) for la, lo in pts])))
         for f in sorted(glob.glob('data_all/land_use.parquet') or glob.glob('data*/land_use.parquet')):
             t = pq.read_table(f, columns=['class', 'geometry']).to_pydict()
@@ -143,7 +143,7 @@ decks = []                # mostovky silnic a tratí (svět, výška): MHD z jí
 # linky tramvají, když chybí jízdní řády (site/mhd.json): [konečná, konečná, počet vozů na lince]
 TRAM_LINES = [tuple(t) for t in MESTO.get('mhd', {}).get('tramvaje', [])]
 for chunk in chunks:
-    src = json.load(open(f'{chunk_dir(chunk)}/info_src.json'))
+    src = json.load(open(f'{chunk_dir(chunk)}/info_src.json', encoding='utf-8'))
     OFF = chunk_center(chunk)
     K = CKEY[chunk]
     buildings, chimneys, roads = [], [], []
@@ -257,7 +257,7 @@ for chunk in chunks:
     decks += [{'p': [[round(x + OFF[0], 1), round(y + OFF[1], 1), z] for x, y, z in d['p']], 'w': d['w']} for d in src.get('decks', [])]
     tram_stops += [(x + OFF[0], y + OFF[1], n) for x, y, n in src.get('tstops', [])]
     # stromy u silnic, kolejí a sjezdovek: auta, tramvaje a lyžaři se za jejich korunami schovají (svět, z terénu, výška, jehličnan)
-    sc_ = json.load(open(f'{chunk_dir(chunk)}/scene.json'))
+    sc_ = json.load(open(f'{chunk_dir(chunk)}/scene.json', encoding='utf-8'))
     T_ = [t for t in sc_['trees'] if (len(t) < 6 or t[5] != 2) and abs(t[0]) <= HALF and abs(t[1]) <= HALF]
     _wk = walk_of(chunk).get('walk', {})   # stromy i u pěších zón, ať se za ně chodci schovají (ne u lesních cest: data by nabobtnala)
     ln_ = [shapely.LineString([(x - OFF[0], y - OFF[1]) for x, y in w_]) for w_, c_ in zip(_wk.get('l', []), _wk.get('c', '')) if c_ == 'p'] + \
@@ -389,7 +389,7 @@ for name, lat, lon, text in NEEDS:
     if c in CKEY: needs.append({'name': name, 'text': text, 'k': CKEY[c], 'xy': list(px(float(x), float(y), gz(x, y) + 15)[:2])})
 os.makedirs('site/overlay', exist_ok=True)
 for K, v in per_chunk.items():
-    json.dump(v, open(f'site/overlay/{K}.json', 'w'), separators=(',', ':'), ensure_ascii=False)
+    json.dump(v, open(f'site/overlay/{K}.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 # názvy čtvrtí (Overture divisions: macrohood + obce/osady), zobrazují se jen při oddálení
 districts = []
 _dv = pq.read_table('data_all/division_area.parquet').to_pandas()
@@ -469,14 +469,14 @@ for a_n, b_n, n_ in TRAM_LINES:
                   'stops': [list(px(TSTOP[n][0], TSTOP[n][1], 0)[:2]) + [n] for n in st]})
     print('tramvaj', a_n, '–', b_n, round(sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(on, on[1:]))), 'm', len(st), 'zastávek')
 # semafory (nastroje/semafory.py): [x, y, křižovatka] ve společných souřadnicích; silnicím je přiřadí prohlížeč
-signals = [[round(float(x), 1), round(float(y), 1), j] for la, lo, j in json.load(open('assets/semafory.json')) for x, y in [to_local(lo, la)]] if os.path.exists('assets/semafory.json') else []
+signals = [[round(float(x), 1), round(float(y), 1), j] for la, lo, j in json.load(open('assets/semafory.json', encoding='utf-8')) for x, y in [to_local(lo, la)]] if os.path.exists('assets/semafory.json') else []
 import plugins as _plugins
 def _plugin_xy(a, b, is_world=False):
     global OFF; OFF = (0.0, 0.0); x, y = (float(a), float(b)) if is_world else to_local(float(b), float(a)); return list(px(float(x), float(y), gz(x, y))[:2])
 _doplnky = _plugins.load_and_run_plugins(MESTO, {**cam, 'w': W, 'h': H}, _plugin_xy)
 json.dump({'w': W, 'h': H, 'cam': cam, 'districts': districts, 'needs': needs, 'xmas': nam, 'chunks': {CKEY[c]: CHUNKS[c] for c in chunks}, 'bus': bus_route, 'trams': trams, 'decks': decks,
            'streets': streets, 'places': places, 'neighbors': neighbors, **({'signals': signals} if signals else {}), **({'doplnky': _doplnky} if _doplnky else {})},
-          open('site/overlay.json', 'w'), separators=(',', ':'), ensure_ascii=False)
-json.dump(addr_index, open('site/search.json', 'w'), separators=(',', ':'), ensure_ascii=False)   # adresy pro hledání, načte se až při psaní
+          open('site/overlay.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
+json.dump(addr_index, open('site/search.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)   # adresy pro hledání, načte se až při psaní
 print('čtverců', len(chunks), 'budov', sum(len(v['buildings']) for v in per_chunk.values()), 'adres', len(addr_index),
       'ulic', len(streets), 'míst', len(places), 'sousedů', len(neighbors), 'kB', os.path.getsize('site/overlay.json') // 1000)

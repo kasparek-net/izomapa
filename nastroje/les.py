@@ -1,8 +1,9 @@
 # les podle ortofota ČÚZK: stáhne letecké snímky celé mapy po 2 m/px a z nich masku korun stromů
 # -> build/orto/ (dlaždice), build/orto_cele.jpg, build/les_maska.png + .json (prep.py: kde není koruna, je louka a žádné stromy)
 # spouštět z kořene repa: python nastroje/les.py   (stahuje se jednou, ~1 min na čtverec)
-import sys, os, json, subprocess; sys.path.insert(0, '.')
+import sys, os, json; sys.path.insert(0, '.')
 import numpy as np, geo
+from nastroje.orto import ortofoto
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 D = 'build/orto/'; os.makedirs(D, exist_ok=True)
@@ -15,9 +16,9 @@ for ty in range(0, H, T):
         w, h = min(T, W - tx), min(T, H - ty)
         lo0, la1 = geo.to_lonlat(X0 + tx * M, Y1 - ty * M); lo1, la0 = geo.to_lonlat(X0 + (tx + w) * M, Y1 - (ty + h) * M)
         f = f'{D}{round(X0 + tx * M)}_{round(Y1 - ty * M)}_{w}x{h}.jpg'   # podle polohy: po změně rozsahu mapy se nevezme stará dlaždice
-        if not os.path.exists(f):
-            subprocess.run(['curl', '-s', '-m', '120', '-o', f, 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0'
-                            f'&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:4326&BBOX={la0},{lo0},{la1},{lo1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/jpeg'], check=True)
+        if not ortofoto(f, 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0'
+                        f'&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:4326&BBOX={la0},{lo0},{la1},{lo1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/jpeg'):
+            sys.exit(f'ortofoto se nestáhlo (ČÚZK WMS nedostupná nebo vrátila chybu): {f}, zkus to později')
         big.paste(Image.open(f).convert('RGB'), (tx, ty))
         print('ortofoto', tx, ty, flush=True)
 big.save('build/orto_cele.jpg', quality=85)

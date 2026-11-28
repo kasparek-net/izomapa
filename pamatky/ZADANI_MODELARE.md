@@ -6,6 +6,9 @@ Komunikuj s uživatelem česky a věcně. Než začneš, přečti si celé `pama
 
 ## Role
 
+V Claude Code jsou modelář a rešeršér připravení jako agenti `modelar` a `reserser` (`.claude/agents/`), koordinátor je
+hlavní session (skill `pamatky`). Jinde je spouštěj s tímto zadáním.
+
 - **Koordinátor** (hlavní agent, se kterým uživatel mluví): vybere s uživatelem stavby, připraví podklady, rozdělí práci,
   hlídá kvalitu a úspornost, vyrobí snímky před / po, pustí dashboard a po schválení render. Sám modeluje jen tehdy,
   když nemůže spouštět další agenty (pak jde stavbu po stavbě).

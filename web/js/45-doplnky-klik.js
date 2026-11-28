@@ -14,7 +14,7 @@
       const [ix, iy] = vpToImg(e.position);
       const evt = { x: ix, y: iy, screenX: e.position.x, screenY: e.position.y, originalEvent: e };
       let handled = false;
-      for (const h of pluginClicks) if (h.fn(evt) === true) { handled = true; break; }
+      for (const h of pluginClicks) { let r; try { r = h.fn(evt); } catch (err) { console.error(err); } if (r === true) { handled = true; break; } }
       if (handled || pluginCapture) return;
     }
     if (typeof PLANES !== 'undefined') {

@@ -9,7 +9,7 @@
     }
   });
   // data čtverců (budovy, komíny, silnice, voda) se načítají až při přiblížení, viz loadVisible()
-  const CH = {}, chimneys = [];
+  const CH = {}, CH_ERR = {}, chimneys = [];
   const onChunk = [];
   function loadChunk(k) {
     if (CH[k]) return CH[k].ready;
@@ -20,14 +20,15 @@
       for (const [cx, cy, cid] of d.chimneys) { const id = sid(cid); chimneys.push([cx, cy, cid.split(':')[0], id, rnd(id), rnd(id + 0.5)]); }   // klíč čtverce a náhoda jednou, ne každý snímek
       for (const f of onChunk) f(k, d);
       return CH[k];
-    }).catch(() => null) };
+    }, () => { delete CH[k]; CH_ERR[k] = Date.now(); return null; })   // nestáhlo se: zkusit znovu, ale ne dřív než za 30 s
+      .catch(() => null) };   // chyba při zpracování: znovu nenačítat, část dat už je v globálních seznamech
     return CH[k].ready;
   }
   function loadVisible() {
     const vb = viewer.viewport.getBounds(true);
     if (vb.width > 1.3) return;                         // oddáleno: budovy se neklikají, auta a kouř nejsou vidět
     for (const l of LAYERS) {
-      if (CH[l.key] || !shown(l.key)) continue;
+      if (CH[l.key] || Date.now() - (CH_ERR[l.key] || 0) < 30000 || !shown(l.key)) continue;
       const h = l.w * (l.hrel || 0.56);
       if (l.x < vb.x + vb.width && l.x + l.w > vb.x && l.y < vb.y + vb.height && l.y + h > vb.y) loadChunk(l.key);
     }

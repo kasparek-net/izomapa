@@ -25,7 +25,8 @@ PY
 echo "čtverce s výzdobou: ${PLAN:-žádné}"
 KEEP=""
 for c in $PLAN; do
-  python prep.py $(dir $c) $c > /dev/null 2>&1 && echo "scéna $c"
+  OUT=$(python prep.py $(dir $c) $c 2>&1) || { printf '%s\n' "$OUT" >&2; echo "CHYBA: scéna $c (prep.py), vánoční vrstva se nekreslí" >&2; exit 1; }   # chyba scény = konec, ne render ze staré scény
+  echo "scéna $c"
   ./render_chunk.sh $c xmas_winter xmas_autumn
   D=$( [ "$c" = "0,0" ] && echo build || echo build/c$(echo $c | tr ',' '_') )
   OK=""; for x in xmas_winter xmas_autumn; do ls $D/tiles_$x/*.png > /dev/null 2>&1 && OK="$OK $x"; done      # bez dlaždic (nic ve čtverci) = bez vrstvy
@@ -34,7 +35,7 @@ for c in $PLAN; do
   KEEP="$KEEP $c"
 done
 # z tiles.json pryč vrstvy čtverců, kde už výzdoba není
-[ -f site/tiles.json ] && python - $KEEP <<'PY'
+if [ -f site/tiles.json ]; then python - $KEEP <<'PY'      # if, ne &&: chyba pythonu skript zastaví (set -e)
 import json, sys
 keep = set(sys.argv[1:])
 t = json.load(open('site/tiles.json'))
@@ -45,5 +46,6 @@ clean(t, '0,0')
 for ch in t.get('chunks', {}).values(): clean(ch, f"{ch['chunk'][0]},{ch['chunk'][1]}")
 json.dump(t, open('site/tiles.json', 'w'))
 PY
+fi
 python build_html.py > /dev/null
 echo "Hotovo."

@@ -94,11 +94,13 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'OBEC': json.dumps(M.get('nazev') if je_obec else None, ensure_ascii=False),
         'VLAK': json.dumps({'vychozi': (M.get('vlak') or {}).get('vychozi', 'regionova') if isinstance(M.get('vlak'), dict) else M.get('vlak', 'regionova'), 'linky': M['vlak'].get('linky', {}) if isinstance(M.get('vlak'), dict) else {}}),
         'DOPRAVA_ZDROJ': ', intenzity dopravy © <a href="https://www.rsd.cz/silnice-a-dalnice/scitani-dopravy" target="_blank" rel="noopener">ŘSD ČR</a> (Celostátní sčítání dopravy)' if M.get('doprava') else '',
-        'MESTO_ZDROJ': ', stromy a mobiliář z pasportů města © Město Kopřivnice' if os.path.exists('assets/stromy_mesta.json') else '',
         'ZDROJOVY_KOD': f'<p class="muted"><a href="{E(M["zdrojovy_kod"])}" target="_blank" rel="noopener">Zdrojový kód této mapy</a> (AGPL-3.0).</p>'
                         if M.get('zdrojovy_kod') else '',
         'RUIAN_ZDROJ': ', typy budov z RÚIAN' if os.path.exists('assets/ruian_budovy.json') else '',
         'VITR_ZDROJ': ', ' + ('počasí a vítr' if M.get('pocasi') and M.get('vitr') else 'počasí' if M.get('pocasi') else 'vítr') + ' © <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)' if M.get('vitr') or M.get('pocasi') else '',
+        # další zdroje dat města (mesto.json "dalsi_zdroje": [{"text": "…", "url": "…"}]), např. pasporty a technická mapa města
+        'DALSI_ZDROJE': ''.join(f', <a href="{E(z["url"])}" target="_blank" rel="noopener">{E(z["text"])}</a>' if z.get('url') else f', {E(z["text"])}'
+                                for z in ({'text': z} if isinstance(z, str) else z for z in (M.get('dalsi_zdroje') or []))),
         'PLUHY_ZDROJ': ', sypače zimní údržby © <a href="https://udrzba.rsd.cz/" target="_blank" rel="noopener">ŘSD ČR</a>' if M.get('pluhy', False) else '',
         'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', False) else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'

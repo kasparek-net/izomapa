@@ -26,6 +26,6 @@
     const go = (e) => { if (!HB) return; const r = mini.getBoundingClientRect(), s = HB.width / r.width; viewer.viewport.panTo(new OpenSeadragon.Point(HB.x + (e.clientX - r.left) * s, HB.y + (e.clientY - r.top) * s)); };
     mini.addEventListener('pointerdown', (e) => { drag = true; mini.setPointerCapture(e.pointerId); go(e); });
     mini.addEventListener('pointermove', (e) => { if (drag) go(e); });
-    mini.addEventListener('pointerup', () => { drag = false; });
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) mini.addEventListener(ev, () => { drag = false; });
   }
 

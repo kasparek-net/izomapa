@@ -1,5 +1,6 @@
   // stromy u cest (overlay čtverce): koruny, za kterými se schovají vozidla a lyžaři. Mřížka po 16 m ve světě.
-  const TG = new Map(), tgk = (x, y) => Math.floor(x / 16) + ',' + Math.floor(y / 16);
+  // číselný klíč buňky (jako dzk v 20-souradnice.js): treeShapes a deckShapes projdou 49 buněk při každém volání (víckrát na vozidlo), řetězec by se pokaždé skládal
+  const TG = new Map(), tgc = (i, j) => i * 100003 + j, tgk = (x, y) => tgc(Math.floor(x / 16), Math.floor(y / 16));
   onChunk.push((k, d) => { for (const t of d.trees || []) { const q = tgk(t[0], t[1]); if (!TG.has(q)) TG.set(q, []); TG.get(q).push(t); } });
   // obrysy korun před bodem (x, y, z) v obrazových pixelech: elipsa listnáče, trojúhelník jehličnanu (jako v renderu)
   // stromy před vozidlem: auto se schová přesně za pixely stromu. Kresby stromů jsou z rendereru (site/stromy/<období>.png,
@@ -32,7 +33,7 @@
   }
   function deckShapes(x, y, z, dv, bb, out) {
     const cx = Math.floor(x / 16), cy = Math.floor(y / 16), seen = new Set();
-    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const s of DG.get(i + ',' + j) || []) {
+    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const s of DG.get(tgc(i, j)) || []) {
       if (seen.has(s)) continue; seen.add(s);
       { const ex = s.b[0] - s.a[0], ey = s.b[1] - s.a[1], t = Math.max(0, Math.min(1, ((x - s.a[0]) * ex + (y - s.a[1]) * ey) / ((ex * ex + ey * ey) || 1)));
         const deckZ = s.a[2] + (s.b[2] - s.a[2]) * t;
@@ -91,7 +92,7 @@
   }
   function treeShapes(x, y, z, bb, m = 0) {                     // m = okraj v pixelech obrázku (zaokrouhlení při kreslení)
     const dv = depth(x, y, z), out = [], cx = Math.floor(x / 16), cy = Math.floor(y / 16), A = stromy(), k0 = 0.2 / cam.mpp;
-    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const t of TG.get(i + ',' + j) || []) {   // stromy před vozidlem (k jihozápadu) až ~60 m
+    for (let i = cx - 4; i <= cx + 2; i++) for (let j = cy - 4; j <= cy + 2; j++) for (const t of TG.get(tgc(i, j)) || []) {   // stromy před vozidlem (k jihozápadu) až ~60 m
       const [tx, ty, tz, h, con] = t;
       if (depth(tx, ty, tz) >= dv - 0.3) continue;                               // strom je za vozidlem
       if (A) {                                                                    // přesná kresba stromu

@@ -37,6 +37,8 @@ assets/dominanty.json
 assets/oblasti.json
 assets/doplnky.json
 assets/doplnky/
+# a vše ostatní v assets/ (výstupy nastroje/*.py, vanoce.json, satelit.json…): sdílené ukázky jsou v priklady/
+/assets/*
 
 # hlášení: vlastní konfigurace a hesla serveru
 /wrangler.jsonc
@@ -58,7 +60,6 @@ Fotky k nahrání/
 Satelitni snimky/
 output/
 .env*
-.dev.vars
 *.sql
 *.sqlite
 .vercel/

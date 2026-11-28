@@ -10,7 +10,7 @@ L=build/ctverec_$(echo $c | tr "," "_").log      # chyby nezahazovat: log čtver
 if [ "$c" = "0,0" ]; then B=build; T=site/tiles/summer; else B=build/c$(echo $c | tr "," "_"); T=site/tiles/c$(echo $c | tr "," "_"); fi
 python prep.py $D $c > $L 2>&1 || { echo "CHYBA $c (viz $L)" | tee -a build/render_par.log; exit 1; }
 # render jen změněných čtverců: stejná scéna, podklady i kód renderu jako minule a dlaždice na webu = není co kreslit
-O=$(python nastroje/otisk.py $c)
+O=$(python nastroje/otisk.py $c 2>> $L) && [ -n "$O" ] || { echo "CHYBA otisk $c (viz $L)" | tee -a build/render_par.log; exit 1; }   # prázdný otisk by příště čtverec tiše přeskočil
 if [ -d "$T" ] && [ -f $B/otisk_renderu ] && [ "$(cat $B/otisk_renderu)" = "$O" ]; then
   echo "beze změny $c" | tee -a build/render_par.log; exit 0
 fi

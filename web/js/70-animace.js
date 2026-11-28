@@ -350,7 +350,7 @@
   if ({{MHD}}) fetch('mhd.json' + VER).then((r) => r.json()).then((m) => {
     m.shapes = m.shapes.map((w) => { const len = [0]; for (let i = 1; i < w.length; i++) len.push(len[i - 1] + Math.hypot(w[i][0] - w[i - 1][0], w[i][1] - w[i - 1][1])); return { w, len, L: len[len.length - 1] }; });
     m.dur = m.trips.map((t) => t[4][t[4].length - 2]);
-    m.maxDur = Math.max(...m.dur);
+    m.maxDur = m.dur.reduce((x, d) => Math.max(x, d), 0);   // ne Math.max(...): u velkého GTFS přeteče zásobník
     m.maxWait = m.trips.reduce((x, t) => Math.max(x, t[7] || 0), 0);   // čekání na konečné před odjezdem (mhd.py)
     Object.assign(MHD, m, { on: true });
     stopsReady();
@@ -360,7 +360,7 @@
       .formatToParts(new Date()).map((q) => [q.type, q.value]));
     return { d: +(p.year + p.month + p.day), wd: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.weekday), s: (+p.hour % 24) * 3600 + +p.minute * 60 + +p.second + (Date.now() % 1000) / 1000 };
   };
-  const ymd = (d) => +`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const ymd = (d, k) => { const t = new Date(Date.UTC(Math.floor(d / 1e4), Math.floor(d / 100) % 100 - 1, d % 100 + k)); return t.getUTCFullYear() * 1e4 + (t.getUTCMonth() + 1) * 100 + t.getUTCDate(); };   // pražské datum RRRRMMDD posunuté o k dní
   function mhdServices(d, wd, strict) {                    // služby jízdního řádu platné v daný den
     const on = new Set();
     for (const [id, [days, from, to, add, rem]] of Object.entries(MHD.services)) {
@@ -370,10 +370,10 @@
     return on;
   }
   function mhdActive() {                                   // jedoucí spoje (dnešní i ty, co vyjely včera před půlnocí)
-    const n = pragueNow(), y = new Date(); y.setDate(y.getDate() - 1);
+    const n = pragueNow();
     let today = mhdServices(n.d, n.wd, true);
     if (!MHD.trips.some((t) => today.has(t[2]))) today = mhdServices(n.d, n.wd, false);   // prošlý jízdní řád: aspoň podle dne v týdnu
-    const yest = mhdServices(ymd(y), (n.wd + 6) % 7, false), out = [];
+    const yest = mhdServices(ymd(n.d, -1), (n.wd + 6) % 7, false), out = [];
     for (const [svc, t] of [[today, n.s], [yest, n.s + 86400]]) {
       const T = MHD.trips; let lo = 0, hi = T.length;
       while (lo < hi) { const m = (lo + hi) >> 1; if (T[m][3] < t - MHD.maxDur) lo = m + 1; else hi = m; }
@@ -437,11 +437,10 @@
     }
   }
   function stopDepartures(nid) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
-    const p = pragueNow(), y = new Date(); y.setDate(y.getDate() - 1);
-    const zit = new Date(); zit.setDate(zit.getDate() + 1);
+    const p = pragueNow();
     let today = mhdServices(p.d, p.wd, true);
     if (!MHD.trips.some((t) => today.has(t[2]))) today = mhdServices(p.d, p.wd, false);
-    const yest = mhdServices(ymd(y), (p.wd + 6) % 7, false), tom = mhdServices(ymd(zit), (p.wd + 1) % 7, false), out = [];
+    const yest = mhdServices(ymd(p.d, -1), (p.wd + 6) % 7, false), tom = mhdServices(ymd(p.d, 1), (p.wd + 1) % 7, false), out = [];
     for (const [svc, base] of [[today, 0], [yest, -86400], [tom, 86400]]) for (const t of MHD.trips) {
       if (!svc.has(t[2]) || MHD.routes[t[0]][1] === 2) continue;
       const z = t[6];
